@@ -67,6 +67,18 @@ def increment_gate_block_row(conn: sqlite3.Connection, gate_id: str) -> None:
     )
 
 
+def set_gate_enabled_row(conn: sqlite3.Connection, gate_id: str, enabled: bool) -> bool:
+    cur = conn.execute("UPDATE gates SET enabled = ? WHERE id = ?", (int(enabled), gate_id))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def delete_gate_row(conn: sqlite3.Connection, gate_id: str) -> bool:
+    cur = conn.execute("DELETE FROM gates WHERE id = ?", (gate_id,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
 def upsert_experiment_row(conn: sqlite3.Connection, exp: ExperimentRecord) -> ExperimentRecord:
     conn.execute(
         """

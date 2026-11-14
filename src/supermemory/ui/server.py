@@ -1,4 +1,4 @@
-"""Stdlib HTTP JSON API + SPA Server for the Multi-Project & Tiered SuperMemory Observatory."""
+"""Stdlib HTTP JSON API + SPA Server for the SuperMemory Interactive Management Console."""
 
 from __future__ import annotations
 
@@ -13,17 +13,11 @@ from supermemory.cognitive.federation import (
     ensure_global_memory,
     federated_recall,
     list_registered_workspaces,
-    promote_node_to_global,
 )
-from supermemory.cognitive.tiers import (
-    auto_consolidate_episodic,
-    classify_tier,
-    compute_tier_telemetry,
-    consolidate_nodes,
-)
+from supermemory.cognitive.tiers import classify_tier, compute_tier_telemetry
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.storage.sqlite_store import GraphStore
-from supermemory.sync.markdown_compiler import MarkdownCompiler
+from supermemory.ui.api_actions import dispatch_store_mutation, handle_workspace_action
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -42,7 +36,7 @@ def _resolve_scope_workspace(default_ws: Path, scope_param: str) -> Path:
         return default_ws
     if clean == "global":
         return ensure_global_memory()
-    cand = Path(clean).resolve()
+    cand = Path(clean).expanduser().resolve()
     if cand.is_dir() and ((cand / ".supermemory").is_dir() or (cand / "memory" / "graph_snapshot.json").is_file()):
         return cand
     return default_ws
@@ -138,34 +132,17 @@ def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
             route = parsed.path
             length = int(self.headers.get("Content-Length") or "0")
             body = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
-            ws = _resolve_scope_workspace(default_ws, str(body.get("scope") or "local"))
 
             try:
+                if route == "/api/workspaces/init":
+                    self._send_json(handle_workspace_action(body))
+                    return
+                ws = _resolve_scope_workspace(default_ws, str(body.get("scope") or "local"))
                 with GraphStore(ws) as store:
-                    if route == "/api/consolidate":
-                        out = consolidate_nodes(
-                            store,
-                            source_ids=list(body.get("source_ids") or []),
-                            target_tier=str(body.get("target_tier") or "SEMANTIC"),
-                            title=str(body.get("title") or "Consolidated Memory"),
-                            summary=str(body.get("summary") or ""),
-                            content=str(body.get("content") or ""),
-                        )
-                        MarkdownCompiler(store).compile_all()
-                        self._send_json(out)
-                        return
-
-                    if route == "/api/auto-consolidate":
-                        out = auto_consolidate_episodic(store, min_cluster_size=int(body.get("min_cluster_size") or 2))
-                        MarkdownCompiler(store).compile_all()
-                        self._send_json(out)
-                        return
-
-                    if route == "/api/promote":
-                        out = promote_node_to_global(store, str(body["node_id"]))
-                        MarkdownCompiler(store).compile_all()
-                        self._send_json(out)
-                        return
+                    result = dispatch_store_mutation(route, store, body)
+                if result is not None:
+                    self._send_json(result)
+                    return
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
                 return
@@ -195,9 +172,9 @@ def create_http_server(workspace_root: Path, host: str = "127.0.0.1", port: int 
 
 
 def run_ui_server(workspace_root: Path, host: str = "127.0.0.1", port: int = 8765) -> int:
-    """Start blocking Graph Observatory Web UI server."""
+    """Start blocking SuperMemory Interactive Management Console server."""
     srv, actual_port = create_http_server(workspace_root, host=host, port=port)
-    print(f"🧠 SuperMemory v2.0 Multi-Project & Tiered Observatory live at: http://{host}:{actual_port}")
+    print(f"🧠 SuperMemory v2.1 Interactive Management Console live at: http://{host}:{actual_port}")
     print(f"   Default Workspace: {workspace_root.resolve()}")
     print("   Press Ctrl+C to stop.")
     try:

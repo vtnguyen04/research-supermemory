@@ -10,9 +10,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from supermemory.models import CodeGate, ExperimentRecord, MemoryEdge, MemoryNode, utc_now_iso
 from supermemory.storage.ledger_ops import (
+    delete_gate_row,
     increment_gate_block_row,
     list_experiment_rows,
     list_gate_rows,
+    set_gate_enabled_row,
     upsert_experiment_row,
     upsert_gate_row,
 )
@@ -110,6 +112,15 @@ class GraphStore:
         row = self.conn.execute("SELECT * FROM nodes WHERE id = ?", (node_id,)).fetchone()
         return self._row_to_node(row) if row else None
 
+    def delete_node(self, node_id: str) -> bool:
+        self.conn.execute("DELETE FROM edges WHERE source_id = ? OR target_id = ?", (node_id, node_id))
+        self.conn.execute("DELETE FROM experiments WHERE exp_id = ?", (node_id,))
+        cur = self.conn.execute("DELETE FROM nodes WHERE id = ?", (node_id,))
+        if cur.rowcount > 0:
+            self._append_event("NODE_DELETED", node_id, f"Deleted node {node_id}")
+        self.conn.commit()
+        return cur.rowcount > 0
+
     def list_nodes(
         self,
         node_types: Optional[Sequence[str]] = None,
@@ -191,6 +202,18 @@ class GraphStore:
 
     def list_gates(self, enabled_only: bool = False) -> List[CodeGate]:
         return list_gate_rows(self.conn, enabled_only=enabled_only)
+
+    def set_gate_enabled(self, gate_id: str, enabled: bool) -> bool:
+        ok = set_gate_enabled_row(self.conn, gate_id, enabled)
+        if ok:
+            self.log_event("GATE_TOGGLED", gate_id, f"Gate {gate_id} -> enabled={enabled}")
+        return ok
+
+    def delete_gate(self, gate_id: str) -> bool:
+        ok = delete_gate_row(self.conn, gate_id)
+        if ok:
+            self.log_event("GATE_DELETED", gate_id, f"Deleted gate {gate_id}")
+        return ok
 
     def record_gate_block(self, gate_id: str, detail: str) -> None:
         increment_gate_block_row(self.conn, gate_id)

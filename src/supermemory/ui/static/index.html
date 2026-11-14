@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SuperMemory Observatory — Tiered Cognitive Graph & Global/Local Federation</title>
+  <title>SuperMemory Observatory &amp; Console — Quản lý Đồ thị Nhận thức 4 Tầng &amp; Global/Local Memory</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -11,38 +11,44 @@
     <div class="brand">
       <div class="brand-badge">SM</div>
       <div>
-        <h1 id="project-title">SuperMemory Observatory</h1>
+        <h1 id="project-title">SuperMemory Console</h1>
         <p id="active-goal-line" class="subtitle">Loading active state...</p>
       </div>
     </div>
     <div class="topbar-controls">
-      <select id="workspace-switcher" class="select-input" title="Switch between Local Project Folders & Global SuperMemory"></select>
+      <select id="workspace-switcher" class="select-input" title="Chuyển đổi giữa các dự án Local & Global SuperMemory"></select>
+      <button id="btn-open-init" class="btn-ghost" title="Khởi tạo dự án mới hoặc Import ZALOAI">+ Dự án</button>
+      <button id="btn-open-state" class="btn-ghost" title="Cập nhật Mục tiêu & Trạng thái hiện tại (L0 Working)">🎯 State</button>
+      <button id="btn-open-quick-node" class="btn-ghost" title="Tạo nhanh Quy trình (L1) hoặc Tri thức (L2)">+ Tri thức</button>
+      <button id="btn-run-audit" class="btn-ghost" title="Quét toàn bộ dự án với các CodeGate đang bật">🔍 Audit</button>
+      <button id="btn-handoff" class="btn-ghost" title="Xuất HANDOFF_BRIEFING.md chống quên khi đổi Agent / Compact">🤝 Handoff</button>
       <div class="search-box">
-        <input id="global-search" type="search" placeholder="Federated Recall (Local + Global BM25 & 2-hop graph)..." />
-        <button id="btn-clear-search" class="btn-ghost" title="Clear filter">✕</button>
+        <input id="global-search" type="search" placeholder="Tìm kiếm liên thông Local + Global (BM25 + 2-hop)..." />
+        <button id="btn-clear-search" class="btn-ghost" title="Xóa tìm kiếm">✕</button>
       </div>
-      <button id="btn-refresh" class="btn-primary">↻ Sync Live</button>
+      <button id="btn-refresh" class="btn-primary">↻ Đồng bộ</button>
     </div>
   </header>
 
+  <div id="toast-bar" class="toast hidden"></div>
   <section id="anti-repeat-banner" class="warning-banner hidden"></section>
 
   <section class="kpi-strip" id="kpi-strip">
-    <div class="kpi-card"><span class="kpi-label">Graph Entities</span><strong id="kpi-nodes">0</strong></div>
-    <div class="kpi-card accent-emerald"><span class="kpi-label">L1 Procedural (Laws/Gates)</span><strong id="kpi-procedural">0</strong></div>
-    <div class="kpi-card accent-sky"><span class="kpi-label">L2 Semantic (Insights)</span><strong id="kpi-semantic">0</strong></div>
-    <div class="kpi-card accent-violet"><span class="kpi-label">L3 Episodic (Exps/Logs)</span><strong id="kpi-episodic">0</strong></div>
-    <div class="kpi-card accent-cyan"><span class="kpi-label">Gate Blocks Prevented</span><strong id="kpi-blocks">0</strong></div>
-    <div class="kpi-card accent-amber"><span class="kpi-label">Prompt Token Budget</span><strong id="kpi-tokens">0 tok</strong></div>
+    <div class="kpi-card"><span class="kpi-label">Tổng Node</span><strong id="kpi-nodes">0</strong></div>
+    <div class="kpi-card accent-emerald"><span class="kpi-label">L1 Procedural (Luật/Gate)</span><strong id="kpi-procedural">0</strong></div>
+    <div class="kpi-card accent-sky"><span class="kpi-label">L2 Semantic (Insight)</span><strong id="kpi-semantic">0</strong></div>
+    <div class="kpi-card accent-violet"><span class="kpi-label">L3 Episodic (Log/Exp)</span><strong id="kpi-episodic">0</strong></div>
+    <div class="kpi-card accent-cyan"><span class="kpi-label">Vi phạm đã chặn</span><strong id="kpi-blocks">0</strong></div>
+    <div class="kpi-card accent-amber"><span class="kpi-label">Prompt Capsule</span><strong id="kpi-tokens">0 tok</strong></div>
   </section>
 
   <nav class="tab-bar">
-    <button class="tab-btn active" data-tab="tab-graph">🕸 Knowledge Graph</button>
-    <button class="tab-btn" data-tab="tab-tiers">🧬 Cognitive Tiers & Merge Memory</button>
-    <button class="tab-btn" data-tab="tab-constitution">🛡 Laws, Mistakes & Gates</button>
-    <button class="tab-btn" data-tab="tab-experiments">🧪 Scientific Experiments</button>
-    <button class="tab-btn" data-tab="tab-lifecycle">📋 Proposals & Idea Vault</button>
-    <button class="tab-btn" data-tab="tab-events">⚡ Event Stream</button>
+    <button class="tab-btn active" data-tab="tab-graph">🕸 Đồ thị Tri thức</button>
+    <button class="tab-btn" data-tab="tab-tiers">🧬 Gộp Memory & 4 Tầng</button>
+    <button class="tab-btn" data-tab="tab-constitution">🛡 Luật, Bài học & Gates</button>
+    <button class="tab-btn" data-tab="tab-experiments">🧪 Thí nghiệm Khoa học</button>
+    <button class="tab-btn" data-tab="tab-lifecycle">📋 Proposals & Kho Ý tưởng</button>
+    <button class="tab-btn" data-tab="tab-events">⚡ Nhật ký Sự kiện</button>
   </nav>
 
   <main class="workspace-grid">
@@ -53,81 +59,94 @@
           <div id="tier-filters" class="filter-pills"></div>
           <div id="type-filters" class="filter-pills"></div>
           <div class="graph-actions">
-            <button id="btn-relayout" class="btn-ghost">⟳ Re-layout</button>
-            <button id="btn-reset-zoom" class="btn-ghost">⛶ Fit View</button>
+            <button id="btn-relayout" class="btn-ghost">⟳ Sắp xếp lại</button>
+            <button id="btn-reset-zoom" class="btn-ghost">⛶ Vừa khung</button>
           </div>
         </div>
         <div class="canvas-wrap">
           <canvas id="graph-canvas"></canvas>
           <div id="graph-tooltip" class="graph-tooltip hidden"></div>
           <div class="graph-legend">
-            <span>L1 Procedural (Laws/Procedures/Gates) • L2 Semantic (Insights/Ideas) • L3 Episodic (Experiments/Lessons)</span>
+            <span>Bấm vào node bất kỳ để Xem / Sửa trực tiếp / Nối cạnh / Đưa lên Global / Xóa ở cột bên phải</span>
           </div>
         </div>
       </section>
 
-      <!-- TAB 2: COGNITIVE TIERS & INTERACTIVE MEMORY CONSOLIDATION / MERGE STUDIO -->
+      <!-- TAB 2: COGNITIVE TIERS & INTERACTIVE MERGE STUDIO -->
       <section id="tab-tiers" class="tab-panel">
         <div class="merge-banner">
           <div>
-            <h2 class="section-heading">🧠 4-Tier Cognitive Hierarchy & Anti-Overload Consolidation Studio</h2>
-            <p id="tier-budget-summary" class="muted">Progressive disclosure keeps Agent prompt ultra-lean while storing unlimited episodic history.</p>
+            <h2 class="section-heading">🧠 Quản lý 4 Tầng Nhận thức & Phòng Gộp Memory (Chống ngộp Context)</h2>
+            <p id="tier-budget-summary" class="muted">Progressive Disclosure giữ prompt luôn gọn nhẹ dưới 850 tokens.</p>
           </div>
-          <button id="btn-auto-consolidate" class="btn-ghost">⚡ Auto-Consolidate Episodic Clusters</button>
+          <div class="action-row">
+            <label class="chk-inline"><input type="checkbox" id="chk-hide-consolidated" checked /> Ẩn mảnh đã gộp</label>
+            <button id="btn-select-episodic" class="btn-ghost">☑ Chọn L3 chưa gộp</button>
+            <button id="btn-clear-merge-sel" class="btn-ghost">✕ Bỏ chọn</button>
+            <button id="btn-auto-consolidate" class="btn-primary">⚡ Tự động Gộp theo Cụm</button>
+          </div>
         </div>
 
         <div class="merge-form-card">
           <div class="merge-row">
-            <input id="merge-title" class="text-input" placeholder="Distilled Memory Title (e.g. 'Unified Retrieval Latency & Caching Invariants')..." />
+            <input id="merge-title" class="text-input" placeholder="Tiêu đề tri thức sau khi gộp (VD: 'Quy chuẩn tối ưu bộ nhớ đệm & latency')..." />
             <select id="merge-tier" class="select-input">
-              <option value="SEMANTIC">Target: L2 SEMANTIC (Distilled Domain Knowledge)</option>
-              <option value="PROCEDURAL">Target: L1 PROCEDURAL (Reusable Playbook / Rule)</option>
+              <option value="SEMANTIC">Đích: L2 SEMANTIC (Tri thức đúc kết)</option>
+              <option value="PROCEDURAL">Đích: L1 PROCEDURAL (Quy trình / Luật thực thi)</option>
             </select>
-            <button id="btn-merge-selected" class="btn-primary">🧬 Gộp Memory đã chọn (0)</button>
+            <button id="btn-merge-selected" class="btn-primary">🧬 Gộp các mục đã chọn (0)</button>
           </div>
-          <textarea id="merge-summary" class="text-area" rows="2" placeholder="Synthesized insight / procedural rule distilled from the selected nodes..."></textarea>
+          <textarea id="merge-summary" class="text-area" rows="2" placeholder="Nội dung tổng hợp / nguyên tắc cốt lõi rút ra từ các mảnh được chọn..."></textarea>
           <p id="merge-feedback" class="muted"></p>
         </div>
 
         <div class="tier-columns" id="tier-columns"></div>
       </section>
 
-      <!-- TAB 3: LAWS, LESSONS & GATES -->
+      <!-- TAB 3: LAWS, LESSONS & GATES MANAGEMENT -->
       <section id="tab-constitution" class="tab-panel">
+        <div class="action-header">
+          <h2 class="section-heading">⚖️ Quản trị Hiến pháp (LAWs), Bài học Tự học & Chốt chặn CodeGate</h2>
+          <div class="action-row">
+            <button id="btn-add-lesson" class="btn-primary">+ Ghi Bài học / Thêm Rule mới</button>
+            <button id="btn-add-gate" class="btn-ghost">+ Tạo CodeGate / Khóa SHA-256</button>
+          </div>
+        </div>
         <div class="two-col">
           <div>
-            <h2 class="section-heading">⚖️ Anti-Regression Constitution (LAWs)</h2>
+            <h3 class="sub-heading">📜 Luật Bất biến & Quy trình (L1 Procedural)</h3>
             <div id="laws-list" class="card-stack"></div>
           </div>
           <div>
-            <h2 class="section-heading">🛡 PreToolUse Executable CodeGates</h2>
+            <h3 class="sub-heading">🛡 Chốt chặn PreToolUse (Bật/Tắt/Xóa trực tiếp)</h3>
             <div id="gates-list" class="card-stack"></div>
-            <h2 class="section-heading mt-lg">🔥 Mistakes & Lessons Consolidated</h2>
+            <h3 class="sub-heading mt-lg">🔥 Sổ cái Sai lầm & Bài học đã Gộp</h3>
             <div id="lessons-list" class="card-stack"></div>
           </div>
         </div>
       </section>
 
-      <!-- TAB 4: EXPERIMENTS & METRIC LINEAGE -->
+      <!-- TAB 4: SCIENTIFIC EXPERIMENTS -->
       <section id="tab-experiments" class="tab-panel">
         <div class="exp-header">
-          <h2 class="section-heading">📈 Monotonic Metric Progression & Hypothesis Ledger</h2>
-          <select id="exp-track-filter" class="select-input">
-            <option value="ALL">All Tracks</option>
-          </select>
+          <h2 class="section-heading">📈 Sổ cái Thí nghiệm Đơn biến & Đường cong Điểm số</h2>
+          <div class="action-row">
+            <select id="exp-track-filter" class="select-input"><option value="ALL">Tất cả Track</option></select>
+            <button id="btn-add-exp" class="btn-primary">+ Log Thí nghiệm mới</button>
+          </div>
         </div>
         <div id="exp-chart-box" class="chart-box"></div>
         <div class="table-wrap">
           <table class="data-table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th>Mã EXP</th>
                 <th>Track</th>
-                <th>Title & Single-Variable Diff</th>
+                <th>Tiêu đề & Biến thay đổi duy nhất</th>
                 <th>CV Metric</th>
                 <th>Test / LB</th>
                 <th>Δ Baseline</th>
-                <th>Verdict</th>
+                <th>Kết luận</th>
               </tr>
             </thead>
             <tbody id="exp-table-body"></tbody>
@@ -135,38 +154,56 @@
         </div>
       </section>
 
-      <!-- TAB 5: LIFECYCLE KANBAN & IDEA VAULT -->
+      <!-- TAB 5: PROPOSALS KANBAN & IDEA VAULT -->
       <section id="tab-lifecycle" class="tab-panel">
-        <h2 class="section-heading">📋 OpenSpec Proposal Lifecycle Pipeline</h2>
+        <div class="action-header">
+          <h2 class="section-heading">📋 Vòng đời OpenSpec Proposal (Chuyển bước & Duyệt trực tiếp)</h2>
+          <div class="action-row">
+            <button id="btn-add-proposal" class="btn-primary">+ Tạo Proposal mới</button>
+            <button id="btn-add-idea" class="btn-ghost">+ Thêm Idea / Thuật toán / Dead-End</button>
+          </div>
+        </div>
         <div id="proposal-kanban" class="kanban-board"></div>
-        <h2 class="section-heading mt-lg">💡 Idea, Algorithm & Dead-End Vault (Anti-Repeat Memory)</h2>
+        <h2 class="section-heading mt-lg">💡 Kho Ý tưởng, Thuật toán & Vết xe đổ (Anti-Repeat Vault)</h2>
         <div id="ideas-grid" class="ideas-grid"></div>
       </section>
 
       <!-- TAB 6: LIVE HARNESS EVENT STREAM -->
       <section id="tab-events" class="tab-panel">
-        <h2 class="section-heading">⚡ Immutable Harness & Self-Learning Telemetry</h2>
+        <h2 class="section-heading">⚡ Dòng sự kiện Bất biến của Harness & Self-Learning</h2>
         <div id="events-list" class="card-stack"></div>
       </section>
     </div>
 
-    <!-- RIGHT INSPECTOR DRAWER -->
+    <!-- RIGHT INSPECTOR & INLINE CRUD DRAWER -->
     <aside id="inspector-drawer" class="inspector">
       <div class="inspector-header">
         <div>
-          <span id="insp-badge" class="type-badge">SELECT NODE</span>
-          <h3 id="insp-id">Graph Inspector</h3>
+          <span id="insp-badge" class="type-badge">CHỌN NODE</span>
+          <h3 id="insp-id"> Thanh tra & Chỉnh sửa Node</h3>
         </div>
-        <button id="btn-close-inspector" class="btn-ghost" title="Clear selection">✕</button>
+        <button id="btn-close-inspector" class="btn-ghost" title="Đóng chọn">✕</button>
       </div>
       <div id="insp-body" class="inspector-body">
-        <p class="muted">Click any node in the Graph, Cognitive Tier column, Law card, or Experiment row to inspect full details, jump across connected edges, or Promote a Local insight up to Global SuperMemory.</p>
+        <p class="muted">Bấm vào bất kỳ Node nào trên Đồ thị, Cột 4 Tầng, Luật, Proposal hoặc Thí nghiệm để Xem chi tiết, <strong>Sửa trực tiếp</strong>, <strong>Nối cạnh đồ thị</strong>, <strong>Promote lên Global</strong> hoặc <strong>Xóa</strong>.</p>
       </div>
     </aside>
   </main>
 
+  <!-- UNIVERSAL MANAGEMENT MODAL -->
+  <div id="studio-modal" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-title">Thao tác</h3>
+        <button id="btn-close-modal" class="btn-ghost">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
   <script src="/graph_canvas.js"></script>
   <script src="/merge_studio.js"></script>
+  <script src="/studio_actions.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
