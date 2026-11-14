@@ -2,7 +2,7 @@
   "$schema": "https://antigravity.google/schemas/plugin.json",
   "name": "supermemory",
   "displayName": "SuperMemory Harness",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Federated Local+Global 4-Tier Cognitive Knowledge Graph, Agent-Native Semantic Self-Learning Harness, PreToolUse CodeGates, Scientific Experiment Registry & Interactive Merge Studio.",
   "author": {
     "name": "SuperMemory Engineering"

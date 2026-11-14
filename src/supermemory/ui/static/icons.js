@@ -1,4 +1,4 @@
-// Crisp 1.5px Geometric Line Icons & Semantic Status Helpers (Zero Emojis)
+// Crisp 1.5px Geometric Line Icons, Semantic Status Helpers & Shared Pagination (Zero Emojis)
 (function () {
   const esc = (val) =>
     String(val ?? "")
@@ -53,20 +53,40 @@
   function statusTag(rawStatus, labelOverride = "") {
     const code = String(rawStatus || "ACTIVE").toUpperCase();
     const label = labelOverride || code;
-    let cls = "status-tag";
-    let icon = "dot";
-    if (OK_SET.has(code)) {
-      cls += " status-ok";
-      icon = "check";
-    } else if (WARN_SET.has(code)) {
-      cls += " status-warn";
-      icon = "warn";
-    } else if (ERR_SET.has(code)) {
-      cls += " status-err";
-      icon = "x";
-    }
+    let cls = "status-tag", icon = "dot";
+    if (OK_SET.has(code)) { cls += " status-ok"; icon = "check"; }
+    else if (WARN_SET.has(code)) { cls += " status-warn"; icon = "warn"; }
+    else if (ERR_SET.has(code)) { cls += " status-err"; icon = "x"; }
     return `<span class="${cls}"><span class="status-icon" aria-hidden="true">${svg(icon, 12)}</span><span>${esc(label)}</span></span>`;
   }
 
-  window.SuperMemoryIcons = { svg, hydrateIcons, statusTag, esc };
+  const pageMap = {};
+  function paginate(items, key, perPage = 5) {
+    const total = items.length;
+    const pages = Math.max(1, Math.ceil(total / perPage));
+    const cur = Math.min(pages, Math.max(1, pageMap[key] || 1));
+    pageMap[key] = cur;
+    const start = (cur - 1) * perPage;
+    const slice = items.slice(start, start + perPage);
+    if (total <= perPage) return { slice, html: "" };
+    const html = `<nav class="pager-bar" aria-label="Phân trang ${esc(key)}">
+      <span class="pager-info">${start + 1}&ndash;${Math.min(total, start + perPage)} / ${total}</span>
+      <div class="pager-btns">
+        <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur - 1}" ${cur <= 1 ? "disabled" : ""}>Trước</button>
+        <span class="pager-num">Trang ${cur}/${pages}</span>
+        <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur + 1}" ${cur >= pages ? "disabled" : ""}>Sau</button>
+      </div></nav>`;
+    return { slice, html };
+  }
+
+  function bindPagers(root, onRerender) {
+    root.querySelectorAll("[data-page-key]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        pageMap[btn.getAttribute("data-page-key")] = Number(btn.getAttribute("data-page-to")) || 1;
+        onRerender();
+      });
+    });
+  }
+
+  window.SuperMemoryIcons = { svg, hydrateIcons, statusTag, esc, paginate, bindPagers };
 })();

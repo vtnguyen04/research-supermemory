@@ -205,6 +205,12 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         assert "<dialog" in html
         assert "skip-link" in html
         assert "inspector-backdrop" in html
+        assert "canvas-viewport" in html
+        for gmode in ("FORCE", "RADIAL", "LANES"):
+            assert f'data-gmode="{gmode}"' in html
+        assert "paginate(" in fetched["/views.js"] and "paginate(" in fetched["/merge_studio.js"]
+        assert ".pager-bar" in css
+        assert not re.search(r"repeat\(\s*[5-9]\s*,\s*minmax\(", css)
         assert ":focus-visible" in css
         assert "font-variant-numeric: tabular-nums" in css
         assert "--bg-canvas: #F5F4F0" in css and "--sp-4: 1rem" in css

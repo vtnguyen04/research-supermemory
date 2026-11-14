@@ -30,20 +30,18 @@ def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True
     )
 
     core_rule_body = (
-        f"# 🧠 {proj.upper()} — MANDATORY SUPERMEMORY HARNESS & CONSTITUTION\n\n"
-        f"> **⚠️ CRITICAL EVERY-TURN PROTOCOL (COMPACTION & MULTI-AGENT PROOF):**\n"
-        f"> Before proposing or editing any code, ALWAYS read:\n"
-        f"> 1. [01_ACTIVE_STATE.md](file://{state_uri}) (Live goals, phase & next steps)\n"
-        f"> 2. [02_CONSTITUTION_AND_LESSONS.md](file://{const_uri}) (`< 200` lines — read 100% in ONE call!)\n"
-        f"> 3. Query prior ideas/experiments/mistakes via `supermemory recall \"<topic>\"` (or MCP `supermemory_recall`).\n\n"
+        f"# 🧠 {proj.upper()} — SUPERMEMORY CONSTITUTION & ZERO-OVERHEAD HARNESS\n\n"
+        f"> **⚡ FAST ZERO-OVERHEAD PROTOCOL (NO TURN-SPAM):**\n"
+        f"> - `SessionStart` already injects your active capsule. On normal Q&A, chat clarifications, or read-only turns, **do NOT** re-read memory files or call `supermemory_*` tools — reply directly!\n"
+        f"> - **Before non-trivial code edits or new proposals**, read [01_ACTIVE_STATE.md](file://{state_uri}), [02_CONSTITUTION_AND_LESSONS.md](file://{const_uri}), and query `supermemory_recall`.\n\n"
         f"---\n\n"
         f"## ⚖️ 1. Non-Negotiable Constitutional Laws (Enforced by PreToolUse & Audit Gates)\n\n"
         f"{law_bullets}\n\n"
         f"---\n\n"
-        f"## 🔄 2. Cognitive Tiers, Semantic Self-Triage & Federated Loop\n\n"
-        f"1. **Federated Progressive Recall (`L1 PROCEDURAL` + `L2 SEMANTIC`):** Query `supermemory recall \"<topic>\"` (`supermemory_recall`) before proposing/coding. Raw `L3 EPISODIC` logs stay paged on disk so context never bloats.\n"
-        f"2. **Agent-Native Semantic Self-Triage (Every Turn):** Use YOUR semantic comprehension (never wait for magic keywords): autonomously persist any subtle/explicit user critique (`supermemory_record_lesson` + `CodeGate`), new rule/preference (`scope='local'` or `'global'`), failed experiment/insight (`supermemory_log_experiment` with `insights` -> [03_EXPERIMENTS_REGISTRY.md](file://{exp_uri})), or state update; if pure read-only Q&A, call `supermemory_checkpoint`.\n"
-        f"3. **Spec-First & Clean Code (`< {max_lines}` lines/file):** Track non-trivial work via `PROPOSAL` (`PROPOSED -> ... -> AUDITED -> ARCHIVED`), consolidate episodic clusters via `supermemory consolidate`, and keep [00_MEMORY_GRAPH.md](file://{graph_uri}) & `01_ACTIVE_STATE.md` synced atomically.\n"
+        f"## 🔄 2. Selective High-Signal Memory Loop (Anti-Spam)\n\n"
+        f"1. **Progressive Recall (`L1 PROCEDURAL` + `L2 SEMANTIC`):** Query `supermemory_recall` before proposing/coding non-trivial features so falsified dead-ends are never repeated.\n"
+        f"2. **Selective Self-Learning (Never Spam on Casual Chat):** Call `supermemory_record_lesson` (+ `CodeGate`) **ONLY** for explicit user rules/preferences (`scope='local'` or `'global'`) or genuine technical bug post-mortems — NEVER on casual clarifications. Log real benchmarks via `supermemory_log_experiment` ([03_EXPERIMENTS_REGISTRY.md](file://{exp_uri})).\n"
+        f"3. **Clean Code (`< {max_lines}` lines/file) & Full-Tab UI Visual Audit:** Keep [00_MEMORY_GRAPH.md](file://{graph_uri}) & `01_ACTIVE_STATE.md` synced on milestone completions, and visually inspect ALL UI tabs/viewports after any frontend change.\n"
     )
 
     written: Dict[str, str] = {}

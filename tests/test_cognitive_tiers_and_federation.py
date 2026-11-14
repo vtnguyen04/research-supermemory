@@ -62,27 +62,31 @@ def test_zero_regex_semantic_turn_attestation_and_live_rule_sync(tmp_path: Path,
     init_workspace(proj, project_name="SemanticProj")
     conv = "conv-sem-1"
 
-    # Subtle phrasing with ZERO regex scolding/rule keywords!
-    subtle_msg = "Ủa sao chỗ tính điểm lại dùng print trực tiếp thế nhỉ, nhìn log rối quá."
-    pre = dispatch_hook(
+    # 1. Normal chat / clarification ("tao đã cho mày edit đâu?") MUST have zero overhead & Stop immediately allows!
+    casual_msg = "tao đã cho mày edit đâu?"
+    pre_casual = dispatch_hook(
         "PreInvocation",
-        {"conversationId": conv, "workspacePaths": [str(proj)], "invocationNum": 1, "initialNumSteps": 4, "lastUserInput": subtle_msg},
+        {"conversationId": conv, "workspacePaths": [str(proj)], "invocationNum": 1, "initialNumSteps": 4, "lastUserInput": casual_msg},
     )
-    assert "SEMANTIC MEMORY TRIAGE ACTIVE" in pre["injectSteps"][0]["systemMessage"]["systemMessage"]
+    assert pre_casual == {}
+    stop_casual = dispatch_hook(
+        "Stop",
+        {"conversationId": conv, "workspacePaths": [str(proj)], "continuationActive": False, "terminationReason": "NO_TOOL_CALL"},
+    )
+    assert stop_casual["decision"] == "allow"
 
-    # Agent forgets to call any supermemory_* tool -> Stop hook catches it without needing regex!
+    # 2. Explicit rule ("Lưu vào lesson...") triggers pending_lesson_lock -> Stop blocks until saved -> live-syncs AGENTS.md + PreToolUse Gate!
+    dispatch_hook(
+        "PreInvocation",
+        {"conversationId": conv, "workspacePaths": [str(proj)], "invocationNum": 2, "initialNumSteps": 8, "lastUserInput": "Lưu vào lesson: cấm dùng print trực tiếp ra stdout trong pipeline tính điểm!"},
+    )
     stop_1 = dispatch_hook(
         "Stop",
         {"conversationId": conv, "workspacePaths": [str(proj)], "continuationActive": False, "terminationReason": "NO_TOOL_CALL"},
     )
     assert stop_1["decision"] == "continue"
-    assert "SEMANTIC TURN-ATTESTATION REQUIRED" in stop_1["reason"]
+    assert "SELF-LEARNING COMMIT REQUIRED" in stop_1["reason"]
 
-    # Next turn: Agent proactively saves the subtle rule via MCP -> auto-updates AGENTS.md + PreToolUse Gate!
-    dispatch_hook(
-        "PreInvocation",
-        {"conversationId": conv, "workspacePaths": [str(proj)], "invocationNum": 2, "initialNumSteps": 8, "lastUserInput": "Nhớ dùng logger chuẩn nhé, đừng in bừa ra stdout."},
-    )
     execute_mcp_tool(
         "supermemory_record_lesson",
         {

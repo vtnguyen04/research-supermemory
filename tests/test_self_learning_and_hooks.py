@@ -38,6 +38,14 @@ def test_bilingual_self_learning_detector() -> None:
     assert s4.requires_state_sync is True
     assert s4.category == "ARCHITECTURE_SPEC"
 
+    # Casual turn clarifications and normal technical "why" questions must NEVER spam lessons!
+    s5 = SelfLearningDetector.analyze("tao đã cho mày edit đâu?")
+    assert s5.requires_lesson is False
+    assert s5.requires_state_sync is False
+
+    s6 = SelfLearningDetector.analyze("Tại sao lại dùng thuật toán BM25 ở bước truy vấn này?")
+    assert s6.requires_lesson is False
+
 
 def test_pre_tool_use_gates_and_frozen_sha256(tmp_path: Path) -> None:
     init_workspace(tmp_path, project_name="GateTest", max_lines=300)

@@ -1,4 +1,4 @@
-// Main State Container & Accessible Daylight Studio Controller
+// Main State Container & Accessible Multi-Mode Studio Controller
 (function () {
   const { hydrateIcons, esc } = window.SuperMemoryIcons;
   const { ForceGraphCanvas } = window.SuperMemoryGraph;
@@ -8,8 +8,8 @@
   const Views = window.SuperMemoryViews;
 
   let state = { nodes: [], edges: [], gates: [], experiments: [], events: [], meta: {}, analytics: {}, cognitive_tiers: {}, workspaces: [] };
-  let currentScope = "local", activeTier = "ALL", activeType = "ALL";
-  let graphView = null, inspector = null, mergeStudio = null, modals = null, toastTimer = null;
+  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null;
+  let graphView = null, inspector = null, mergeStudio = null, modals = null;
 
   function toast(msg, isError = false) {
     const el = document.getElementById("toast-region");
@@ -60,7 +60,10 @@
       Views.renderExperiments(state, handlers);
       Views.renderLifecycle(state, handlers);
       Views.renderEvents(state, handlers);
-      const qInspect = new URLSearchParams(window.location.search).get("inspect");
+      const qs = new URLSearchParams(window.location.search);
+      const qMode = qs.get("mode");
+      if (qMode && ["FORCE", "RADIAL", "LANES"].includes(qMode.toUpperCase())) setGraphMode(qMode.toUpperCase());
+      const qInspect = qs.get("inspect");
       if (qInspect && !inspector.selectedId) { graphView.selectedId = qInspect; inspector.inspect(qInspect); }
     } catch (err) {
       errStrip.classList.remove("hidden");
@@ -105,28 +108,21 @@
   }
 
   function renderGraphToolbar() {
-    const tc = ((state.cognitive_tiers || {}).counts_by_tier) || {};
-    const total = (state.nodes || []).length;
-    const segs = [
-      ["ALL", `Tất cả (${total})`],
-      ["PROCEDURAL", `L1 Hiến pháp (${tc.PROCEDURAL || 0})`],
-      ["SEMANTIC", `L2 Tri thức (${tc.SEMANTIC || 0})`],
-      ["EPISODIC", `L3 Thực nghiệm (${tc.EPISODIC || 0})`],
-    ];
+    const tc = ((state.cognitive_tiers || {}).counts_by_tier) || {}, total = (state.nodes || []).length;
+    const segs = [["ALL", `Tất cả (${total})`], ["PROCEDURAL", `L1 (${tc.PROCEDURAL || 0})`], ["SEMANTIC", `L2 (${tc.SEMANTIC || 0})`], ["EPISODIC", `L3 (${tc.EPISODIC || 0})`]];
     const tray = document.getElementById("tier-filters");
     tray.innerHTML = segs.map(([k, lbl]) => `<button type="button" class="seg-btn" aria-pressed="${activeTier === k}" data-tier="${k}">${esc(lbl)}</button>`).join("");
     tray.querySelectorAll("[data-tier]").forEach((btn) => btn.addEventListener("click", () => {
-      activeTier = btn.getAttribute("data-tier");
-      renderGraphToolbar();
-      graphView.setFilter(activeTier, activeType);
+      activeTier = btn.getAttribute("data-tier"); renderGraphToolbar(); graphView.setFilter(activeTier, activeType);
     }));
-
-    const sel = document.getElementById("type-filter-select");
-    const nc = (state.analytics || {}).nodes_by_type || {};
-    const keys = Object.keys(nc).sort();
+    const sel = document.getElementById("type-filter-select"), nc = (state.analytics || {}).nodes_by_type || {}, keys = Object.keys(nc).sort();
     if (activeType !== "ALL" && !nc[activeType]) activeType = "ALL";
-    sel.innerHTML = `<option value="ALL">Tất cả loại thực thể (${total})</option>` +
-      keys.map((k) => `<option value="${esc(k)}" ${activeType === k ? "selected" : ""}>${esc(k)} (${nc[k]})</option>`).join("");
+    sel.innerHTML = `<option value="ALL">Tất cả loại (${total})</option>` + keys.map((k) => `<option value="${esc(k)}" ${activeType === k ? "selected" : ""}>${esc(k)} (${nc[k]})</option>`).join("");
+  }
+
+  function setGraphMode(mode) {
+    document.querySelectorAll("[data-gmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.gmode === mode)));
+    graphView.setMode(mode);
   }
 
   function bindTabsAndShortcuts() {
@@ -147,14 +143,14 @@
         if (ev.key in map) { ev.preventDefault(); activateTab(tabs[map[ev.key]], true); }
       });
     });
-    const hashTab = tabs.find((t) => t.dataset.tab === `tab-${location.hash.slice(1)}`);
+    const rawTab = (location.hash.slice(1) || new URLSearchParams(location.search).get("tab") || "").replace(/^tab-/, "").replace(/^proposals$/, "lifecycle");
+    const hashTab = tabs.find((t) => t.dataset.tab === `tab-${rawTab}`);
     if (hashTab) activateTab(hashTab);
 
     const search = document.getElementById("global-search"), clearBtn = document.getElementById("btn-clear-search"), kbd = document.getElementById("search-kbd");
     let timer = null;
     search.addEventListener("input", () => {
-      clearBtn.classList.toggle("hidden", !search.value);
-      kbd.classList.toggle("hidden", Boolean(search.value));
+      clearBtn.classList.toggle("hidden", !search.value); kbd.classList.toggle("hidden", Boolean(search.value));
       clearTimeout(timer);
       timer = setTimeout(async () => {
         const q = search.value.trim(), banner = document.getElementById("anti-repeat-banner");
@@ -182,6 +178,8 @@
     inspector = new InspectorController(() => state, () => currentScope, postJson, loadGraph, (n) => modals.openUpsertNode(n), toast, () => { graphView.selectedId = null; });
     mergeStudio = new MergeStudioController(() => state, postJson, loadGraph, (id) => { graphView.selectedId = id; inspector.inspect(id); }, toast);
     bindTabsAndShortcuts();
+    document.querySelectorAll("[data-gmode]").forEach((b) => b.addEventListener("click", () => setGraphMode(b.dataset.gmode)));
+    document.getElementById("chk-hide-aux").addEventListener("change", (ev) => graphView.setHideAux(ev.target.checked));
     document.getElementById("workspace-switcher").addEventListener("change", (ev) => { currentScope = ev.target.value; inspector.resetEmpty(); loadGraph(); });
     document.getElementById("type-filter-select").addEventListener("change", (ev) => { activeType = ev.target.value; graphView.setFilter(activeTier, activeType); });
     document.getElementById("btn-refresh").addEventListener("click", loadGraph);

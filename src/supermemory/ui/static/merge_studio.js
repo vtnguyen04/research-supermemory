@@ -1,6 +1,6 @@
-// 4-Tier Cognitive Hierarchy & Memory Consolidation Workbench Controller
+// 4-Tier Cognitive Hierarchy & Paginated Memory Consolidation Workbench Controller
 (function () {
-  const { esc, statusTag } = window.SuperMemoryIcons;
+  const { esc, statusTag, paginate, bindPagers } = window.SuperMemoryIcons;
 
   class MergeStudioController {
     constructor(getState, postJson, onRefresh, onInspect, notify) {
@@ -37,32 +37,23 @@
           const items = (state.nodes || []).filter(
             (n) => n.memory_tier === c.key && (!hideCons || n.status !== "CONSOLIDATED")
           );
-          const rows = items
+          const pg = paginate(items, `tier-${c.key}`, 5);
+          const rows = pg.slice
             .map((n) => {
               const checked = this.selectedIds.has(n.id) ? "checked" : "";
-              return `
-                <div class="selectable-row">
-                  <input type="checkbox" class="merge-chk" data-id="${esc(n.id)}" aria-label="Chọn ${esc(n.id)}" ${checked} />
-                  <button type="button" class="row-trigger" data-inspect="${esc(n.id)}">
-                    <span class="row-top">
-                      <span class="mono-id">${esc(n.id)}</span>
-                      ${statusTag(n.status, `${n.node_type} / ${n.status}`)}
-                    </span>
-                    <span class="row-title">${esc(n.title)}</span>
-                    <span class="row-desc">${esc(n.summary).slice(0, 150)}</span>
-                  </button>
-                </div>`;
+              return `<div class="selectable-row">
+                <input type="checkbox" class="merge-chk" data-id="${esc(n.id)}" aria-label="Chọn ${esc(n.id)}" ${checked} />
+                <button type="button" class="row-trigger" data-inspect="${esc(n.id)}">
+                  <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, `${n.node_type} / ${n.status}`)}</span>
+                  <span class="row-title">${esc(n.title)}</span>
+                  <span class="row-desc">${esc(n.summary).slice(0, 125)}</span>
+                </button></div>`;
             })
             .join("");
           const empty = `<div class="empty-state"><p class="empty-title">Tầng này đang trống</p><p class="empty-desc">Không có thực thể nào khớp bộ lọc hiện tại.</p></div>`;
-          return `
-            <div class="ledger-panel">
-              <div class="ledger-header">
-                <h3>${esc(c.title)}</h3>
-                <span class="mono-id">${items.length}</span>
-              </div>
-              <div class="ledger-list">${rows || empty}</div>
-            </div>`;
+          return `<div class="ledger-panel">
+            <div class="ledger-header"><h3>${esc(c.title)}</h3><span class="mono-id">${items.length}</span></div>
+            <div class="ledger-list">${rows || empty}</div>${pg.html}</div>`;
         })
         .join("");
 
@@ -77,6 +68,7 @@
       box.querySelectorAll("[data-inspect]").forEach((btn) => {
         btn.addEventListener("click", () => this.onInspect(btn.getAttribute("data-inspect")));
       });
+      bindPagers(box, () => this.render());
       this._syncSubmitLabel();
     }
 
@@ -116,22 +108,14 @@
           fb.textContent = `Đã chưng cất thành [${tier}] ${data.created_node.id}: ${data.created_node.title}`;
           this.notify(`Đã tạo ${data.created_node.id} (${tier})`);
           await this.onRefresh();
-        } catch (err) {
-          fb.textContent = err.message;
-        }
+        } catch (err) { fb.textContent = err.message; }
       });
       document.getElementById("btn-auto-consolidate").addEventListener("click", async () => {
         try {
           const data = await this.postJson("/api/auto-consolidate", { min_cluster_size: 2 });
-          const msg = data.count
-            ? `Đã tự động gộp ${data.count} cụm thành: ${data.created_semantic_nodes.join(", ")}`
-            : "Các nhánh hiện tại có dưới 2 mảnh L3 chưa gộp, chưa cần nén thêm.";
-          fb.textContent = msg;
-          this.notify(msg);
-          await this.onRefresh();
-        } catch (err) {
-          fb.textContent = err.message;
-        }
+          const msg = data.count ? `Đã tự động gộp ${data.count} cụm: ${data.created_semantic_nodes.join(", ")}` : "Chưa có cụm L3 nào từ 2 mục trở lên cần gộp.";
+          fb.textContent = msg; this.notify(msg); await this.onRefresh();
+        } catch (err) { fb.textContent = err.message; }
       });
     }
   }

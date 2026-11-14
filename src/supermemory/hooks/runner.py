@@ -1,4 +1,4 @@
-"""Antigravity Lifecycle Hook Runner: Federated Global/Local + Agent-Native Semantic Self-Triage."""
+"""Antigravity Lifecycle Hook Runner: Zero-Overhead Normal Turns + Event-Driven Gates."""
 
 from __future__ import annotations
 
@@ -56,25 +56,16 @@ def dispatch_hook(event_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     ws = _resolve_supermemory_workspace(payload)
     conv_id = str(payload.get("conversationId") or "default-session")
 
-    # Uninitialized project mode: use Global SuperMemory cleanly without polluting the folder!
     if ws is None:
         if ev == "SessionStart":
             g_titles = _global_rule_titles()
             extra = ("\n• Global Learned Rules: " + " | ".join(g_titles[:4])) if g_titles else ""
             msg = (
                 "🌐 SUPERMEMORY GLOBAL HARNESS ACTIVE (No Local `.supermemory` in this folder yet)."
-                f"{extra}\n• Save cross-project preferences with `scope='global'`, or run `supermemory init` "
-                "(MCP `supermemory_init`) to create an isolated Local SuperMemory for this project."
+                f"{extra}\n• Normal Q&A requires ZERO memory calls. Only call `supermemory_record_lesson` "
+                "(`scope='global'`) for genuine cross-project rules, or `supermemory init` when requested."
             )
             return {"injectSteps": [{"systemMessage": {"systemMessage": msg}}]}
-        if ev == "PreInvocation":
-            u_in = str(payload.get("lastUserInput") or "").strip()
-            if len(u_in) >= 8:
-                rec = federated_recall(u_in, local_ws=None, include_global=True, limit=3)
-                if rec["anti_repeat_warnings"]:
-                    w_txt = "⚠️ GLOBAL SUPERMEMORY RECALL:\n" + "\n".join(f"  • {w}" for w in rec["anti_repeat_warnings"][:3])
-                    return {"injectSteps": [{"systemMessage": {"systemMessage": w_txt}}]}
-            return {}
         if ev == "PreToolUse":
             return {"decision": "allow"}
         return {}
@@ -105,11 +96,13 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
     st = get_session_state(store, conv_id)
     inv_num = int(payload.get("invocationNum") or 0)
     step_idx = int(payload.get("initialNumSteps") or 0)
+    prev_step = int(st.get("last_step_idx") or 0)
     user_input = str(payload.get("lastUserInput") or "")
 
     injected_msgs: List[str] = []
-    if st["last_step_idx"] > 20 and 0 < step_idx < (st["last_step_idx"] // 2):
+    if prev_step > 20 and 0 < step_idx < (prev_step // 2):
         st["compaction_count"] = st.get("compaction_count", 0) + 1
+        st["last_heartbeat_bucket"] = 0
         capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
         injected_msgs.append("♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED:\n" + capsule)
         store.log_event("COMPACTION_RECOVERY", conv_id, f"Restored tiered state at step {step_idx}")
@@ -120,35 +113,35 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
 
-        # Optional fast hint (advisory — LLM semantic triage covers 100% of phrasings!)
         sig = SelfLearningDetector.analyze(user_input)
         if sig.requires_lesson:
             st["pending_lesson_lock"] = True
             st["pending_lesson_quote"] = user_input
             st["pending_lesson_category"] = sig.category
             injected_msgs.append(sig.guidance)
-        else:
-            injected_msgs.append(
-                "🧠 SEMANTIC MEMORY TRIAGE ACTIVE: Autonomously evaluate user intent & tool outcomes this turn — "
-                "persist any implicit/explicit critique (`supermemory_record_lesson`), new rule/procedure "
-                "(`supermemory_record_lesson` / `supermemory_add_gate`, local or `scope='global'`), experiment/bug "
-                "insight (`supermemory_log_experiment` / `supermemory_link_knowledge`), or state update "
-                "(`supermemory_update_state`); if pure read-only Q&A, call `supermemory_checkpoint`."
-            )
 
-        rec = federated_recall(user_input, local_ws=store.workspace_root, include_global=True, limit=4, hops=1)
-        if rec["anti_repeat_warnings"]:
-            warn_block = "⚠️ SUPERMEMORY ANTI-REPEAT RECALL (LOCAL + GLOBAL):\n" + "\n".join(
-                f"  • {w}" for w in rec["anti_repeat_warnings"][:4]
-            )
-            injected_msgs.append(warn_block)
-    elif step_idx >= 20 and (step_idx // 20) > (int(st.get("last_step_idx") or 0) // 20):
-        # Long-horizon autonomous `/goal` heartbeat even when `lastUserInput` stays constant for days!
-        capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
-        injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT (ANTI-DRIFT & ANTI-REPEAT):\n" + capsule)
+        # Only inject anti-repeat recall if query is substantial and hits a concrete high-BM25 warning
+        if len(user_input.strip()) >= 28:
+            rec = federated_recall(user_input, local_ws=store.workspace_root, include_global=True, limit=3, hops=1)
+            high_hit = any(float(r.get("score") or 0) >= 8.5 for r in rec.get("results") or [])
+            if high_hit and rec["anti_repeat_warnings"]:
+                warn_block = "⚠️ SUPERMEMORY ANTI-REPEAT RECALL:\n" + "\n".join(
+                    f"  • {w}" for w in rec["anti_repeat_warnings"][:3]
+                )
+                injected_msgs.append(warn_block)
+    elif step_idx >= 20 and "/goal" in user_input.lower():
+        # Long-horizon `/goal` heartbeat ONLY for `/goal` campaigns, once per 20-step bucket (never on step_idx=0!)
+        cur_bucket = step_idx // 20
+        prev_bucket = int(st.get("last_heartbeat_bucket") or 0)
+        if cur_bucket > prev_bucket:
+            st["last_heartbeat_bucket"] = cur_bucket
+            capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
+            injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT (ANTI-DRIFT & ANTI-REPEAT):\n" + capsule)
 
     st["invocation_num"] = inv_num
-    st["last_step_idx"] = max(step_idx, st["last_step_idx"]) if step_idx >= st["last_step_idx"] else step_idx
+    # CRITICAL FIX: Never reset last_step_idx to 0 when intra-turn tool steps omit initialNumSteps!
+    if step_idx > 0:
+        st["last_step_idx"] = step_idx
     save_session_state(store, st)
 
     if not injected_msgs:
@@ -205,13 +198,7 @@ def _on_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) 
 
     if t_name in ("write_file", "edit_file", "replace_file_content", "multi_replace_file_content") and not err:
         raw_p = str(t_args.get("Path") or t_args.get("TargetFile") or "")
-        if raw_p and "memory/" not in raw_p and "/brain/" not in raw_p and not raw_p.endswith(("AGENTS.md", "GEMINI.md", "CLAUDE.md")):
-            dirty = list(st.get("dirty_files") or [])
-            if raw_p not in dirty:
-                dirty.append(raw_p)
-            st["dirty_files"] = dirty[-20:]
-            st["turn_memory_handled"] = False
-        elif "02_CONSTITUTION_AND_LESSONS.md" in raw_p:
+        if "02_CONSTITUTION_AND_LESSONS.md" in raw_p:
             st["pending_lesson_lock"] = False
             st["turn_memory_handled"] = True
 
@@ -223,6 +210,7 @@ def _on_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) 
 
 
 def _on_stop(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Zero-overhead Stop gate: NEVER block normal Q&A/chat! Only enforce pending explicit lessons or unlogged benchmarks."""
     if payload.get("continuationActive"):
         return {"decision": "allow"}
     if str(payload.get("terminationReason") or "") != "NO_TOOL_CALL":
@@ -237,27 +225,21 @@ def _on_stop(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[s
             "decision": "continue",
             "reason": (
                 "🛡️ SUPERMEMORY SELF-LEARNING COMMIT REQUIRED (LAW-08): "
-                "Persist the lesson/rule + CodeGate via `supermemory learn` / `supermemory_record_lesson` "
-                "(or `supermemory_add_gate`) before finishing your response."
+                "Persist the explicit lesson/rule + CodeGate via `supermemory learn` or `supermemory_record_lesson` "
+                "before finishing your response."
             ),
         }
 
-    has_unhandled_work = bool(st.get("pending_sync_reason") or st.get("dirty_files") or len(str(st.get("last_seen_user_input") or "")) >= 15)
-    if not st.get("turn_memory_handled") and has_unhandled_work:
+    if not st.get("turn_memory_handled") and st.get("pending_sync_reason"):
+        reason_txt = str(st.get("pending_sync_reason"))
         st["turn_memory_handled"] = True
         st["pending_sync_reason"] = ""
-        st["dirty_files"] = []
         save_session_state(store, st)
         return {
             "decision": "continue",
             "reason": (
-                "🧠 SUPERMEMORY SEMANTIC TURN-ATTESTATION REQUIRED: "
-                "Use your semantic understanding (not regexes) to audit this turn before stopping: "
-                "(1) Any subtle/explicit user critique or mistake? -> `supermemory_record_lesson`. "
-                "(2) Any new user rule, convention, or procedure? -> `supermemory_record_lesson` / `supermemory_add_gate` (local or `scope='global'`). "
-                "(3) Any failed experiment, bug root-cause, or insight? -> `supermemory_log_experiment` / `supermemory_link_knowledge`. "
-                "(4) Code/project state changed? -> `supermemory_update_state`. "
-                "(5) Pure read-only Q&A with zero memory delta? -> `supermemory_checkpoint(status='CLEAN')`."
+                f"🧪 SUPERMEMORY EXPERIMENT LOG REQUIRED: {reason_txt} ran this turn without logging. "
+                "Record the experiment result & insights via `supermemory_log_experiment` (`supermemory exp`) before stopping."
             ),
         }
     return {"decision": "allow"}

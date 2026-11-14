@@ -11,52 +11,59 @@ _HYPOTHETICAL_GUARD = re.compile(
     flags=re.IGNORECASE | re.UNICODE,
 )
 
+# Turn-local conversational clarifications ("who said you could edit yet?", "wait don't run yet")
+# must NEVER be misclassified as permanent repo Laws or Lessons!
+_TURN_CLARIFICATION_GUARD = re.compile(
+    r"(?:cho mày edit đâu|bảo mày edit đâu|chưa cho edit|chưa bảo sửa|khoan hãy sửa|khoan edit|chỉ hỏi thôi|đừng sửa vội|did i ask you to edit|don't edit yet)",
+    flags=re.IGNORECASE | re.UNICODE,
+)
+
 _CORRECTION_PATTERNS: List[Tuple[str, str, int]] = [
     (
         "NEW_USER_RULE",
-        r"(?:thêm rule|thêm luật|quy tắc mới|luật mới|từ giờ trở đi|từ nay trở đi|từ giờ cấm|bắt buộc phải|cấm dùng|cấm xài|tuyệt đối cấm|tuyệt đối không được|luôn phải nhớ|nhớ kỹ rule|add a rule|add rule|new rule|from now on|never use\b|always enforce\b)",
+        r"(?:thêm rule|thêm luật|lưu vào lesson|lưu và lesson|ghi vào lesson|quy tắc mới|luật mới|từ giờ trở đi|từ nay trở đi|từ giờ cấm|cấm dùng|cấm xài|tuyệt đối cấm|tuyệt đối không được|nhớ kỹ rule|add a rule|add rule|new rule|save to lesson|from now on\b.*?\bnever\b)",
         94,
     ),
     (
         "HARDCODING_LEAKAGE",
-        r"\b(?:hardcode|hard-code|trá hình|leakage|rò rỉ|vá lỗi tập test|sửa trực tiếp trên tập test|overfit|generalize|tổng quát hóa)\b",
+        r"\b(?:hardcode|hard-code|trá hình|leakage|rò rỉ|vá lỗi tập test|sửa trực tiếp trên tập test|overfit)\b",
         95,
     ),
     (
         "CLEAN_CODE_BLOAT",
-        r"\b(?:clean code|code rác|rác rưởi|hack não|phình to|file nháp|chạy 1 lần|over-engineer|quá dài|vượt trần dòng)\b",
+        r"\b(?:code rác|rác rưởi|file nháp|chạy 1 lần|over-engineer|vượt trần dòng)\b",
         88,
     ),
     (
         "COST_CACHE_WASTE",
-        r"\b(?:đốt tiền|hết sạch credit|tốn tiền|no_cache|chạy lại mấy câu đã đúng|api waste|prompt caching)\b",
+        r"\b(?:đốt tiền|hết sạch credit|no_cache|chạy lại mấy câu đã đúng|api waste|prompt caching)\b",
         92,
     ),
     (
         "STALE_MEMORY",
-        r"\b(?:không save|khong save|không lưu|quên ghi|quên mất|không làm theo agent\.md|stale memory|lặp lại lỗi|sai đi sai lại|tái phạm)\b",
+        r"\b(?:không save vào memory|quên ghi vào memory|forgot to save|không làm theo agent\.md|stale memory|lặp lại lỗi|sai đi sai lại|tái phạm)\b",
         96,
     ),
     (
         "COMPUTE_PLACEMENT",
-        r"\b(?:nóng máy|sập máy|chạy trên máy tao|đưa server cho mày chi|kill background|tự ý kill)\b",
+        r"\b(?:nóng máy|sập máy|chạy trên máy tao|đưa server cho mày chi|tự ý kill)\b",
         90,
     ),
     (
         "ARTIFACT_CONTAMINATION",
-        r"\b(?:phí lượt nộp|mất lượt nộp|copy từ gold|ghi đè submission|làm hỏng file)\b",
+        r"\b(?:phí lượt nộp|mất lượt nộp|copy từ gold|ghi đè submission)\b",
         94,
     ),
     (
         "GENERAL_SCOLDING",
-        r"(?:tại sao lại|tao đã bảo|tao đã nói|đã dặn|nhắc bao nhiêu lần|đã cấm|cấm tuyệt đối|sao cứ|mày ngu|ngu vậy|ngu thế|ngu vãi|óc chó|điên à|sai rồi|sai bét|làm sai|bậy rồi|tào lao|vớ vẩn|ảo giác|bịa đặt|phá code|hỏng hết|làm ăn kiểu gì|stop doing|never do that|why did you|you forgot to|i told you not to|you broke|wrong again|hallucinat|stupid)",
+        r"(?:tại sao mày lại|sao mày cứ|tao đã bảo cấm|tao đã dặn|nhắc bao nhiêu lần|mày ngu|ngu vậy|ngu thế|óc chó|sai bét|ảo giác|bịa đặt|phá code|làm ăn kiểu gì|i told you not to|wrong again|hallucinat)",
         86,
     ),
 ]
 
 _DIRECTIVE_PATTERNS: List[Tuple[str, str]] = [
-    ("STRATEGIC_TARGET", r"(?:mục tiêu|tao muốn\s*[><=]|target\s*[><=]|phải đạt\s*[><=]|không cần fine-?tune)"),
-    ("ARCHITECTURE_SPEC", r"(?:kiến trúc|lộ trình|layer [a-z]|pillar \d|proposal|thiết kế hệ thống|vòng đời)"),
+    ("STRATEGIC_TARGET", r"(?:tao muốn\s*[><=]|target\s*[><=]|phải đạt\s*[><=])"),
+    ("ARCHITECTURE_SPEC", r"(?:thiết kế hệ thống theo kiến trúc|vòng đời proposal rõ ràng)"),
 ]
 
 _CATEGORY_TO_DEFAULT_LAW: Dict[str, str] = {
@@ -85,17 +92,17 @@ class UserSignal:
 
 
 class SelfLearningDetector:
-    """Classifies user messages to trigger mandatory self-learning & rule-commit hooks."""
+    """High-precision detector for explicit rules & real technical post-mortems (zero chat false-positives)."""
 
     @classmethod
     def analyze(cls, user_input: str) -> UserSignal:
         text = (user_input or "").strip()
-        if len(text) < 6:
+        if len(text) < 10:
             return UserSignal(False, False, "NONE", "", 0, "", "")
 
         excerpt = text[:280].replace("\n", " ").strip()
-        if _HYPOTHETICAL_GUARD.search(text):
-            return UserSignal(False, False, "HYPOTHETICAL", "", 0, excerpt, "")
+        if _HYPOTHETICAL_GUARD.search(text) or _TURN_CLARIFICATION_GUARD.search(text):
+            return UserSignal(False, False, "NONE", "", 0, excerpt, "")
 
         best_cat = "NONE"
         best_conf = 0
@@ -107,22 +114,12 @@ class SelfLearningDetector:
 
         if best_conf >= 80:
             law_id = _CATEGORY_TO_DEFAULT_LAW.get(best_cat, "LAW-08")
-            if best_cat == "NEW_USER_RULE":
-                guidance = (
-                    "🛡️ NEW USER RULE DETECTED (MANDATORY COMMIT LOCK ACTIVE): "
-                    "The user defined a new rule/constraint. Before ending this turn, you MUST persist it via "
-                    "`supermemory learn` / `supermemory gate add` (or MCP `supermemory_record_lesson` / "
-                    "`supermemory_add_gate`) so `02_CONSTITUTION_AND_LESSONS.md`, `AGENTS.md`, and `PreToolUse` "
-                    "CodeGates enforce it permanently. The Stop hook WILL block turn completion until saved."
-                )
-            else:
-                guidance = (
-                    f"🛡️ SELF-LEARNING TRIGGERED ({best_cat} -> {law_id}): "
-                    f"User issued a behavioral/technical correction. Before ending this turn, you MUST: "
-                    f"(1) record the root-cause lesson via `supermemory learn` or MCP `supermemory_record_lesson`, "
-                    f"(2) attach/update an executable CodeGate (`forbid_regex` / `forbid_cmd_regex` / `freeze_path`) "
-                    f"if mechanically checkable, and (3) sync memory. The Stop hook WILL block stopping until committed."
-                )
+            guidance = (
+                f"🛡️ SELF-LEARNING TRIGGERED ({best_cat} -> {law_id}): "
+                f"Explicit user rule or technical correction detected. Before ending this turn, record the "
+                f"root-cause lesson via `supermemory learn` or `supermemory_record_lesson` (and bind a "
+                f"`CodeGate` if mechanically checkable)."
+            )
             return UserSignal(
                 requires_lesson=True,
                 requires_state_sync=True,
@@ -137,17 +134,8 @@ class SelfLearningDetector:
             if re.search(d_pat, text, flags=re.IGNORECASE | re.UNICODE) and len(text) >= 40:
                 guidance = (
                     f"🧭 STRATEGIC DIRECTIVE DETECTED ({d_cat}): "
-                    f"Persist full user targets/architecture into SuperMemory (`supermemory_update_state` / "
-                    f"`supermemory_manage_proposal`) in THIS turn so context compaction never loses any layer."
+                    f"Persist updated project targets/architecture via `supermemory_update_state` if scope changed."
                 )
-                return UserSignal(
-                    requires_lesson=False,
-                    requires_state_sync=True,
-                    category=d_cat,
-                    suggested_law_id="LAW-07",
-                    confidence=75,
-                    excerpt=excerpt,
-                    guidance=guidance,
-                )
+                return UserSignal(False, True, d_cat, "LAW-07", 75, excerpt, guidance)
 
         return UserSignal(False, False, "NONE", "", 0, excerpt, "")

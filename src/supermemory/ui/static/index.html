@@ -24,7 +24,7 @@
         </span>
         <div class="brand-text">
           <span class="brand-name">SuperMemory</span>
-          <span class="version-tag">Studio 2.4</span>
+          <span class="version-tag">Studio 2.5</span>
         </div>
       </div>
 
@@ -126,34 +126,47 @@
       <div id="error-banner" class="alert-strip alert-danger hidden" role="alert"></div>
 
       <main id="main-content" class="stage-container">
-        <!-- TAB 1: STRUCTURED TIER-LANE CARD GRAPH -->
+        <!-- TAB 1: MULTI-MODE INTERACTIVE KNOWLEDGE GRAPH -->
         <section id="tab-graph" role="tabpanel" aria-labelledby="tabbtn-graph" class="tab-panel active">
           <div class="canvas-stage">
             <div class="floating-toolbar">
-              <div class="segmented-tray" role="group" aria-label="Lọc theo tầng nhận thức" id="tier-filters"></div>
               <div class="toolbar-cluster">
+                <div class="segmented-tray" role="group" aria-label="Chế độ hiển thị đồ thị" id="graph-mode-bar">
+                  <button type="button" class="seg-btn" aria-pressed="true" data-gmode="FORCE">Mạng tự do</button>
+                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="RADIAL">Đồng tâm</button>
+                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="LANES">Phân tầng</button>
+                </div>
+                <div class="segmented-tray" role="group" aria-label="Lọc theo tầng nhận thức" id="tier-filters"></div>
+              </div>
+              <div class="toolbar-cluster">
+                <label class="checkbox-label toolbar-chk">
+                  <input type="checkbox" id="chk-hide-aux" checked />
+                  <span>Ẩn Audit phụ</span>
+                </label>
                 <label for="type-filter-select" class="sr-only">Lọc theo loại thực thể</label>
                 <select id="type-filter-select" class="control-select select-compact">
                   <option value="ALL">Tất cả loại thực thể</option>
                 </select>
                 <div class="zoom-pill">
                   <button type="button" id="btn-zoom-out" class="zoom-btn" aria-label="Thu nhỏ bản đồ">&minus;</button>
-                  <button type="button" id="btn-reset-zoom" class="zoom-reset">Căn khung</button>
+                  <button type="button" id="btn-reset-zoom" class="zoom-reset">Vừa khung</button>
                   <button type="button" id="btn-zoom-in" class="zoom-btn" aria-label="Phóng to bản đồ">+</button>
                 </div>
-                <button type="button" id="btn-relayout" class="btn btn-secondary btn-sm">Sắp xếp theo tầng</button>
+                <button type="button" id="btn-relayout" class="btn btn-secondary btn-sm">Xếp lại</button>
               </div>
             </div>
 
-            <canvas id="graph-canvas" tabindex="0" aria-label="Bản đồ tri thức 3 tầng. Kéo thả thẻ để di chuyển, cuộn để thu phóng, nhấp vào thẻ để mở chi tiết."></canvas>
-            <div id="graph-tooltip" class="graph-tooltip hidden" role="tooltip"></div>
+            <div class="canvas-viewport">
+              <canvas id="graph-canvas" tabindex="0" aria-label="Bản đồ tri thức 3 tầng. Kéo thả thẻ để di chuyển, cuộn để thu phóng, nhấp vào thẻ để mở chi tiết."></canvas>
+              <div id="graph-tooltip" class="graph-tooltip hidden" role="tooltip"></div>
 
-            <div class="canvas-legend">
-              <span class="legend-item"><span class="legend-swatch" data-tone="LAW"></span>L1 Luật &amp; Gate</span>
-              <span class="legend-item"><span class="legend-swatch" data-tone="SEMANTIC"></span>L2 Tri thức &amp; Insight</span>
-              <span class="legend-item"><span class="legend-swatch" data-tone="EXPERIMENT"></span>L3 Thực nghiệm &amp; Proposal</span>
-              <span class="legend-item"><span class="legend-swatch" data-tone="LESSON"></span>Bài học sai lầm</span>
-              <span class="legend-hint">Nhấp vào bất kỳ thẻ nào để mở bảng chi tiết</span>
+              <div class="canvas-legend">
+                <span class="legend-item"><span class="legend-swatch" data-tone="LAW"></span>L1 Luật &amp; Gate</span>
+                <span class="legend-item"><span class="legend-swatch" data-tone="SEMANTIC"></span>L2 Tri thức &amp; Insight</span>
+                <span class="legend-item"><span class="legend-swatch" data-tone="EXPERIMENT"></span>L3 Thực nghiệm &amp; Proposal</span>
+                <span class="legend-item"><span class="legend-swatch" data-tone="LESSON"></span>Bài học sai lầm</span>
+                <span class="legend-hint">Nhấp vào bất kỳ nút nào để mở bảng chi tiết</span>
+              </div>
             </div>
           </div>
         </section>
@@ -280,6 +293,7 @@
                 </thead>
                 <tbody id="exp-table-body"></tbody>
               </table>
+              <div id="exp-pager"></div>
             </div>
           </div>
         </section>
@@ -298,11 +312,14 @@
               </div>
             </div>
 
-            <div id="proposal-kanban" class="pipeline-grid" aria-label="Bảng trạng thái Proposal"></div>
+            <div id="proposal-stage-bar" class="segmented-tray stage-filter-bar" role="group" aria-label="Lọc giai đoạn Proposal"></div>
+            <div id="proposal-grid" class="vault-grid" aria-label="Danh sách Proposal"></div>
+            <div id="proposal-pager" class="standalone-pager"></div>
 
             <div class="subsection-block">
               <h3>Kho Ý tưởng, Thuật toán &amp; Nhận xét Đúc kết</h3>
               <div id="ideas-grid" class="vault-grid" role="list"></div>
+              <div id="ideas-pager" class="standalone-pager"></div>
             </div>
           </div>
         </section>
