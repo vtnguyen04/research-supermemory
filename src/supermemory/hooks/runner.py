@@ -142,6 +142,10 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
                 f"  • {w}" for w in rec["anti_repeat_warnings"][:4]
             )
             injected_msgs.append(warn_block)
+    elif step_idx >= 20 and (step_idx // 20) > (int(st.get("last_step_idx") or 0) // 20):
+        # Long-horizon autonomous `/goal` heartbeat even when `lastUserInput` stays constant for days!
+        capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
+        injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT (ANTI-DRIFT & ANTI-REPEAT):\n" + capsule)
 
     st["invocation_num"] = inv_num
     st["last_step_idx"] = max(step_idx, st["last_step_idx"]) if step_idx >= st["last_step_idx"] else step_idx
@@ -197,6 +201,7 @@ def _on_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) 
         st["pending_sync_reason"] = ""
     elif t_name in ("run_command", "bash") and _BENCHMARK_CMD_RE.search(cmd):
         st["pending_sync_reason"] = f"Benchmark/experiment executed (`{cmd[:60]}`)"
+        st["turn_memory_handled"] = False
 
     if t_name in ("write_file", "edit_file", "replace_file_content", "multi_replace_file_content") and not err:
         raw_p = str(t_args.get("Path") or t_args.get("TargetFile") or "")
@@ -205,6 +210,7 @@ def _on_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) 
             if raw_p not in dirty:
                 dirty.append(raw_p)
             st["dirty_files"] = dirty[-20:]
+            st["turn_memory_handled"] = False
         elif "02_CONSTITUTION_AND_LESSONS.md" in raw_p:
             st["pending_lesson_lock"] = False
             st["turn_memory_handled"] = True

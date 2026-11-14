@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from supermemory.cognitive.novelty_guard import enforce_novelty_against_history
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.lifecycle.experiments import record_scientific_experiment
 from supermemory.models import (
@@ -52,6 +53,7 @@ class LifecycleManager:
         is_algorithm: bool = False,
         invariants: str = "",
         inspired_by: Optional[List[str]] = None,
+        novelty_diff: str = "",
     ) -> Dict[str, Any]:
         ntype = NodeType.ALGORITHM.value if is_algorithm else NodeType.IDEA.value
         prefix = "ALGO" if is_algorithm else "IDEA"
@@ -105,7 +107,9 @@ class LifecycleManager:
         tasks: Optional[List[str]] = None,
         idea_ids: Optional[List[str]] = None,
         proposal_id: str = "",
+        novelty_diff: str = "",
     ) -> Dict[str, Any]:
+        enforce_novelty_against_history(self.store, title, f"{why} {what_changes}", novelty_diff=novelty_diff)
         pid = proposal_id.strip() or self._next_id("PROP", NodeType.PROPOSAL.value)
         slug = f"{pid}_{_slugify(title)}"
         prop_dir = self.store.mem_dir / "04_PROPOSALS" / slug

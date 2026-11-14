@@ -86,13 +86,29 @@ def build_tiered_capsule(store: GraphStore, query: str = "", global_rules: List[
         p for p in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=6)
         if p.status not in ("ARCHIVED", "REJECTED", "CONSOLIDATED")
     ]
-    exps = [e for e in store.list_experiments()[-2:]]
+    exps_all = store.list_experiments()
+    exps = exps_all[-2:]
+    scored_exps = [
+        e for e in exps_all
+        if e.verdict not in ("REVERT", "FAILED", "REJECTED") and (e.test_score is not None or e.cv_score is not None)
+    ]
+    sota = max(scored_exps, key=lambda x: float(x.test_score if x.test_score is not None else (x.cv_score or 0.0))) if scored_exps else None
+    dead_end_count = sum(
+        1 for n in store.list_nodes(limit=2000) if n.status in ("REJECTED", "REVERT", "FAILED")
+    )
 
     lines: List[str] = [
         f"🧠 SUPERMEMORY CONSTITUTIONAL HARNESS ACTIVE — Project: `{proj}`",
         f"• [L0 WORKING] Goal: {goal}",
         f"• [L0 WORKING] Next: {next_act}",
     ]
+    if sota or dead_end_count:
+        sota_txt = (
+            f"🏆 Best SOTA: `{sota.exp_id}` ({sota.track} = {sota.test_score if sota.test_score is not None else sota.cv_score})"
+            if sota
+            else "🏆 Best SOTA: None yet"
+        )
+        lines.append(f"• [L0 SCOREBOARD] {sota_txt} | Falsified Dead-Ends (Never Repeat): {dead_end_count}")
     if proposals:
         lines.append("• [L0 WORKING] Active Proposals: " + " | ".join(f"`{p.id}`[{p.status}] {p.title[:45]}" for p in proposals[:3]))
 

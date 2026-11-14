@@ -129,6 +129,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
                 rejection_reason=str(args.get("rejection_reason") or ""),
                 is_algorithm=bool(args.get("is_algorithm", False)),
                 invariants=str(args.get("invariants") or ""),
+                novelty_diff=str(args.get("novelty_diff") or ""),
             )
             mark_turn_memory_handled(store)
             MarkdownCompiler(store).compile_all()
@@ -147,6 +148,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
                     design_notes=str(args.get("design_notes") or ""),
                     tasks=list(args.get("tasks") or []),
                     proposal_id=str(args.get("proposal_id") or ""),
+                    novelty_diff=str(args.get("novelty_diff") or ""),
                 )
             mark_turn_memory_handled(store)
             MarkdownCompiler(store).compile_all()

@@ -182,10 +182,16 @@ def record_scientific_experiment(
         store.add_edge(MemoryEdge(source_id=obs_id, target_id=exp_id, relation=EdgeType.DERIVED_FROM.value))
         observation_ids.append(obs_id)
 
+    # Autonomous REM-sleep consolidation on long-horizon runs (>= 6 unconsolidated episodic runs/track)
+    from supermemory.cognitive.tiers import auto_consolidate_episodic
+
+    auto_cons = auto_consolidate_episodic(store, min_cluster_size=6)
+
     return {
         "exp_id": exp_id,
         "delta_vs_baseline": delta,
         "regression_detected": regression_detected,
         "observation_ids": observation_ids,
+        "auto_consolidated_nodes": auto_cons.get("created_semantic_nodes", []),
         "log_path": rel_log,
     }
