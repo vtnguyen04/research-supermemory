@@ -1,10 +1,23 @@
-#!/usr/bin/env python3
+#!/home/quynhthu/.local/bin/python3.11
 """Antigravity Lifecycle Hook Entrypoint for the SuperMemory Plugin."""
 
 from __future__ import annotations
 
+import os
+import shutil
 import sys
 from pathlib import Path
+
+if sys.version_info < (3, 11):
+    for _py in (
+        "/home/quynhthu/.local/bin/python3.11",
+        shutil.which("python3.11"),
+        shutil.which("python3.12"),
+        shutil.which("python3.13"),
+        str(Path.home() / ".local/share/uv/tools/supermemory-harness/bin/python"),
+    ):
+        if _py and os.path.isfile(_py) and os.access(_py, os.X_OK):
+            os.execv(_py, [_py, *sys.argv])
 
 
 def _bootstrap_path() -> None:

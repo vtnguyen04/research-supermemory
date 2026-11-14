@@ -74,7 +74,7 @@ def list_registered_workspaces() -> List[Dict[str, Any]]:
         {
             "id": "global",
             "scope": "GLOBAL",
-            "name": "🌐 Global SuperMemory (All Projects)",
+            "name": "Global SuperMemory (All Workspaces)",
             "path": str(g_root),
             "exists": True,
         }

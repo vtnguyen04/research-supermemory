@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "supermemory": {
-      "command": "python3",
+      "command": "/home/quynhthu/.local/bin/python3.11",
       "args": [
         "${PLUGIN_ROOT}/scripts/mcp_entry.py"
       ]

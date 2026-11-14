@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import urllib.request
 from pathlib import Path
@@ -11,7 +12,7 @@ from typing import Any, Dict
 import pytest
 
 from supermemory.bootstrap import init_workspace
-from supermemory.ui.server import create_http_server
+from supermemory.ui.server import STATIC_DIR, create_http_server
 
 
 def _post_json(base: str, route: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -161,6 +162,63 @@ def test_full_ui_management_console_crud_and_lifecycle(tmp_path: Path, monkeypat
         assert _post_json(base, "/api/node/delete", {"scope": sc, "node_id": "PROC-001"})["deleted"] is True
         gdata = _get_json(base, f"/api/graph?scope={sc}")
         assert all(n["id"] != "PROC-001" for n in gdata["nodes"])
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) -> None:
+    proj = tmp_path / "proj_ui_contract"
+    init_workspace(proj, project_name="UIContractApp")
+    srv, port = create_http_server(proj, host="127.0.0.1", port=0)
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{port}"
+
+    expected_assets = [
+        "/",
+        "/styles.css",
+        "/icons.js",
+        "/graph_canvas.js",
+        "/inspector.js",
+        "/merge_studio.js",
+        "/modals.js",
+        "/views.js",
+        "/app.js",
+    ]
+    emoji_rx = re.compile(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]")
+    confirm_rx = re.compile(r"\bwindow\.(alert|confirm)\s*\(")
+
+    try:
+        fetched: Dict[str, str] = {}
+        for route in expected_assets:
+            with urllib.request.urlopen(f"{base}{route}", timeout=5) as resp:
+                assert resp.status == 200
+                fetched[route] = resp.read().decode("utf-8")
+
+        html = fetched["/"]
+        css = fetched["/styles.css"]
+        assert "SuperMemory Observatory" in html
+        assert 'role="tablist"' in html
+        assert 'role="tab"' in html
+        assert 'role="tabpanel"' in html
+        assert "<dialog" in html
+        assert "skip-link" in html
+        assert ":focus-visible" in css
+        assert "font-variant-numeric: tabular-nums" in css
+        assert "--bg-canvas:" in css and "--sp-4: 1rem" in css
+
+        js_files = sorted(STATIC_DIR.glob("*.js"))
+        assert len(js_files) == 7
+        for js_path in js_files:
+            lines = js_path.read_text(encoding="utf-8").splitlines()
+            assert len(lines) < 200, f"{js_path.name} exceeds 200 lines ({len(lines)})"
+
+        for route, content in fetched.items():
+            assert not emoji_rx.search(content), f"Emoji detected in {route}"
+            assert not confirm_rx.search(content), f"Browser confirm/alert detected in {route}"
+            if route != "/styles.css":
+                assert 'style="' not in content, f"Inline HTML style attribute detected in {route}"
     finally:
         srv.shutdown()
         srv.server_close()

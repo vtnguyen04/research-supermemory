@@ -1,20 +1,16 @@
-// Interactive 4-Tier Cognitive Hierarchy & Memory Merge / Consolidation Studio
+// 4-Tier Cognitive Hierarchy & Memory Consolidation Workbench Controller
 (function () {
-  const esc = (s) =>
-    String(s ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+  const { esc, statusTag } = window.SuperMemoryIcons;
 
   class MergeStudioController {
-    constructor(getState, getScope, onRefresh, onInspect, notify) {
+    constructor(getState, postJson, onRefresh, onInspect, notify) {
       this.getState = getState;
-      this.getScope = getScope;
+      this.postJson = postJson;
       this.onRefresh = onRefresh;
       this.onInspect = onInspect;
-      this.notify = notify || (() => {});
+      this.notify = notify;
       this.selectedIds = new Set();
-      this._bindButtonsImmediate();
+      this._bindControls();
     }
 
     render() {
@@ -27,13 +23,13 @@
       const hideCons = document.getElementById("chk-hide-consolidated")?.checked;
 
       document.getElementById("tier-budget-summary").textContent =
-        `Capsule đang nạp cho Agent: ~${activeTok} tokens / Tổng Vault: ~${totalTok} tokens ` +
-        `(Tiết kiệm ${savedPct}% context • Đã gộp ${consCount} mảnh Episodic).`;
+        `Capsule nạp cho Agent: ~${activeTok} tok / Tổng kho lưu trữ: ~${totalTok} tok ` +
+        `(Giảm ${savedPct}% ngữ cảnh, đã nén ${consCount} mảnh L3).`;
 
       const cols = [
-        { key: "PROCEDURAL", title: "🛡 L1 PROCEDURAL (Luật, Quy trình, Gates)" },
-        { key: "SEMANTIC", title: "💡 L2 SEMANTIC (Tri thức & Insight đúc kết)" },
-        { key: "EPISODIC", title: "🧪 L3 EPISODIC (Thí nghiệm, Bài học, Proposals)" },
+        { key: "PROCEDURAL", title: "L1 Procedural — Luật & Gates" },
+        { key: "SEMANTIC", title: "L2 Semantic — Tri thức miền" },
+        { key: "EPISODIC", title: "L3 Episodic — Thực nghiệm & Bài học" },
       ];
       const box = document.getElementById("tier-columns");
       box.innerHTML = cols
@@ -41,113 +37,102 @@
           const items = (state.nodes || []).filter(
             (n) => n.memory_tier === c.key && (!hideCons || n.status !== "CONSOLIDATED")
           );
-          const cards = items
+          const rows = items
             .map((n) => {
               const checked = this.selectedIds.has(n.id) ? "checked" : "";
-              return `<div class="entity-card">
-                <div class="check-row">
-                  <input type="checkbox" class="merge-chk" data-id="${esc(n.id)}" ${checked} />
-                  <div style="flex:1" data-inspect="${esc(n.id)}">
-                    <div class="card-top">
-                      <span class="card-id">${esc(n.id)}</span>
-                      <span class="type-badge">${esc(n.node_type)} • ${esc(n.status)}</span>
-                    </div>
-                    <div class="card-title">${esc(n.title)}</div>
-                    <div class="card-desc">${esc(n.summary).slice(0, 140)}</div>
-                  </div>
-                </div>
-              </div>`;
+              return `
+                <div class="selectable-row">
+                  <input type="checkbox" class="merge-chk" data-id="${esc(n.id)}" aria-label="Chọn ${esc(n.id)}" ${checked} />
+                  <button type="button" class="row-trigger" data-inspect="${esc(n.id)}">
+                    <span class="row-top">
+                      <span class="mono-id">${esc(n.id)}</span>
+                      ${statusTag(n.status, `${n.node_type} / ${n.status}`)}
+                    </span>
+                    <span class="row-title">${esc(n.title)}</span>
+                    <span class="row-desc">${esc(n.summary).slice(0, 150)}</span>
+                  </button>
+                </div>`;
             })
             .join("");
-          return `<div class="tier-col"><h3>${c.title} (${items.length})</h3>
-            <div class="card-stack">${cards || '<p class="muted">Trống</p>'}</div></div>`;
+          const empty = `<div class="empty-state"><p class="empty-title">Tầng này đang trống</p><p class="empty-desc">Không có thực thể nào khớp bộ lọc hiện tại.</p></div>`;
+          return `
+            <div class="ledger-panel">
+              <div class="ledger-header">
+                <h3>${esc(c.title)}</h3>
+                <span class="mono-id">${items.length}</span>
+              </div>
+              <div class="ledger-list">${rows || empty}</div>
+            </div>`;
         })
         .join("");
 
       box.querySelectorAll(".merge-chk").forEach((chk) => {
-        chk.onchange = (ev) => {
+        chk.addEventListener("change", (ev) => {
           const id = ev.target.getAttribute("data-id");
           if (ev.target.checked) this.selectedIds.add(id);
           else this.selectedIds.delete(id);
-          this._updateButtonCount();
-        };
+          this._syncSubmitLabel();
+        });
       });
-      box.querySelectorAll("[data-inspect]").forEach((el) => {
-        el.onclick = () => this.onInspect(el.getAttribute("data-inspect"));
+      box.querySelectorAll("[data-inspect]").forEach((btn) => {
+        btn.addEventListener("click", () => this.onInspect(btn.getAttribute("data-inspect")));
       });
-      this._updateButtonCount();
+      this._syncSubmitLabel();
     }
 
-    _updateButtonCount() {
+    _syncSubmitLabel() {
       const btn = document.getElementById("btn-merge-selected");
-      if (btn) btn.textContent = `🧬 Gộp các mục đã chọn (${this.selectedIds.size})`;
+      if (btn) btn.textContent = `Gộp mục đã chọn (${this.selectedIds.size})`;
     }
 
-    _bindButtonsImmediate() {
-      const mergeBtn = document.getElementById("btn-merge-selected");
-      const autoBtn = document.getElementById("btn-auto-consolidate");
-      const selEpBtn = document.getElementById("btn-select-episodic");
-      const clearBtn = document.getElementById("btn-clear-merge-sel");
-      const hideChk = document.getElementById("chk-hide-consolidated");
+    _bindControls() {
       const fb = document.getElementById("merge-feedback");
-
-      if (hideChk) hideChk.onchange = () => this.render();
-      if (selEpBtn) {
-        selEpBtn.onclick = () => {
-          (this.getState().nodes || [])
-            .filter((n) => n.memory_tier === "EPISODIC" && n.status !== "CONSOLIDATED")
-            .forEach((n) => this.selectedIds.add(n.id));
-          this.render();
-        };
-      }
-      if (clearBtn) {
-        clearBtn.onclick = () => {
-          this.selectedIds.clear();
-          this.render();
-        };
-      }
-
-      mergeBtn.onclick = async () => {
+      document.getElementById("chk-hide-consolidated").addEventListener("change", () => this.render());
+      document.getElementById("btn-select-episodic").addEventListener("click", () => {
+        (this.getState().nodes || [])
+          .filter((n) => n.memory_tier === "EPISODIC" && n.status !== "CONSOLIDATED")
+          .forEach((n) => this.selectedIds.add(n.id));
+        this.render();
+      });
+      document.getElementById("btn-clear-merge-sel").addEventListener("click", () => {
+        this.selectedIds.clear();
+        this.render();
+      });
+      document.getElementById("merge-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
         const ids = Array.from(this.selectedIds);
         const title = document.getElementById("merge-title").value.trim();
         const summary = document.getElementById("merge-summary").value.trim();
         const tier = document.getElementById("merge-tier").value;
         if (!ids.length || !title || !summary) {
-          fb.textContent = "⚠️ Hãy tích chọn ít nhất 1 node và nhập đủ Tiêu đề + Nội dung đúc kết.";
+          fb.textContent = "Vui lòng chọn ít nhất 1 mục nguồn và điền đủ Tiêu đề cùng Nguyên lý tổng hợp.";
           return;
         }
-        const res = await fetch("/api/consolidate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scope: this.getScope(), source_ids: ids, target_tier: tier, title, summary }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          fb.textContent = `❌ ${data.error || "Consolidation failed"}`;
-          return;
+        try {
+          const data = await this.postJson("/api/consolidate", { source_ids: ids, target_tier: tier, title, summary });
+          this.selectedIds.clear();
+          document.getElementById("merge-title").value = "";
+          document.getElementById("merge-summary").value = "";
+          fb.textContent = `Đã chưng cất thành [${tier}] ${data.created_node.id}: ${data.created_node.title}`;
+          this.notify(`Đã tạo ${data.created_node.id} (${tier})`);
+          await this.onRefresh();
+        } catch (err) {
+          fb.textContent = err.message;
         }
-        this.selectedIds.clear();
-        document.getElementById("merge-title").value = "";
-        document.getElementById("merge-summary").value = "";
-        fb.textContent = `✅ Đã gộp thành [${tier}] ${data.created_node.id}: ${data.created_node.title}`;
-        this.notify(`✅ Đã tạo ${data.created_node.id} (${tier})`);
-        await this.onRefresh();
-      };
-
-      autoBtn.onclick = async () => {
-        const res = await fetch("/api/auto-consolidate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scope: this.getScope(), min_cluster_size: 2 }),
-        });
-        const data = await res.json();
-        const msg = data.count
-          ? `⚡ Đã tự động gộp ${data.count} cụm: ${data.created_semantic_nodes.join(", ")}`
-          : "ℹ️ Mọi cụm hiện tại đã gọn (< 2 mảnh Episodic chưa gộp / track).";
-        fb.textContent = msg;
-        this.notify(msg);
-        await this.onRefresh();
-      };
+      });
+      document.getElementById("btn-auto-consolidate").addEventListener("click", async () => {
+        try {
+          const data = await this.postJson("/api/auto-consolidate", { min_cluster_size: 2 });
+          const msg = data.count
+            ? `Đã tự động gộp ${data.count} cụm thành: ${data.created_semantic_nodes.join(", ")}`
+            : "Các nhánh hiện tại có dưới 2 mảnh L3 chưa gộp, chưa cần nén thêm.";
+          fb.textContent = msg;
+          this.notify(msg);
+          await this.onRefresh();
+        } catch (err) {
+          fb.textContent = err.message;
+        }
+      });
     }
   }
 
