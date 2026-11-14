@@ -1,34 +1,26 @@
-// Accessible Entity Inspector Drawer with Inline 2-Step Confirmation & Edge Linker
+// Contextual Floating Slide-Over Inspector Sheet with Inline 2-Step Confirmation
 (function () {
   const { esc, statusTag } = window.SuperMemoryIcons;
 
   class InspectorController {
     constructor(getState, getScope, postJson, onRefresh, onOpenEditModal, notify, onClearSelection) {
-      this.getState = getState;
-      this.getScope = getScope;
-      this.postJson = postJson;
-      this.onRefresh = onRefresh;
-      this.onOpenEditModal = onOpenEditModal;
-      this.notify = notify;
-      this.onClearSelection = onClearSelection;
+      Object.assign(this, { getState, getScope, postJson, onRefresh, onOpenEditModal, notify, onClearSelection });
       this.drawer = document.getElementById("inspector-drawer");
+      this.backdrop = document.getElementById("inspector-backdrop");
       document.getElementById("btn-close-inspector").addEventListener("click", () => this.close());
+      this.backdrop.addEventListener("click", () => this.close());
     }
 
     close() {
       this.drawer.classList.remove("is-open");
+      this.drawer.setAttribute("aria-hidden", "true");
+      this.backdrop.classList.add("hidden");
       if (this.onClearSelection) this.onClearSelection();
     }
 
     resetEmpty() {
-      this.drawer.classList.remove("is-open");
-      document.getElementById("insp-badge").textContent = "CHƯA CHỌN MỤC";
-      document.getElementById("insp-id").textContent = "Thanh tra thực thể";
-      document.getElementById("insp-body").innerHTML = `
-        <div class="empty-state">
-          <p class="empty-title">Chưa có thực thể nào được chọn</p>
-          <p class="empty-desc">Chọn một nút trên đồ thị hoặc một dòng trong sổ cái để xem thuộc tính, sửa nội dung, nối cạnh liên kết hoặc chuyển lên Global.</p>
-        </div>`;
+      this.close();
+      document.getElementById("insp-body").innerHTML = "";
     }
 
     async inspect(nodeId) {
@@ -42,11 +34,13 @@
       const { node, edges } = await res.json();
       const state = this.getState();
       this.drawer.classList.add("is-open");
+      this.drawer.setAttribute("aria-hidden", "false");
+      this.backdrop.classList.remove("hidden");
       document.getElementById("insp-badge").textContent = `${node.memory_tier || "SEMANTIC"} / ${node.node_type}`;
       document.getElementById("insp-id").textContent = `${node.id} — ${node.title}`;
 
       const promoteBtn = !state.is_global
-        ? `<button type="button" id="btn-promote-global" class="btn btn-secondary btn-xs">Đưa lên Global</button>`
+        ? `<button type="button" id="btn-promote-global" class="btn btn-secondary btn-sm">Đưa lên Global</button>`
         : "";
       const fileRow = node.file_path
         ? `<span class="prop-key">Tệp nguồn</span><span class="prop-val"><a class="file-anchor" href="file://${esc(node.file_path)}" target="_blank" rel="noreferrer">${esc(node.file_path)}</a></span>`
@@ -75,20 +69,19 @@
         ? `<div class="inspector-section"><h3 class="inspector-subhead">Thuộc tính mở rộng (Metadata)</h3><pre class="code-block">${esc(JSON.stringify(node.metadata, null, 2))}</pre></div>`
         : "";
 
-      const body = document.getElementById("insp-body");
-      body.innerHTML = `
+      document.getElementById("insp-body").innerHTML = `
         <div class="row-actions">
-          <button type="button" id="btn-edit-node" class="btn btn-primary btn-xs">Sửa thực thể</button>
+          <button type="button" id="btn-edit-node" class="btn btn-primary btn-sm">Chỉnh sửa</button>
           ${promoteBtn}
           <span id="insp-del-zone">
-            <button type="button" id="btn-arm-del-node" class="btn btn-danger btn-xs">Xóa</button>
+            <button type="button" id="btn-arm-del-node" class="btn btn-danger btn-sm">Xóa</button>
           </span>
         </div>
 
         <div class="prop-grid">
-          <span class="prop-key">Mã Node</span><span class="prop-val">${esc(node.id)}</span>
+          <span class="prop-key">Mã thực thể</span><span class="prop-val">${esc(node.id)}</span>
           <span class="prop-key">Phân loại</span><span class="prop-val">${esc(node.node_type)}</span>
-          <span class="prop-key">Tầng nhớ</span><span class="prop-val">${esc(node.memory_tier || "SEMANTIC")}</span>
+          <span class="prop-key">Tầng nhận thức</span><span class="prop-val">${esc(node.memory_tier || "SEMANTIC")}</span>
           <span class="prop-key">Trạng thái</span><span>${statusTag(node.status)}</span>
           <span class="prop-key">Cập nhật</span><span class="prop-val">${esc((node.updated_at || "").slice(0, 19))}</span>
           ${fileRow}
@@ -101,13 +94,13 @@
         </div>
 
         <div class="inspector-section">
-          <h3 class="inspector-subhead">Nối cạnh từ ${esc(node.id)}</h3>
+          <h3 class="inspector-subhead">Nối cạnh liên kết từ ${esc(node.id)}</h3>
           <div class="link-composer">
             <label for="link-rel" class="sr-only">Quan hệ liên kết</label>
             <select id="link-rel" class="control-select">${relOpts}</select>
             <label for="link-dst" class="sr-only">Thực thể đích</label>
             <select id="link-dst" class="control-select">${targetOpts}</select>
-            <button type="button" id="btn-add-edge" class="btn btn-secondary btn-xs">Nối cạnh</button>
+            <button type="button" id="btn-add-edge" class="btn btn-secondary btn-sm">Nối cạnh</button>
           </div>
         </div>
 
@@ -123,7 +116,6 @@
 
     _bindInspectorActions(node) {
       document.getElementById("btn-edit-node").addEventListener("click", () => this.onOpenEditModal(node));
-
       const promoteBtn = document.getElementById("btn-promote-global");
       if (promoteBtn) {
         promoteBtn.addEventListener("click", async () => {
@@ -131,9 +123,7 @@
             const out = await this.postJson("/api/promote", { node_id: node.id });
             this.notify(`Đã chuyển lên Global: ${out.global_id}`);
             await this.onRefresh();
-          } catch (err) {
-            this.notify(err.message, true);
-          }
+          } catch (err) { this.notify(err.message, true); }
         });
       }
 
@@ -142,12 +132,11 @@
         if (!armBtn) return;
         armBtn.addEventListener("click", () => {
           const zone = document.getElementById("insp-del-zone");
-          zone.innerHTML = `
-            <button type="button" id="btn-confirm-del-node" class="btn btn-danger btn-xs">Xác nhận xóa</button>
-            <button type="button" id="btn-cancel-del-node" class="btn btn-ghost btn-xs">Hủy</button>`;
+          zone.innerHTML = `<button type="button" id="btn-confirm-del-node" class="btn btn-danger btn-sm">Xác nhận xóa</button>
+            <button type="button" id="btn-cancel-del-node" class="btn btn-ghost btn-sm">Hủy</button>`;
           document.getElementById("btn-confirm-del-node").focus();
           document.getElementById("btn-cancel-del-node").addEventListener("click", () => {
-            zone.innerHTML = `<button type="button" id="btn-arm-del-node" class="btn btn-danger btn-xs">Xóa</button>`;
+            zone.innerHTML = `<button type="button" id="btn-arm-del-node" class="btn btn-danger btn-sm">Xóa</button>`;
             bindArmDelete();
           });
           document.getElementById("btn-confirm-del-node").addEventListener("click", async () => {
@@ -156,26 +145,21 @@
               this.notify(`Đã xóa thực thể ${node.id}`);
               this.resetEmpty();
               await this.onRefresh();
-            } catch (err) {
-              this.notify(err.message, true);
-            }
+            } catch (err) { this.notify(err.message, true); }
           });
         });
       };
       bindArmDelete();
 
       document.getElementById("btn-add-edge").addEventListener("click", async () => {
-        const dst = document.getElementById("link-dst").value;
-        const rel = document.getElementById("link-rel").value;
+        const dst = document.getElementById("link-dst").value, rel = document.getElementById("link-rel").value;
         if (!dst) return;
         try {
           await this.postJson("/api/edge/add", { source_id: node.id, target_id: dst, relation: rel });
           this.notify(`Đã nối cạnh ${node.id} -> ${dst}`);
           await this.onRefresh();
           await this.inspect(node.id);
-        } catch (err) {
-          this.notify(err.message, true);
-        }
+        } catch (err) { this.notify(err.message, true); }
       });
 
       document.getElementById("insp-body").querySelectorAll("[data-jump]").forEach((btn) => {

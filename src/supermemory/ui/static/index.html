@@ -3,109 +3,122 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SuperMemory Observatory — Constitutional Graph Workbench</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f3f4f6' stroke-width='2'%3E%3Crect x='3' y='3' width='18' height='18' rx='4' fill='%230a0b0d'/%3E%3Ccircle cx='8.5' cy='8.5' r='2'/%3E%3Ccircle cx='15.5' cy='8.5' r='2'/%3E%3Ccircle cx='12' cy='15.5' r='2'/%3E%3Cpath d='M10.2 9.5L13.8 9.5M9.3 10.3L11.2 13.8M14.7 10.3L12.8 13.8'/%3E%3C/svg%3E" />
+  <title>SuperMemory Observatory — Constitutional Knowledge Studio</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111214' stroke-width='2'%3E%3Crect x='2.5' y='2.5' width='19' height='19' rx='5' fill='%23F7F6F3'/%3E%3Ccircle cx='8.5' cy='9' r='2'/%3E%3Ccircle cx='15.5' cy='9' r='2'/%3E%3Ccircle cx='12' cy='15.5' r='2'/%3E%3Cpath d='M10.5 9h3M9.5 10.7l1.7 3.1M14.5 10.7l-1.7 3.1'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <a href="#main-content" class="skip-link">Chuyển tới nội dung chính</a>
 
   <div class="app-shell">
-    <!-- LEFT NAVIGATION RAIL -->
+    <!-- ARCHITECTURAL LEFT SIDEBAR -->
     <aside class="nav-rail" aria-label="Điều hướng dự án và phân hệ">
       <div class="rail-brand">
-        <svg class="brand-mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75">
-          <rect x="2.5" y="2.5" width="19" height="19" rx="4" />
-          <circle cx="8.5" cy="9" r="1.75" />
-          <circle cx="15.5" cy="9" r="1.75" />
-          <circle cx="12" cy="15.5" r="1.75" />
-          <path d="M10.25 9h3.5M9.35 10.55l1.8 3.35M14.65 10.55l-1.8 3.35" />
-        </svg>
-        <span class="brand-name">SuperMemory</span>
-        <span class="version-tag">v2.3</span>
+        <span class="brand-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="8" cy="8.5" r="2.2" />
+            <circle cx="16" cy="8.5" r="2.2" />
+            <circle cx="12" cy="16" r="2.2" />
+            <path d="M10.2 8.5h3.6M9.1 10.5l1.9 3.5M14.9 10.5l-1.9 3.5" />
+          </svg>
+        </span>
+        <div class="brand-text">
+          <span class="brand-name">SuperMemory</span>
+          <span class="version-tag">Studio 2.4</span>
+        </div>
       </div>
 
-      <div class="rail-workspace">
-        <label for="workspace-switcher" class="sr-only">Chọn không gian bộ nhớ</label>
-        <select id="workspace-switcher" class="control-select" aria-label="Chọn không gian bộ nhớ"></select>
-        <button type="button" id="btn-open-init" class="btn btn-secondary btn-block">Thêm hoặc Import dự án</button>
+      <div class="workspace-bezel">
+        <div class="workspace-core">
+          <div class="workspace-head">
+            <label for="workspace-switcher" class="workspace-label">Không gian bộ nhớ</label>
+            <button type="button" id="btn-open-init" class="text-action">+ Thêm dự án</button>
+          </div>
+          <select id="workspace-switcher" class="workspace-select" aria-label="Chọn không gian bộ nhớ"></select>
+        </div>
       </div>
 
       <nav class="rail-nav" role="tablist" aria-label="Phân hệ quản trị">
         <button type="button" role="tab" id="tabbtn-graph" class="nav-item active" aria-selected="true" aria-controls="tab-graph" data-tab="tab-graph">
           <span class="nav-icon" data-icon="topology" aria-hidden="true"></span>
-          <span>Đồ thị liên kết</span>
+          <span class="nav-label">Bản đồ Tri thức</span>
           <span id="nav-count-nodes" class="nav-count">0</span>
-        </button>
-        <button type="button" role="tab" id="tabbtn-tiers" class="nav-item" aria-selected="false" aria-controls="tab-tiers" tabindex="-1" data-tab="tab-tiers">
-          <span class="nav-icon" data-icon="layers" aria-hidden="true"></span>
-          <span>Phân tầng &amp; Gộp</span>
-          <span id="nav-count-episodic" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-constitution" class="nav-item" aria-selected="false" aria-controls="tab-constitution" tabindex="-1" data-tab="tab-constitution">
           <span class="nav-icon" data-icon="shield" aria-hidden="true"></span>
-          <span>Hiến pháp &amp; Gates</span>
+          <span class="nav-label">Hiến pháp &amp; Gates</span>
           <span id="nav-count-gates" class="nav-count">0</span>
+        </button>
+        <button type="button" role="tab" id="tabbtn-tiers" class="nav-item" aria-selected="false" aria-controls="tab-tiers" tabindex="-1" data-tab="tab-tiers">
+          <span class="nav-icon" data-icon="layers" aria-hidden="true"></span>
+          <span class="nav-label">Phân tầng &amp; Gộp</span>
+          <span id="nav-count-episodic" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-experiments" class="nav-item" aria-selected="false" aria-controls="tab-experiments" tabindex="-1" data-tab="tab-experiments">
           <span class="nav-icon" data-icon="activity" aria-hidden="true"></span>
-          <span>Sổ cái thực nghiệm</span>
+          <span class="nav-label">Sổ cái Thực nghiệm</span>
           <span id="nav-count-exps" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-lifecycle" class="nav-item" aria-selected="false" aria-controls="tab-lifecycle" tabindex="-1" data-tab="tab-lifecycle">
           <span class="nav-icon" data-icon="gitBranch" aria-hidden="true"></span>
-          <span>Proposals &amp; Kho Idea</span>
+          <span class="nav-label">Proposals &amp; Kho Idea</span>
           <span id="nav-count-props" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-events" class="nav-item" aria-selected="false" aria-controls="tab-events" tabindex="-1" data-tab="tab-events">
           <span class="nav-icon" data-icon="terminal" aria-hidden="true"></span>
-          <span>Nhật ký hệ thống</span>
+          <span class="nav-label">Nhật ký Hệ thống</span>
         </button>
       </nav>
 
-      <div class="rail-telemetry" aria-label="Thông số bộ nhớ đệm">
+      <div class="telemetry-card" aria-label="Thông số bộ nhớ đệm">
         <div class="meter-head">
           <span class="meter-label">Prompt Capsule</span>
-          <span id="kpi-tokens" class="meter-val">0 / 850 tok</span>
+          <strong id="kpi-tokens" class="meter-val">0 / 850 tok</strong>
         </div>
         <div class="meter-track" role="progressbar" aria-label="Dung lượng Prompt Capsule" aria-valuemin="0" aria-valuemax="850" id="token-meter-bar">
           <div id="token-meter-fill" class="meter-fill"></div>
         </div>
-        <div class="telemetry-row">
-          <span>Nén ngữ cảnh</span>
-          <strong id="kpi-compression">0%</strong>
-        </div>
-        <div class="telemetry-row">
-          <span>Vi phạm đã chặn</span>
-          <strong id="kpi-blocks">0</strong>
+        <div class="telemetry-grid">
+          <div class="telemetry-stat">
+            <span>Nén ngữ cảnh</span>
+            <strong id="kpi-compression">0%</strong>
+          </div>
+          <div class="telemetry-stat">
+            <span>Đã chặn lỗi</span>
+            <strong id="kpi-blocks">0</strong>
+          </div>
         </div>
         <div class="rail-footer-actions">
-          <button type="button" id="btn-run-audit" class="btn btn-ghost btn-sm">Kiểm định Gates</button>
-          <button type="button" id="btn-handoff" class="btn btn-ghost btn-sm">Xuất Handoff</button>
+          <button type="button" id="btn-run-audit" class="btn btn-secondary btn-sm">Kiểm định Gates</button>
+          <button type="button" id="btn-handoff" class="btn btn-secondary btn-sm">Xuất Handoff</button>
         </div>
       </div>
     </aside>
 
-    <!-- CENTER WORKSPACE -->
+    <!-- FULL-WIDTH DAYLIGHT WORKSPACE -->
     <div class="workspace-center">
       <header class="command-bar">
         <div class="project-context">
           <span id="scope-indicator" class="scope-pill">LOCAL</span>
-          <h1 id="project-title" class="page-title">SuperMemory</h1>
-          <span class="divider-dot" aria-hidden="true">/</span>
-          <p id="active-goal-line" class="goal-summary">Đang tải trạng thái...</p>
-          <button type="button" id="btn-open-state" class="btn btn-ghost btn-sm" aria-label="Chỉnh sửa mục tiêu và trạng thái làm việc">Sửa mục tiêu</button>
+          <div class="project-titles">
+            <div class="title-row">
+              <h1 id="project-title" class="page-title">SuperMemory</h1>
+              <button type="button" id="btn-open-state" class="text-action" aria-label="Chỉnh sửa mục tiêu chiến lược">Sửa mục tiêu</button>
+            </div>
+            <p id="active-goal-line" class="goal-summary">Đang đồng bộ trạng thái bộ nhớ...</p>
+          </div>
         </div>
 
         <div class="command-actions">
           <div class="search-field">
             <span class="search-icon" data-icon="search" aria-hidden="true"></span>
-            <label for="global-search" class="sr-only">Tìm kiếm BM25 và đồ thị 2-hop</label>
-            <input id="global-search" type="search" placeholder="Tìm kiếm liên thông (nhấn /)..." autocomplete="off" />
+            <label for="global-search" class="sr-only">Tìm kiếm liên thông BM25 và đồ thị 2-hop</label>
+            <input id="global-search" type="search" placeholder="Tìm luật, bài học, thực nghiệm..." autocomplete="off" />
+            <kbd class="kbd-hint" id="search-kbd" aria-hidden="true">/</kbd>
             <button type="button" id="btn-clear-search" class="icon-btn hidden" aria-label="Xóa từ khóa tìm kiếm">&times;</button>
           </div>
-          <button type="button" id="btn-open-quick-node" class="btn btn-primary btn-sm">Tạo Node</button>
-          <button type="button" id="btn-refresh" class="btn btn-secondary btn-sm" aria-label="Đồng bộ dữ liệu mới nhất">Đồng bộ</button>
+          <button type="button" id="btn-refresh" class="btn btn-secondary">Đồng bộ</button>
+          <button type="button" id="btn-open-quick-node" class="btn btn-primary">+ Tạo thực thể</button>
         </div>
       </header>
 
@@ -113,201 +126,217 @@
       <div id="error-banner" class="alert-strip alert-danger hidden" role="alert"></div>
 
       <main id="main-content" class="stage-container">
-        <!-- TAB 1: TOPOLOGY GRAPH -->
+        <!-- TAB 1: STRUCTURED TIER-LANE CARD GRAPH -->
         <section id="tab-graph" role="tabpanel" aria-labelledby="tabbtn-graph" class="tab-panel active">
-          <div class="sub-toolbar">
-            <div class="filter-group" role="group" aria-label="Lọc theo tầng nhận thức" id="tier-filters"></div>
-            <div class="filter-group" role="group" aria-label="Lọc theo loại thực thể" id="type-filters"></div>
-            <div class="toolbar-right">
-              <button type="button" id="btn-zoom-out" class="btn btn-ghost btn-sm" aria-label="Thu nhỏ đồ thị">&minus;</button>
-              <button type="button" id="btn-reset-zoom" class="btn btn-ghost btn-sm">100%</button>
-              <button type="button" id="btn-zoom-in" class="btn btn-ghost btn-sm" aria-label="Phóng to đồ thị">+</button>
-              <button type="button" id="btn-relayout" class="btn btn-secondary btn-sm">Sắp xếp lại</button>
-            </div>
-          </div>
           <div class="canvas-stage">
-            <canvas id="graph-canvas" tabindex="0" aria-label="Đồ thị tri thức tương tác. Kéo để di chuyển, cuộn để thu phóng, nhấp vào nút để thanh tra chi tiết."></canvas>
-            <div id="graph-tooltip" class="graph-tooltip hidden" role="tooltip"></div>
-            <div class="canvas-status-bar">
-              <span id="canvas-summary">L1 Procedural &middot; L2 Semantic &middot; L3 Episodic</span>
-              <span class="muted">Kéo thả để ghim vị trí Node</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- TAB 2: 4-TIER CONSOLIDATION WORKBENCH -->
-        <section id="tab-tiers" role="tabpanel" aria-labelledby="tabbtn-tiers" class="tab-panel" hidden>
-          <div class="panel-header">
-            <div>
-              <h2>Phân tầng Nhận thức &amp; Nén Tri thức</h2>
-              <p id="tier-budget-summary" class="section-subtitle">Đang tính toán tỷ lệ nén ngữ cảnh...</p>
-            </div>
-            <div class="toolbar-right">
-              <label class="checkbox-label">
-                <input type="checkbox" id="chk-hide-consolidated" checked />
-                <span>Ẩn mục đã gộp</span>
-              </label>
-              <button type="button" id="btn-select-episodic" class="btn btn-secondary btn-sm">Chọn L3 chưa gộp</button>
-              <button type="button" id="btn-clear-merge-sel" class="btn btn-ghost btn-sm">Bỏ chọn</button>
-              <button type="button" id="btn-auto-consolidate" class="btn btn-primary btn-sm">Tự động gộp theo cụm</button>
-            </div>
-          </div>
-
-          <form id="merge-form" class="composer-surface" novalidate>
-            <div class="composer-grid">
-              <div class="field-group">
-                <label for="merge-title" class="field-label">Tiêu đề tri thức chưng cất</label>
-                <input id="merge-title" class="control-input" type="text" placeholder="Ví dụ: Bất biến ổn định phân phối tiềm ẩn RSSM" required />
-              </div>
-              <div class="field-group">
-                <label for="merge-tier" class="field-label">Tầng đích</label>
-                <select id="merge-tier" class="control-select">
-                  <option value="SEMANTIC">L2 Semantic — Tri thức miền bài toán</option>
-                  <option value="PROCEDURAL">L1 Procedural — Quy trình / Luật chuẩn</option>
+            <div class="floating-toolbar">
+              <div class="segmented-tray" role="group" aria-label="Lọc theo tầng nhận thức" id="tier-filters"></div>
+              <div class="toolbar-cluster">
+                <label for="type-filter-select" class="sr-only">Lọc theo loại thực thể</label>
+                <select id="type-filter-select" class="control-select select-compact">
+                  <option value="ALL">Tất cả loại thực thể</option>
                 </select>
+                <div class="zoom-pill">
+                  <button type="button" id="btn-zoom-out" class="zoom-btn" aria-label="Thu nhỏ bản đồ">&minus;</button>
+                  <button type="button" id="btn-reset-zoom" class="zoom-reset">Căn khung</button>
+                  <button type="button" id="btn-zoom-in" class="zoom-btn" aria-label="Phóng to bản đồ">+</button>
+                </div>
+                <button type="button" id="btn-relayout" class="btn btn-secondary btn-sm">Sắp xếp theo tầng</button>
               </div>
-              <div class="field-group composer-submit">
-                <button type="submit" id="btn-merge-selected" class="btn btn-primary">Gộp mục đã chọn (0)</button>
-              </div>
             </div>
-            <div class="field-group">
-              <label for="merge-summary" class="field-label">Nguyên lý tổng hợp từ các mảnh nguồn</label>
-              <textarea id="merge-summary" class="control-textarea" rows="2" placeholder="Tóm tắt quy luật chung để Agent tái sử dụng dài hạn..." required></textarea>
-            </div>
-            <p id="merge-feedback" class="inline-feedback" role="status" aria-live="polite"></p>
-          </form>
 
-          <div class="tier-board" id="tier-columns"></div>
-        </section>
+            <canvas id="graph-canvas" tabindex="0" aria-label="Bản đồ tri thức 3 tầng. Kéo thả thẻ để di chuyển, cuộn để thu phóng, nhấp vào thẻ để mở chi tiết."></canvas>
+            <div id="graph-tooltip" class="graph-tooltip hidden" role="tooltip"></div>
 
-        <!-- TAB 3: CONSTITUTION, GATES & LESSONS -->
-        <section id="tab-constitution" role="tabpanel" aria-labelledby="tabbtn-constitution" class="tab-panel" hidden>
-          <div class="panel-header">
-            <div>
-              <h2>Hiến pháp, Chốt chặn CodeGate &amp; Bài học</h2>
-              <p class="section-subtitle">Mọi quy tắc được thực thi trực tiếp tại PreToolUse dưới 20ms và đồng bộ vào AGENTS.md.</p>
-            </div>
-            <div class="toolbar-right">
-              <button type="button" id="btn-add-lesson" class="btn btn-primary btn-sm">Ghi bài học / Thêm Rule</button>
-              <button type="button" id="btn-add-gate" class="btn btn-secondary btn-sm">Thêm Gate / Khóa SHA-256</button>
+            <div class="canvas-legend">
+              <span class="legend-item"><span class="legend-swatch" data-tone="LAW"></span>L1 Luật &amp; Gate</span>
+              <span class="legend-item"><span class="legend-swatch" data-tone="SEMANTIC"></span>L2 Tri thức &amp; Insight</span>
+              <span class="legend-item"><span class="legend-swatch" data-tone="EXPERIMENT"></span>L3 Thực nghiệm &amp; Proposal</span>
+              <span class="legend-item"><span class="legend-swatch" data-tone="LESSON"></span>Bài học sai lầm</span>
+              <span class="legend-hint">Nhấp vào bất kỳ thẻ nào để mở bảng chi tiết</span>
             </div>
           </div>
+        </section>
 
-          <div class="split-columns">
-            <div class="ledger-panel">
-              <div class="ledger-header">
-                <h3>Luật bất biến &amp; Quy trình (L1)</h3>
+        <!-- TAB 2: CONSTITUTION, GATES & LESSONS -->
+        <section id="tab-constitution" role="tabpanel" aria-labelledby="tabbtn-constitution" class="tab-panel" hidden>
+          <div class="content-wrap">
+            <div class="panel-header">
+              <div>
+                <h2>Hiến pháp, Chốt chặn CodeGate &amp; Bài học</h2>
+                <p class="section-subtitle">Mọi quy tắc được kiểm tra tức thời tại PreToolUse và đồng bộ trực tiếp vào AGENTS.md của dự án.</p>
               </div>
-              <div id="laws-list" class="ledger-list" role="list"></div>
-            </div>
-
-            <div class="stack-column">
-              <div class="ledger-panel">
-                <div class="ledger-header">
-                  <h3>Chốt chặn PreToolUse CodeGates</h3>
-                </div>
-                <div id="gates-list" class="ledger-list" role="list"></div>
-              </div>
-
-              <div class="ledger-panel">
-                <div class="ledger-header">
-                  <h3>Sổ cái bài học đã ghi nhận</h3>
-                </div>
-                <div id="lessons-list" class="ledger-list" role="list"></div>
+              <div class="toolbar-right">
+                <button type="button" id="btn-add-gate" class="btn btn-secondary">Thêm Gate / Khóa SHA-256</button>
+                <button type="button" id="btn-add-lesson" class="btn btn-primary">+ Ghi bài học / Thêm Rule</button>
               </div>
             </div>
+
+            <div class="bento-constitution">
+              <div class="surface-card">
+                <div class="card-header">
+                  <h3>Luật bất biến &amp; Quy trình chuẩn (L1)</h3>
+                </div>
+                <div id="laws-list" class="ledger-list" role="list"></div>
+              </div>
+
+              <div class="stack-column">
+                <div class="surface-card">
+                  <div class="card-header">
+                    <h3>Chốt chặn PreToolUse CodeGates đang hoạt động</h3>
+                  </div>
+                  <div id="gates-list" class="ledger-list" role="list"></div>
+                </div>
+
+                <div class="surface-card">
+                  <div class="card-header">
+                    <h3>Sổ cái Bài học rút ra từ thực tế</h3>
+                  </div>
+                  <div id="lessons-list" class="ledger-list" role="list"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: 4-TIER CONSOLIDATION WORKBENCH -->
+        <section id="tab-tiers" role="tabpanel" aria-labelledby="tabbtn-tiers" class="tab-panel" hidden>
+          <div class="content-wrap">
+            <div class="panel-header">
+              <div>
+                <h2>Phân tầng Nhận thức &amp; Nén Tri thức</h2>
+                <p id="tier-budget-summary" class="section-subtitle">Đang tính toán dung lượng ngữ cảnh...</p>
+              </div>
+              <div class="toolbar-right">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chk-hide-consolidated" checked />
+                  <span>Ẩn mục đã gộp</span>
+                </label>
+                <button type="button" id="btn-select-episodic" class="btn btn-secondary">Chọn L3 chưa gộp</button>
+                <button type="button" id="btn-clear-merge-sel" class="btn btn-ghost">Bỏ chọn</button>
+                <button type="button" id="btn-auto-consolidate" class="btn btn-primary">Tự động nén theo cụm</button>
+              </div>
+            </div>
+
+            <form id="merge-form" class="composer-card" novalidate>
+              <div class="composer-grid">
+                <div class="field-group">
+                  <label for="merge-title" class="field-label">Tiêu đề tri thức chưng cất</label>
+                  <input id="merge-title" class="control-input" type="text" placeholder="Ví dụ: Quy luật ổn định phân phối tiềm ẩn trong World Model" required />
+                </div>
+                <div class="field-group">
+                  <label for="merge-tier" class="field-label">Tầng lưu trữ đích</label>
+                  <select id="merge-tier" class="control-select">
+                    <option value="SEMANTIC">L2 Semantic — Tri thức miền bài toán</option>
+                    <option value="PROCEDURAL">L1 Procedural — Quy trình / Luật chuẩn</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <button type="submit" id="btn-merge-selected" class="btn btn-primary">Gộp mục đã chọn (0)</button>
+                </div>
+              </div>
+              <div class="field-group">
+                <label for="merge-summary" class="field-label">Nguyên lý tổng hợp từ các mảnh nguồn</label>
+                <textarea id="merge-summary" class="control-textarea" rows="2" placeholder="Viết quy luật khái quát để Agent ghi nhớ dài hạn mà không tốn token..." required></textarea>
+              </div>
+              <p id="merge-feedback" class="inline-feedback" role="status" aria-live="polite"></p>
+            </form>
+
+            <div class="tier-board" id="tier-columns"></div>
           </div>
         </section>
 
         <!-- TAB 4: SCIENTIFIC EXPERIMENTS -->
         <section id="tab-experiments" role="tabpanel" aria-labelledby="tabbtn-experiments" class="tab-panel" hidden>
-          <div class="panel-header">
-            <div>
-              <h2>Sổ cái Thực nghiệm Đơn biến</h2>
-              <p class="section-subtitle">Theo dõi biến thiên điểm số so với Baseline và kết tinh nhận xét thất bại thành tri thức L2.</p>
+          <div class="content-wrap">
+            <div class="panel-header">
+              <div>
+                <h2>Sổ cái Thực nghiệm Đơn biến</h2>
+                <p class="section-subtitle">Theo dõi điểm số định lượng so với Baseline và kết tinh hậu kiểm thất bại thành tri thức L2.</p>
+              </div>
+              <div class="toolbar-right">
+                <label for="exp-track-filter" class="sr-only">Lọc theo nhánh thực nghiệm</label>
+                <select id="exp-track-filter" class="control-select select-compact">
+                  <option value="ALL">Tất cả nhánh</option>
+                </select>
+                <button type="button" id="btn-add-exp" class="btn btn-primary">+ Ghi thực nghiệm</button>
+              </div>
             </div>
-            <div class="toolbar-right">
-              <label for="exp-track-filter" class="sr-only">Lọc theo nhánh thực nghiệm</label>
-              <select id="exp-track-filter" class="control-select">
-                <option value="ALL">Tất cả nhánh</option>
-              </select>
-              <button type="button" id="btn-add-exp" class="btn btn-primary btn-sm">Ghi thực nghiệm</button>
+
+            <div id="exp-chart-box" class="surface-card chart-card" aria-label="Biểu đồ tiến trình điểm số thực nghiệm"></div>
+
+            <div class="surface-card table-card">
+              <table class="ledger-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Mã thực nghiệm</th>
+                    <th scope="col">Nhánh</th>
+                    <th scope="col">Giả thuyết &amp; Biến thay đổi</th>
+                    <th scope="col">Điểm CV</th>
+                    <th scope="col">Test / LB</th>
+                    <th scope="col" class="num-col">Chênh lệch</th>
+                    <th scope="col">Kết luận</th>
+                  </tr>
+                </thead>
+                <tbody id="exp-table-body"></tbody>
+              </table>
             </div>
-          </div>
-
-          <div id="exp-chart-box" class="chart-surface" aria-label="Biểu đồ tiến trình điểm số thực nghiệm"></div>
-
-          <div class="table-surface">
-            <table class="ledger-table">
-              <thead>
-                <tr>
-                  <th scope="col">Mã</th>
-                  <th scope="col">Nhánh</th>
-                  <th scope="col">Giả thuyết &amp; Biến thay đổi</th>
-                  <th scope="col" class="num-col">CV</th>
-                  <th scope="col" class="num-col">Test / LB</th>
-                  <th scope="col" class="num-col">Delta</th>
-                  <th scope="col">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody id="exp-table-body"></tbody>
-            </table>
           </div>
         </section>
 
         <!-- TAB 5: PROPOSALS & IDEA VAULT -->
         <section id="tab-lifecycle" role="tabpanel" aria-labelledby="tabbtn-lifecycle" class="tab-panel" hidden>
-          <div class="panel-header">
-            <div>
-              <h2>Vòng đời OpenSpec Proposal &amp; Kho Ý tưởng</h2>
-              <p class="section-subtitle">Chặn trùng lặp hướng thất bại (Anti-Repeat Gate) và kiểm soát phê duyệt trước khi đóng gói.</p>
+          <div class="content-wrap">
+            <div class="panel-header">
+              <div>
+                <h2>Vòng đời OpenSpec Proposal &amp; Kho Ý tưởng</h2>
+                <p class="section-subtitle">Kiểm tra chống lặp hướng thất bại trước khi triển khai và lưu vết phê duyệt kiến trúc.</p>
+              </div>
+              <div class="toolbar-right">
+                <button type="button" id="btn-add-idea" class="btn btn-secondary">Lưu Idea / Dead-End</button>
+                <button type="button" id="btn-add-proposal" class="btn btn-primary">+ Tạo Proposal</button>
+              </div>
             </div>
-            <div class="toolbar-right">
-              <button type="button" id="btn-add-proposal" class="btn btn-primary btn-sm">Tạo Proposal</button>
-              <button type="button" id="btn-add-idea" class="btn btn-secondary btn-sm">Lưu Idea / Dead-End</button>
+
+            <div id="proposal-kanban" class="pipeline-grid" aria-label="Bảng trạng thái Proposal"></div>
+
+            <div class="subsection-block">
+              <h3>Kho Ý tưởng, Thuật toán &amp; Nhận xét Đúc kết</h3>
+              <div id="ideas-grid" class="vault-grid" role="list"></div>
             </div>
-          </div>
-
-          <div id="proposal-kanban" class="pipeline-grid" aria-label="Bảng trạng thái Proposal"></div>
-
-          <div class="subsection-block">
-            <h3>Kho Ý tưởng, Thuật toán &amp; Hướng đã bác bỏ</h3>
-            <div id="ideas-grid" class="vault-grid" role="list"></div>
           </div>
         </section>
 
         <!-- TAB 6: AUDIT EVENT LOG -->
         <section id="tab-events" role="tabpanel" aria-labelledby="tabbtn-events" class="tab-panel" hidden>
-          <div class="panel-header">
-            <div>
-              <h2>Nhật ký Sự kiện Bất biến</h2>
-              <p class="section-subtitle">Chuỗi thời gian các tác vụ Hook, Kiểm định, Gộp tầng và Cập nhật đồ thị.</p>
+          <div class="content-wrap">
+            <div class="panel-header">
+              <div>
+                <h2>Nhật ký Sự kiện Bất biến</h2>
+                <p class="section-subtitle">Lịch sử thời gian thực của các chốt chặn Hook, Kiểm định, Gộp tầng và Cập nhật đồ thị.</p>
+              </div>
             </div>
-          </div>
-          <div class="ledger-panel">
-            <div id="events-list" class="ledger-list" role="list"></div>
+            <div class="surface-card">
+              <div id="events-list" class="ledger-list" role="list"></div>
+            </div>
           </div>
         </section>
       </main>
     </div>
-
-    <!-- RIGHT INSPECTOR PANEL -->
-    <aside id="inspector-drawer" class="inspector-panel" aria-label="Chi tiết và chỉnh sửa thực thể">
-      <div class="inspector-top">
-        <div class="inspector-title-group">
-          <span id="insp-badge" class="status-tag">CHƯA CHỌN MỤC</span>
-          <h2 id="insp-id" class="inspector-heading">Thanh tra thực thể</h2>
-        </div>
-        <button type="button" id="btn-close-inspector" class="icon-btn" aria-label="Đóng bảng thanh tra">&times;</button>
-      </div>
-      <div id="insp-body" class="inspector-content">
-        <div class="empty-state">
-          <p class="empty-title">Chưa có thực thể nào được chọn</p>
-          <p class="empty-desc">Chọn một nút trên đồ thị hoặc một dòng trong sổ cái để xem thuộc tính, sửa nội dung, nối cạnh liên kết hoặc chuyển lên Global.</p>
-        </div>
-      </div>
-    </aside>
   </div>
+
+  <!-- CONTEXTUAL SLIDE-OVER INSPECTOR SHEET (HIDDEN UNTIL NODE SELECTED!) -->
+  <div id="inspector-backdrop" class="sheet-backdrop hidden" aria-hidden="true"></div>
+  <aside id="inspector-drawer" class="inspector-sheet" aria-label="Chi tiết và chỉnh sửa thực thể" aria-hidden="true">
+    <div class="inspector-top">
+      <div class="inspector-title-group">
+        <span id="insp-badge" class="status-tag">CHI TIẾT THỰC THỂ</span>
+        <h2 id="insp-id" class="inspector-heading">Thanh tra thực thể</h2>
+      </div>
+      <button type="button" id="btn-close-inspector" class="icon-btn" aria-label="Đóng bảng chi tiết">&times;</button>
+    </div>
+    <div id="insp-body" class="inspector-content"></div>
+  </aside>
 
   <!-- NATIVE ACCESSIBLE DIALOG -->
   <dialog id="workbench-dialog" class="workbench-dialog" aria-labelledby="dialog-title">
@@ -321,7 +350,6 @@
     </div>
   </dialog>
 
-  <!-- NON-INTRUSIVE STATUS TOAST -->
   <div id="toast-region" class="toast-region hidden" role="status" aria-live="polite"></div>
 
   <script src="/icons.js"></script>

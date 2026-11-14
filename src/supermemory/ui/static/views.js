@@ -1,4 +1,4 @@
-// Pure Presentation & Accessible Ledger Views (Constitution, Experiments, Proposals, Events)
+// High-Legibility Daylight Presentation Views (Constitution, Experiments, Proposals, Events)
 (function () {
   const { esc, statusTag } = window.SuperMemoryIcons;
 
@@ -16,7 +16,7 @@
       <button type="button" class="ledger-row" data-nid="${esc(n.id)}">
         <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, tagLabel || n.status)}</span>
         <span class="row-title">${esc(n.title)}</span>
-        <span class="row-desc">${esc(n.summary).slice(0, 180)}</span>
+        <span class="row-desc">${esc(n.summary).slice(0, 190)}</span>
       </button></div>`;
   }
 
@@ -30,7 +30,7 @@
     const laws = (state.nodes || []).filter((n) => n.node_type === "LAW" || n.node_type === "PROCEDURE");
     const lessons = (state.nodes || []).filter((n) => n.node_type === "LESSON");
     const lawsBox = document.getElementById("laws-list");
-    lawsBox.innerHTML = laws.map((l) => rowBtnHtml(l, `${l.node_type} / Gộp ${(l.metadata || {}).recurrence_count || 0}`)).join("");
+    lawsBox.innerHTML = laws.map((l) => rowBtnHtml(l, `${l.node_type} · Gộp ${(l.metadata || {}).recurrence_count || 0}`)).join("");
     bindInspectTriggers(lawsBox, h.onInspect);
 
     const gatesBox = document.getElementById("gates-list");
@@ -72,7 +72,7 @@
     } else {
       lessonsBox.innerHTML = `<div class="empty-state"><p class="empty-title">Chưa có bài học nào được ghi</p>
         <p class="empty-desc">Ghi lại sai lầm hoặc quy tắc để tự động kết tinh thành Luật và chốt chặn CodeGate.</p>
-        <div><button type="button" id="cta-empty-lesson" class="btn btn-secondary btn-xs">Ghi bài học đầu tiên</button></div></div>`;
+        <div><button type="button" id="cta-empty-lesson" class="btn btn-secondary btn-sm">Ghi bài học đầu tiên</button></div></div>`;
       document.getElementById("cta-empty-lesson").addEventListener("click", h.onOpenLesson);
     }
   }
@@ -91,29 +91,29 @@
     if (scored.length >= 2) {
       const vals = scored.map((e) => (typeof e.test_score === "number" ? e.test_score : e.cv_score));
       const minV = Math.min(...vals), maxV = Math.max(...vals), span = maxV - minV || 1;
-      const W = 840, H = 124, px = 36, py = 20;
+      const W = 880, H = 148, px = 54, py = 24;
       const pts = scored.map((e, i) => ({
         x: px + (i / (scored.length - 1)) * (W - px * 2),
         y: H - py - (((typeof e.test_score === "number" ? e.test_score : e.cv_score) - minV) / span) * (H - py * 2),
         id: e.exp_id || e.id, v: vals[i],
       }));
-      chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="124" role="img" aria-label="Đường cong điểm số thực nghiệm">
-        <line x1="${px}" y1="${py}" x2="${W - px}" y2="${py}" stroke="#1d212a" stroke-dasharray="3 3"/>
-        <line x1="${px}" y1="${H - py}" x2="${W - px}" y2="${H - py}" stroke="#1d212a" stroke-dasharray="3 3"/>
-        <text x="4" y="${py + 4}" fill="#7e8696" font-size="10" font-family="Geist Mono, monospace">${maxV.toFixed(2)}</text>
-        <text x="4" y="${H - py + 4}" fill="#7e8696" font-size="10" font-family="Geist Mono, monospace">${minV.toFixed(2)}</text>
-        <polyline fill="none" stroke="#f3f4f6" stroke-width="1.75" points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />
-        ${pts.map((p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.75" fill="#38bdf8"><title>${esc(p.id)}: ${p.v}</title></circle>`).join("")}
+      chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="148" role="img" aria-label="Đường cong điểm số thực nghiệm">
+        <line x1="${px}" y1="${py}" x2="${W - px}" y2="${py}" stroke="#D5D1C7" stroke-dasharray="4 4"/>
+        <line x1="${px}" y1="${H - py}" x2="${W - px}" y2="${H - py}" stroke="#D5D1C7" stroke-dasharray="4 4"/>
+        <text x="6" y="${py + 4}" fill="#484C56" font-size="12" font-family="JetBrains Mono, monospace">${maxV.toFixed(1)}</text>
+        <text x="6" y="${H - py + 4}" fill="#484C56" font-size="12" font-family="JetBrains Mono, monospace">${minV.toFixed(1)}</text>
+        <polyline fill="none" stroke="#141518" stroke-width="2.25" points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />
+        ${pts.map((p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="#0284C7" stroke="#FFFFFF" stroke-width="2"><title>${esc(p.id)}: ${p.v}</title></circle>`).join("")}
       </svg>`;
     } else {
-      chart.innerHTML = `<div class="empty-state"><p class="empty-title">Chưa đủ điểm số định lượng để vẽ đồ thị</p>
+      chart.innerHTML = `<div class="empty-state"><p class="empty-title">Chưa đủ điểm số định lượng để vẽ biểu đồ</p>
         <p class="empty-desc">Ghi nhận từ 2 thực nghiệm có điểm CV hoặc Test trở lên để hiển thị đường tiến trình.</p></div>`;
     }
 
     const tbody = document.getElementById("exp-table-body");
     if (!filtered.length) {
       tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><p class="empty-title">Sổ cái thực nghiệm đang trống</p>
-        <div><button type="button" id="cta-empty-exp" class="btn btn-secondary btn-xs">Ghi thực nghiệm đầu tiên</button></div></div></td></tr>`;
+        <div><button type="button" id="cta-empty-exp" class="btn btn-secondary btn-sm">Ghi thực nghiệm đầu tiên</button></div></div></td></tr>`;
       document.getElementById("cta-empty-exp").addEventListener("click", h.onOpenExp);
       return;
     }
@@ -124,9 +124,9 @@
         return `<tr>
           <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="mono-id">${esc(eid)}</span></button></td>
           <td class="mono-id">${esc(e.track)}</td>
-          <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="row-title">${esc(e.title)}</span><span class="row-desc">${esc(e.single_var_diff || e.hypothesis).slice(0, 100)}</span></button></td>
-          <td class="num-col">${esc(e.cv_summary || (e.cv_score ?? "—"))}</td>
-          <td class="num-col">${esc(e.test_summary || (e.test_score ?? "—"))}</td>
+          <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="row-title">${esc(e.title)}</span><span class="row-desc">${esc(e.single_var_diff || e.hypothesis).slice(0, 110)}</span></button></td>
+          <td class="metric-cell">${esc(e.cv_summary || (e.cv_score ?? "—"))}</td>
+          <td class="metric-cell">${esc(e.test_summary || (e.test_score ?? "—"))}</td>
           <td class="num-col">${delta}</td>
           <td>${statusTag(e.verdict)}</td></tr>`;
       })
@@ -167,11 +167,11 @@
     if (ideas.length) {
       grid.innerHTML = ideas.map((n) => `<div role="listitem" class="ledger-panel"><button type="button" class="ledger-row" data-nid="${esc(n.id)}">
         <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, `${n.node_type} / ${n.status}`)}</span>
-        <span class="row-title">${esc(n.title)}</span><span class="row-desc">${esc(n.summary).slice(0, 150)}</span></button></div>`).join("");
+        <span class="row-title">${esc(n.title)}</span><span class="row-desc">${esc(n.summary).slice(0, 160)}</span></button></div>`).join("");
       bindInspectTriggers(grid, h.onInspect);
     } else {
       grid.innerHTML = `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">Kho Ý tưởng &amp; Insight đang trống</p>
-        <div><button type="button" id="cta-empty-idea" class="btn btn-secondary btn-xs">Lưu Idea đầu tiên</button></div></div></div>`;
+        <div><button type="button" id="cta-empty-idea" class="btn btn-secondary btn-sm">Lưu Idea đầu tiên</button></div></div></div>`;
       document.getElementById("cta-empty-idea").addEventListener("click", h.onOpenIdea);
     }
   }
@@ -187,7 +187,7 @@
             <span class="mono-id">${esc((ev.created_at || "").slice(0, 19))}</span>
           </div>
           <div class="row-desc">${esc(ev.summary || "")}</div>
-          ${ev.entity_id && nodeSet.has(ev.entity_id) ? `<div><button type="button" class="btn btn-ghost btn-xs" data-nid="${esc(ev.entity_id)}">Thanh tra ${esc(ev.entity_id)}</button></div>` : ""}
+          ${ev.entity_id && nodeSet.has(ev.entity_id) ? `<div><button type="button" class="btn btn-secondary btn-xs" data-nid="${esc(ev.entity_id)}">Mở ${esc(ev.entity_id)}</button></div>` : ""}
         </div>`).join("")
       : `<div role="listitem" class="empty-state"><p class="empty-desc">Chưa có sự kiện hệ thống nào.</p></div>`;
     bindInspectTriggers(box, h.onInspect);

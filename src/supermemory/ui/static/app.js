@@ -1,4 +1,4 @@
-// Main State Container & Accessible Workbench Shell Controller
+// Main State Container & Accessible Daylight Studio Controller
 (function () {
   const { hydrateIcons, esc } = window.SuperMemoryIcons;
   const { ForceGraphCanvas } = window.SuperMemoryGraph;
@@ -8,23 +8,17 @@
   const Views = window.SuperMemoryViews;
 
   let state = { nodes: [], edges: [], gates: [], experiments: [], events: [], meta: {}, analytics: {}, cognitive_tiers: {}, workspaces: [] };
-  let currentScope = "local";
+  let currentScope = "local", activeTier = "ALL", activeType = "ALL";
   let graphView = null, inspector = null, mergeStudio = null, modals = null, toastTimer = null;
 
   function toast(msg, isError = false) {
     const el = document.getElementById("toast-region");
-    el.textContent = msg;
-    el.className = `toast-region${isError ? " toast-error" : ""}`;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.add("hidden"), 3400);
+    el.textContent = msg; el.className = `toast-region${isError ? " toast-error" : ""}`;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add("hidden"), 3400);
   }
 
   async function postJson(route, payload = {}) {
-    const res = await fetch(route, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope: currentScope, ...payload }),
-    });
+    const res = await fetch(route, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope: currentScope, ...payload }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
@@ -58,7 +52,7 @@
       state = await res.json();
       renderWorkspaceSwitcher();
       renderCommandAndTelemetry();
-      renderFilterChips();
+      renderGraphToolbar();
       graphView.setData(state.nodes, state.edges);
       mergeStudio.render();
       const handlers = buildViewHandlers();
@@ -66,10 +60,12 @@
       Views.renderExperiments(state, handlers);
       Views.renderLifecycle(state, handlers);
       Views.renderEvents(state, handlers);
+      const qInspect = new URLSearchParams(window.location.search).get("inspect");
+      if (qInspect && !inspector.selectedId) { graphView.selectedId = qInspect; inspector.inspect(qInspect); }
     } catch (err) {
       errStrip.classList.remove("hidden");
       errStrip.innerHTML = `<span>Lỗi kết nối máy chủ: ${esc(err.message)}</span>
-        <button type="button" id="btn-retry-load" class="btn btn-secondary btn-xs">Thử lại</button>`;
+        <button type="button" id="btn-retry-load" class="btn btn-secondary btn-sm">Thử lại</button>`;
       document.getElementById("btn-retry-load").addEventListener("click", loadGraph);
     }
   }
@@ -108,22 +104,29 @@
     document.getElementById("nav-count-props").textContent = (state.nodes || []).filter((n) => n.node_type === "PROPOSAL").length;
   }
 
-  function renderChipGroup(boxId, entries, hiddenSet) {
-    const box = document.getElementById(boxId);
-    box.innerHTML = entries.map(([k, cnt]) => `<button type="button" class="filter-chip" aria-pressed="${!hiddenSet.has(k)}" data-chip="${esc(k)}">
-      <span class="chip-dot" data-tone="${esc(k)}"></span><span>${esc(k)} (${cnt})</span></button>`).join("");
-    box.querySelectorAll("[data-chip]").forEach((btn) => btn.addEventListener("click", () => {
-      const k = btn.getAttribute("data-chip");
-      if (hiddenSet.has(k)) hiddenSet.delete(k); else hiddenSet.add(k);
-      graphView.alpha = 0.45; renderFilterChips();
-    }));
-  }
-
-  function renderFilterChips() {
+  function renderGraphToolbar() {
     const tc = ((state.cognitive_tiers || {}).counts_by_tier) || {};
-    renderChipGroup("tier-filters", ["PROCEDURAL", "SEMANTIC", "EPISODIC"].map((k) => [k, tc[k] || 0]), graphView.hiddenTiers);
+    const total = (state.nodes || []).length;
+    const segs = [
+      ["ALL", `Tất cả (${total})`],
+      ["PROCEDURAL", `L1 Hiến pháp (${tc.PROCEDURAL || 0})`],
+      ["SEMANTIC", `L2 Tri thức (${tc.SEMANTIC || 0})`],
+      ["EPISODIC", `L3 Thực nghiệm (${tc.EPISODIC || 0})`],
+    ];
+    const tray = document.getElementById("tier-filters");
+    tray.innerHTML = segs.map(([k, lbl]) => `<button type="button" class="seg-btn" aria-pressed="${activeTier === k}" data-tier="${k}">${esc(lbl)}</button>`).join("");
+    tray.querySelectorAll("[data-tier]").forEach((btn) => btn.addEventListener("click", () => {
+      activeTier = btn.getAttribute("data-tier");
+      renderGraphToolbar();
+      graphView.setFilter(activeTier, activeType);
+    }));
+
+    const sel = document.getElementById("type-filter-select");
     const nc = (state.analytics || {}).nodes_by_type || {};
-    renderChipGroup("type-filters", Object.keys(nc).sort().map((k) => [k, nc[k]]), graphView.hiddenTypes);
+    const keys = Object.keys(nc).sort();
+    if (activeType !== "ALL" && !nc[activeType]) activeType = "ALL";
+    sel.innerHTML = `<option value="ALL">Tất cả loại thực thể (${total})</option>` +
+      keys.map((k) => `<option value="${esc(k)}" ${activeType === k ? "selected" : ""}>${esc(k)} (${nc[k]})</option>`).join("");
   }
 
   function bindTabsAndShortcuts() {
@@ -134,6 +137,7 @@
         t.classList.toggle("active", sel); t.setAttribute("aria-selected", String(sel)); t.setAttribute("tabindex", sel ? "0" : "-1");
         const p = document.getElementById(t.dataset.tab); p.classList.toggle("active", sel); p.hidden = !sel;
       });
+      if (tab.dataset.tab === "tab-graph") requestAnimationFrame(() => graphView.fitView());
       if (moveFocus) tab.focus();
     };
     tabs.forEach((tab, idx) => {
@@ -143,11 +147,14 @@
         if (ev.key in map) { ev.preventDefault(); activateTab(tabs[map[ev.key]], true); }
       });
     });
+    const hashTab = tabs.find((t) => t.dataset.tab === `tab-${location.hash.slice(1)}`);
+    if (hashTab) activateTab(hashTab);
 
-    const search = document.getElementById("global-search"), clearBtn = document.getElementById("btn-clear-search");
+    const search = document.getElementById("global-search"), clearBtn = document.getElementById("btn-clear-search"), kbd = document.getElementById("search-kbd");
     let timer = null;
     search.addEventListener("input", () => {
       clearBtn.classList.toggle("hidden", !search.value);
+      kbd.classList.toggle("hidden", Boolean(search.value));
       clearTimeout(timer);
       timer = setTimeout(async () => {
         const q = search.value.trim(), banner = document.getElementById("anti-repeat-banner");
@@ -158,7 +165,10 @@
         banner.innerHTML = data.anti_repeat_warnings?.length ? `<span>Cảnh báo trùng hướng thất bại: ${data.anti_repeat_warnings.map(esc).join(" | ")}</span>` : "";
       }, 200);
     });
-    clearBtn.addEventListener("click", () => { search.value = ""; clearBtn.classList.add("hidden"); graphView.highlightIds.clear(); document.getElementById("anti-repeat-banner").classList.add("hidden"); });
+    clearBtn.addEventListener("click", () => {
+      search.value = ""; clearBtn.classList.add("hidden"); kbd.classList.remove("hidden");
+      graphView.highlightIds.clear(); document.getElementById("anti-repeat-banner").classList.add("hidden");
+    });
     window.addEventListener("keydown", (ev) => {
       if (ev.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) { ev.preventDefault(); search.focus(); }
       else if (ev.key === "Escape" && !document.getElementById("workbench-dialog").open) inspector.close();
@@ -173,9 +183,10 @@
     mergeStudio = new MergeStudioController(() => state, postJson, loadGraph, (id) => { graphView.selectedId = id; inspector.inspect(id); }, toast);
     bindTabsAndShortcuts();
     document.getElementById("workspace-switcher").addEventListener("change", (ev) => { currentScope = ev.target.value; inspector.resetEmpty(); loadGraph(); });
+    document.getElementById("type-filter-select").addEventListener("change", (ev) => { activeType = ev.target.value; graphView.setFilter(activeTier, activeType); });
     document.getElementById("btn-refresh").addEventListener("click", loadGraph);
-    document.getElementById("btn-zoom-in").addEventListener("click", () => graphView.zoomBy(1.2));
-    document.getElementById("btn-zoom-out").addEventListener("click", () => graphView.zoomBy(0.84));
+    document.getElementById("btn-zoom-in").addEventListener("click", () => graphView.zoomBy(1.18));
+    document.getElementById("btn-zoom-out").addEventListener("click", () => graphView.zoomBy(0.85));
     document.getElementById("btn-reset-zoom").addEventListener("click", () => graphView.fitView());
     document.getElementById("btn-relayout").addEventListener("click", () => graphView.relayout());
     document.getElementById("exp-track-filter").addEventListener("change", () => Views.renderExperiments(state, buildViewHandlers()));

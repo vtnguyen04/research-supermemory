@@ -204,9 +204,12 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         assert 'role="tabpanel"' in html
         assert "<dialog" in html
         assert "skip-link" in html
+        assert "inspector-backdrop" in html
         assert ":focus-visible" in css
         assert "font-variant-numeric: tabular-nums" in css
-        assert "--bg-canvas:" in css and "--sp-4: 1rem" in css
+        assert "--bg-canvas: #F5F4F0" in css and "--sp-4: 1rem" in css
+        micro_font_rx = re.compile(r"font-size:\s*(0\.[0-7]\d*rem|(1[0-2]|[0-9])(\.\d+)?px)\b")
+        assert not micro_font_rx.search(css), "Microscopic font-size (<13px) detected in styles.css"
 
         js_files = sorted(STATIC_DIR.glob("*.js"))
         assert len(js_files) == 7
