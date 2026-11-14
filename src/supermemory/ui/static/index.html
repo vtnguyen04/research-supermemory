@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuperMemory — Project Knowledge Graph & Self-Learning Observatory</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">SM</div>
+      <div>
+        <h1 id="project-title">SuperMemory Observatory</h1>
+        <p id="active-goal-line" class="subtitle">Loading active state...</p>
+      </div>
+    </div>
+    <div class="topbar-controls">
+      <div class="search-box">
+        <input id="global-search" type="search" placeholder="Recall BM25 + 2-hop graph (laws, mistakes, hypotheses, modules)..." />
+        <button id="btn-clear-search" class="btn-ghost" title="Clear filter">✕</button>
+      </div>
+      <button id="btn-refresh" class="btn-primary">↻ Sync Live</button>
+    </div>
+  </header>
+
+  <section id="anti-repeat-banner" class="warning-banner hidden"></section>
+
+  <section class="kpi-strip" id="kpi-strip">
+    <div class="kpi-card"><span class="kpi-label">Graph Entities</span><strong id="kpi-nodes">0</strong></div>
+    <div class="kpi-card"><span class="kpi-label">Typed Edges</span><strong id="kpi-edges">0</strong></div>
+    <div class="kpi-card accent-emerald"><span class="kpi-label">Constitutional Laws</span><strong id="kpi-laws">0</strong></div>
+    <div class="kpi-card accent-rose"><span class="kpi-label">Mistakes & Lessons</span><strong id="kpi-lessons">0</strong></div>
+    <div class="kpi-card accent-cyan"><span class="kpi-label">Gate Blocks Prevented</span><strong id="kpi-blocks">0</strong></div>
+    <div class="kpi-card accent-violet"><span class="kpi-label">Experiments Logged</span><strong id="kpi-exps">0</strong></div>
+  </section>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="tab-graph">🕸 Knowledge Graph</button>
+    <button class="tab-btn" data-tab="tab-constitution">🛡 Laws, Mistakes & Gates</button>
+    <button class="tab-btn" data-tab="tab-experiments">🧪 Scientific Experiments</button>
+    <button class="tab-btn" data-tab="tab-lifecycle">📋 Proposals & Idea Vault</button>
+    <button class="tab-btn" data-tab="tab-events">⚡ Harness Event Stream</button>
+  </nav>
+
+  <main class="workspace-grid">
+    <div class="main-stage">
+      <!-- TAB 1: INTERACTIVE FORCE GRAPH -->
+      <section id="tab-graph" class="tab-panel active">
+        <div class="graph-toolbar">
+          <div id="type-filters" class="filter-pills"></div>
+          <div class="graph-actions">
+            <button id="btn-relayout" class="btn-ghost">⟳ Re-layout</button>
+            <button id="btn-reset-zoom" class="btn-ghost">⛶ Fit View</button>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="graph-canvas"></canvas>
+          <div id="graph-tooltip" class="graph-tooltip hidden"></div>
+          <div class="graph-legend">
+            <span>Drag nodes to pin • Scroll to zoom • Click node to inspect 1-hop lineage</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: LAWS, LESSONS & GATES -->
+      <section id="tab-constitution" class="tab-panel">
+        <div class="two-col">
+          <div>
+            <h2 class="section-heading">⚖️ Anti-Regression Constitution (LAWs)</h2>
+            <div id="laws-list" class="card-stack"></div>
+          </div>
+          <div>
+            <h2 class="section-heading">🛡 PreToolUse Executable CodeGates</h2>
+            <div id="gates-list" class="card-stack"></div>
+            <h2 class="section-heading mt-lg">🔥 Mistakes & Lessons Consolidated</h2>
+            <div id="lessons-list" class="card-stack"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: EXPERIMENTS & METRIC LINEAGE -->
+      <section id="tab-experiments" class="tab-panel">
+        <div class="exp-header">
+          <h2 class="section-heading">📈 Monotonic Metric Progression & Hypothesis Ledger</h2>
+          <select id="exp-track-filter" class="select-input">
+            <option value="ALL">All Tracks</option>
+          </select>
+        </div>
+        <div id="exp-chart-box" class="chart-box"></div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Track</th>
+                <th>Title & Single-Variable Diff</th>
+                <th>CV Metric</th>
+                <th>Test / LB</th>
+                <th>Δ Baseline</th>
+                <th>Verdict</th>
+              </tr>
+            </thead>
+            <tbody id="exp-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 4: LIFECYCLE KANBAN & IDEA VAULT -->
+      <section id="tab-lifecycle" class="tab-panel">
+        <h2 class="section-heading">📋 OpenSpec Proposal Lifecycle Pipeline</h2>
+        <div id="proposal-kanban" class="kanban-board"></div>
+        <h2 class="section-heading mt-lg">💡 Idea, Algorithm & Dead-End Vault (Anti-Repeat Memory)</h2>
+        <div id="ideas-grid" class="ideas-grid"></div>
+      </section>
+
+      <!-- TAB 5: LIVE HARNESS EVENT STREAM -->
+      <section id="tab-events" class="tab-panel">
+        <h2 class="section-heading">⚡ Immutable Harness & Self-Learning Telemetry</h2>
+        <div id="events-list" class="card-stack"></div>
+      </section>
+    </div>
+
+    <!-- RIGHT INSPECTOR DRAWER -->
+    <aside id="inspector-drawer" class="inspector">
+      <div class="inspector-header">
+        <div>
+          <span id="insp-badge" class="type-badge">SELECT NODE</span>
+          <h3 id="insp-id">Graph Inspector</h3>
+        </div>
+        <button id="btn-close-inspector" class="btn-ghost" title="Clear selection">✕</button>
+      </div>
+      <div id="insp-body" class="inspector-body">
+        <p class="muted">Click any node in the Knowledge Graph, Law card, Lesson, Proposal, or Experiment row to inspect its full content, metadata, source file link, and connected graph edges.</p>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/graph_canvas.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

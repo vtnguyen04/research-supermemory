@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.supermemory/*.db
+.supermemory/*.db-shm
+.supermemory/*.db-wal
+.supermemory/runtime/
+plugin/lib/
+.DS_Store
+.env

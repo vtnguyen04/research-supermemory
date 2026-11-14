@@ -1,0 +1,16 @@
+{
+  "$schema": "https://antigravity.google/schemas/plugin.json",
+  "name": "supermemory",
+  "displayName": "SuperMemory Harness",
+  "version": "1.0.0",
+  "description": "Zero-Amnesia Knowledge Graph, Self-Learning Constitutional Harness, PreToolUse CodeGates, Scientific Experiment Registry, and OpenSpec Lifecycle Extension.",
+  "author": {
+    "name": "SuperMemory Engineering"
+  },
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Initialize SuperMemory in this workspace and audit all Constitutional CodeGates",
+    "Recall past lessons, mistakes, and experiments before proposing a new change",
+    "Record a self-learning lesson and bind a PreToolUse CodeGate so this mistake never recurs"
+  ]
+}

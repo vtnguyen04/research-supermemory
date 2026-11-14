@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="smGrad" x1="12" y1="12" x2="116" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#0B1120" stroke="url(#smGrad)" stroke-width="6"/>
+  <path d="M64 24L96 38V64C96 86 81.5 101.5 64 108C46.5 101.5 32 86 32 64V38L64 24Z" fill="#111C33" stroke="url(#smGrad)" stroke-width="4"/>
+  <line x1="64" y1="44" x2="46" y2="66" stroke="#38BDF8" stroke-width="3.5"/>
+  <line x1="64" y1="44" x2="82" y2="66" stroke="#38BDF8" stroke-width="3.5"/>
+  <line x1="46" y1="66" x2="82" y2="66" stroke="#10B981" stroke-width="3"/>
+  <line x1="46" y1="66" x2="64" y2="86" stroke="#F43F5E" stroke-width="3.5"/>
+  <line x1="82" y1="66" x2="64" y2="86" stroke="#10B981" stroke-width="3.5"/>
+  <circle cx="64" cy="44" r="7" fill="#10B981"/>
+  <circle cx="46" cy="66" r="6.5" fill="#06B6D4"/>
+  <circle cx="82" cy="66" r="6.5" fill="#8B5CF6"/>
+  <circle cx="64" cy="86" r="7" fill="#F59E0B"/>
+</svg>
