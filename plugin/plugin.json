@@ -2,8 +2,8 @@
   "$schema": "https://antigravity.google/schemas/plugin.json",
   "name": "supermemory",
   "displayName": "SuperMemory Harness",
-  "version": "1.0.0",
-  "description": "Zero-Amnesia Knowledge Graph, Self-Learning Constitutional Harness, PreToolUse CodeGates, Scientific Experiment Registry, and OpenSpec Lifecycle Extension.",
+  "version": "2.0.0",
+  "description": "Federated Local+Global 4-Tier Cognitive Knowledge Graph, Agent-Native Semantic Self-Learning Harness, PreToolUse CodeGates, Scientific Experiment Registry & Interactive Merge Studio.",
   "author": {
     "name": "SuperMemory Engineering"
   },

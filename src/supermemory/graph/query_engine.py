@@ -137,6 +137,8 @@ class QueryEngine:
                 ExperimentVerdict.FAILED.value,
             ):
                 warnings.append(f"FAILED/REVERTED EXPERIMENT `{nid}` ({item['title']}): {item['summary'][:150]}")
+            elif ntype == NodeType.OBSERVATION.value and status == "FAILURE_INSIGHT":
+                warnings.append(f"FAILURE INSIGHT `{nid}`: {item['summary'][:160]}")
         return warnings
 
     def graph_analytics(self) -> Dict[str, Any]:

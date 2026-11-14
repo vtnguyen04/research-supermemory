@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SuperMemory — Project Knowledge Graph & Self-Learning Observatory</title>
+  <title>SuperMemory Observatory — Tiered Cognitive Graph & Global/Local Federation</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -16,8 +16,9 @@
       </div>
     </div>
     <div class="topbar-controls">
+      <select id="workspace-switcher" class="select-input" title="Switch between Local Project Folders & Global SuperMemory"></select>
       <div class="search-box">
-        <input id="global-search" type="search" placeholder="Recall BM25 + 2-hop graph (laws, mistakes, hypotheses, modules)..." />
+        <input id="global-search" type="search" placeholder="Federated Recall (Local + Global BM25 & 2-hop graph)..." />
         <button id="btn-clear-search" class="btn-ghost" title="Clear filter">✕</button>
       </div>
       <button id="btn-refresh" class="btn-primary">↻ Sync Live</button>
@@ -28,19 +29,20 @@
 
   <section class="kpi-strip" id="kpi-strip">
     <div class="kpi-card"><span class="kpi-label">Graph Entities</span><strong id="kpi-nodes">0</strong></div>
-    <div class="kpi-card"><span class="kpi-label">Typed Edges</span><strong id="kpi-edges">0</strong></div>
-    <div class="kpi-card accent-emerald"><span class="kpi-label">Constitutional Laws</span><strong id="kpi-laws">0</strong></div>
-    <div class="kpi-card accent-rose"><span class="kpi-label">Mistakes & Lessons</span><strong id="kpi-lessons">0</strong></div>
+    <div class="kpi-card accent-emerald"><span class="kpi-label">L1 Procedural (Laws/Gates)</span><strong id="kpi-procedural">0</strong></div>
+    <div class="kpi-card accent-sky"><span class="kpi-label">L2 Semantic (Insights)</span><strong id="kpi-semantic">0</strong></div>
+    <div class="kpi-card accent-violet"><span class="kpi-label">L3 Episodic (Exps/Logs)</span><strong id="kpi-episodic">0</strong></div>
     <div class="kpi-card accent-cyan"><span class="kpi-label">Gate Blocks Prevented</span><strong id="kpi-blocks">0</strong></div>
-    <div class="kpi-card accent-violet"><span class="kpi-label">Experiments Logged</span><strong id="kpi-exps">0</strong></div>
+    <div class="kpi-card accent-amber"><span class="kpi-label">Prompt Token Budget</span><strong id="kpi-tokens">0 tok</strong></div>
   </section>
 
   <nav class="tab-bar">
     <button class="tab-btn active" data-tab="tab-graph">🕸 Knowledge Graph</button>
+    <button class="tab-btn" data-tab="tab-tiers">🧬 Cognitive Tiers & Merge Memory</button>
     <button class="tab-btn" data-tab="tab-constitution">🛡 Laws, Mistakes & Gates</button>
     <button class="tab-btn" data-tab="tab-experiments">🧪 Scientific Experiments</button>
     <button class="tab-btn" data-tab="tab-lifecycle">📋 Proposals & Idea Vault</button>
-    <button class="tab-btn" data-tab="tab-events">⚡ Harness Event Stream</button>
+    <button class="tab-btn" data-tab="tab-events">⚡ Event Stream</button>
   </nav>
 
   <main class="workspace-grid">
@@ -48,6 +50,7 @@
       <!-- TAB 1: INTERACTIVE FORCE GRAPH -->
       <section id="tab-graph" class="tab-panel active">
         <div class="graph-toolbar">
+          <div id="tier-filters" class="filter-pills"></div>
           <div id="type-filters" class="filter-pills"></div>
           <div class="graph-actions">
             <button id="btn-relayout" class="btn-ghost">⟳ Re-layout</button>
@@ -58,12 +61,38 @@
           <canvas id="graph-canvas"></canvas>
           <div id="graph-tooltip" class="graph-tooltip hidden"></div>
           <div class="graph-legend">
-            <span>Drag nodes to pin • Scroll to zoom • Click node to inspect 1-hop lineage</span>
+            <span>L1 Procedural (Laws/Procedures/Gates) • L2 Semantic (Insights/Ideas) • L3 Episodic (Experiments/Lessons)</span>
           </div>
         </div>
       </section>
 
-      <!-- TAB 2: LAWS, LESSONS & GATES -->
+      <!-- TAB 2: COGNITIVE TIERS & INTERACTIVE MEMORY CONSOLIDATION / MERGE STUDIO -->
+      <section id="tab-tiers" class="tab-panel">
+        <div class="merge-banner">
+          <div>
+            <h2 class="section-heading">🧠 4-Tier Cognitive Hierarchy & Anti-Overload Consolidation Studio</h2>
+            <p id="tier-budget-summary" class="muted">Progressive disclosure keeps Agent prompt ultra-lean while storing unlimited episodic history.</p>
+          </div>
+          <button id="btn-auto-consolidate" class="btn-ghost">⚡ Auto-Consolidate Episodic Clusters</button>
+        </div>
+
+        <div class="merge-form-card">
+          <div class="merge-row">
+            <input id="merge-title" class="text-input" placeholder="Distilled Memory Title (e.g. 'Unified Retrieval Latency & Caching Invariants')..." />
+            <select id="merge-tier" class="select-input">
+              <option value="SEMANTIC">Target: L2 SEMANTIC (Distilled Domain Knowledge)</option>
+              <option value="PROCEDURAL">Target: L1 PROCEDURAL (Reusable Playbook / Rule)</option>
+            </select>
+            <button id="btn-merge-selected" class="btn-primary">🧬 Gộp Memory đã chọn (0)</button>
+          </div>
+          <textarea id="merge-summary" class="text-area" rows="2" placeholder="Synthesized insight / procedural rule distilled from the selected nodes..."></textarea>
+          <p id="merge-feedback" class="muted"></p>
+        </div>
+
+        <div class="tier-columns" id="tier-columns"></div>
+      </section>
+
+      <!-- TAB 3: LAWS, LESSONS & GATES -->
       <section id="tab-constitution" class="tab-panel">
         <div class="two-col">
           <div>
@@ -79,7 +108,7 @@
         </div>
       </section>
 
-      <!-- TAB 3: EXPERIMENTS & METRIC LINEAGE -->
+      <!-- TAB 4: EXPERIMENTS & METRIC LINEAGE -->
       <section id="tab-experiments" class="tab-panel">
         <div class="exp-header">
           <h2 class="section-heading">📈 Monotonic Metric Progression & Hypothesis Ledger</h2>
@@ -106,7 +135,7 @@
         </div>
       </section>
 
-      <!-- TAB 4: LIFECYCLE KANBAN & IDEA VAULT -->
+      <!-- TAB 5: LIFECYCLE KANBAN & IDEA VAULT -->
       <section id="tab-lifecycle" class="tab-panel">
         <h2 class="section-heading">📋 OpenSpec Proposal Lifecycle Pipeline</h2>
         <div id="proposal-kanban" class="kanban-board"></div>
@@ -114,7 +143,7 @@
         <div id="ideas-grid" class="ideas-grid"></div>
       </section>
 
-      <!-- TAB 5: LIVE HARNESS EVENT STREAM -->
+      <!-- TAB 6: LIVE HARNESS EVENT STREAM -->
       <section id="tab-events" class="tab-panel">
         <h2 class="section-heading">⚡ Immutable Harness & Self-Learning Telemetry</h2>
         <div id="events-list" class="card-stack"></div>
@@ -131,12 +160,13 @@
         <button id="btn-close-inspector" class="btn-ghost" title="Clear selection">✕</button>
       </div>
       <div id="insp-body" class="inspector-body">
-        <p class="muted">Click any node in the Knowledge Graph, Law card, Lesson, Proposal, or Experiment row to inspect its full content, metadata, source file link, and connected graph edges.</p>
+        <p class="muted">Click any node in the Graph, Cognitive Tier column, Law card, or Experiment row to inspect full details, jump across connected edges, or Promote a Local insight up to Global SuperMemory.</p>
       </div>
     </aside>
   </main>
 
   <script src="/graph_canvas.js"></script>
+  <script src="/merge_studio.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

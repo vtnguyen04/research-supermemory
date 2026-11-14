@@ -1,17 +1,24 @@
-"""MCP JSON Schema definitions for SuperMemory tools."""
+"""MCP JSON Schema definitions for SuperMemory v2.0 (Tiered & Federated)."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
+_SCOPE_PROP = {
+    "type": "string",
+    "enum": ["local", "global"],
+    "default": "local",
+    "description": "Target 'local' project SuperMemory or 'global' (~/.supermemory/global).",
+}
+
 MCP_TOOLS: List[Dict[str, Any]] = [
     {
         "name": "supermemory_init",
-        "description": "Initialize SuperMemory Knowledge Graph, Universal Laws, Gates, and Agent Rules in a workspace.",
+        "description": "Initialize isolated Local SuperMemory in a project folder and register it in Global workspaces.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "workspace": {"type": "string", "description": "Workspace path (defaults to current working directory)."},
+                "workspace": {"type": "string"},
                 "project_name": {"type": "string"},
                 "max_lines": {"type": "integer", "default": 300},
             },
@@ -19,20 +26,21 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "supermemory_status",
-        "description": "Return live Active State capsule, Constitutional Laws, Gate block stats, and recent Experiments.",
+        "description": "Return 4-Tier Cognitive Capsule (Working/Procedural/Semantic/Episodic), token budget stats, and workspaces.",
         "inputSchema": {
             "type": "object",
-            "properties": {"workspace": {"type": "string"}},
+            "properties": {"workspace": {"type": "string"}, "scope": _SCOPE_PROP},
         },
     },
     {
         "name": "supermemory_recall",
-        "description": "Hybrid BM25 + 2-hop Knowledge Graph search & Anti-Repeat Dead-End check before proposing or coding.",
+        "description": "Federated (Local + Global) BM25 + 2-hop Knowledge Graph progressive-disclosure search & Anti-Repeat check.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Topic, module, error, or hypothesis to search."},
+                "query": {"type": "string"},
                 "hops": {"type": "integer", "default": 1},
+                "include_global": {"type": "boolean", "default": True},
                 "workspace": {"type": "string"},
             },
             "required": ["query"],
@@ -40,7 +48,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "supermemory_record_lesson",
-        "description": "Self-learning commit: record a mistake/user correction, consolidate into a LAW, and optionally bind a PreToolUse CodeGate.",
+        "description": "Autonomous self-learning commit: record any critique, mistake, or new user rule into Local or Global LAW + CodeGate.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -49,10 +57,12 @@ MCP_TOOLS: List[Dict[str, Any]] = [
                 "root_cause": {"type": "string"},
                 "prevention_rule": {"type": "string"},
                 "user_quote": {"type": "string"},
-                "law_id": {"type": "string", "description": "Target LAW ID (e.g. LAW-01) or omit to auto-match."},
-                "forbid_regex": {"type": "string", "description": "Optional source code regex to hard-block in PreToolUse."},
+                "law_id": {"type": "string"},
+                "new_law_title": {"type": "string"},
+                "forbid_regex": {"type": "string"},
                 "target_glob": {"type": "string", "default": "**/*.py"},
-                "forbid_cmd_regex": {"type": "string", "description": "Optional shell command regex to hard-block."},
+                "forbid_cmd_regex": {"type": "string"},
+                "scope": _SCOPE_PROP,
                 "workspace": {"type": "string"},
             },
             "required": ["title", "mistake", "root_cause", "prevention_rule"],
@@ -60,7 +70,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "supermemory_add_gate",
-        "description": "Register an executable CodeGate (MAX_LINES, FORBIDDEN_REGEX, FORBIDDEN_FILENAME, FROZEN_SHA256, FORBIDDEN_CMD_PATTERN).",
+        "description": "Register an executable PreToolUse CodeGate (MAX_LINES, FORBIDDEN_REGEX, FROZEN_SHA256, FORBIDDEN_CMD_PATTERN).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -69,7 +79,8 @@ MCP_TOOLS: List[Dict[str, Any]] = [
                 "law_id": {"type": "string", "default": "LAW-08"},
                 "target_glob": {"type": "string", "default": "**/*.py"},
                 "pattern": {"type": "string"},
-                "freeze_path": {"type": "string", "description": "If set, freezes SHA-256 of this file path."},
+                "freeze_path": {"type": "string"},
+                "scope": _SCOPE_PROP,
                 "workspace": {"type": "string"},
             },
             "required": ["name"],
@@ -77,7 +88,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "supermemory_propose_idea",
-        "description": "Log an IDEA or ALGORITHM into the vault (with automatic check against prior rejected dead-ends).",
+        "description": "Log an IDEA or ALGORITHM into Semantic/Procedural memory with Dead-End Anti-Repeat check.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -96,7 +107,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "supermemory_manage_proposal",
-        "description": "Create or advance an OpenSpec-grade lifecycle PROPOSAL (PROPOSED -> DESIGNED -> IMPLEMENTING -> CHALLENGED -> AUDITED -> ARCHIVED).",
+        "description": "Create or advance an OpenSpec lifecycle PROPOSAL (PROPOSED -> DESIGNED -> IMPLEMENTING -> CHALLENGED -> AUDITED -> ARCHIVED).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -115,7 +126,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "supermemory_log_experiment",
-        "description": "Record a scientific EXPERIMENT (hypothesis, single-variable diff, CV/Test metrics, baseline delta, post-mortem) and sync registry.",
+        "description": "Record a scientific EXPERIMENT (enforces post_mortem on failures and crystallizes insights into OBS-XXX Semantic nodes).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -134,6 +145,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
                 "runtime_summary": {"type": "string"},
                 "verdict": {"type": "string", "default": "KEEP"},
                 "post_mortem": {"type": "string"},
+                "insights": {"type": "array", "items": {"type": "string"}},
                 "workspace": {"type": "string"},
             },
             "required": ["title", "hypothesis", "single_var_diff"],
@@ -141,7 +153,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "supermemory_update_state",
-        "description": "Atomically update 01_ACTIVE_STATE.md goals, phase, targets, next actions, and sync Markdown + JSON snapshot.",
+        "description": "Atomically update L0 Working State (01_ACTIVE_STATE.md), Agent Rules, and Snapshot.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -156,18 +168,53 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "supermemory_link_knowledge",
-        "description": "Upsert a KNOWLEDGE_NODE / OBSERVATION and/or link two graph entities with a typed directed edge.",
+        "description": "Upsert a PROCEDURAL (PROCEDURE) or SEMANTIC (KNOWLEDGE_NODE / OBSERVATION) entity and/or typed edge.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "node_id": {"type": "string"},
                 "node_type": {"type": "string", "default": "KNOWLEDGE_NODE"},
+                "memory_tier": {"type": "string", "enum": ["PROCEDURAL", "SEMANTIC", "EPISODIC"]},
                 "title": {"type": "string"},
                 "summary": {"type": "string"},
                 "content": {"type": "string"},
                 "source_id": {"type": "string"},
                 "target_id": {"type": "string"},
                 "relation": {"type": "string", "default": "REFERENCES"},
+                "scope": _SCOPE_PROP,
+                "workspace": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "supermemory_consolidate",
+        "description": "Consolidate/merge Episodic nodes into compact Semantic/Procedural memory, auto-compact tracks, or promote Local -> Global.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "mode": {"type": "string", "enum": ["merge", "auto", "promote"], "default": "merge"},
+                "source_ids": {"type": "array", "items": {"type": "string"}},
+                "target_tier": {"type": "string", "enum": ["SEMANTIC", "PROCEDURAL"], "default": "SEMANTIC"},
+                "title": {"type": "string"},
+                "summary": {"type": "string"},
+                "content": {"type": "string"},
+                "promote_node_id": {"type": "string"},
+                "workspace": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "supermemory_checkpoint",
+        "description": "Semantic turn-closing attestation: mark turn CLEAN (no memory delta) or capture a quick Semantic/Procedural insight.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "enum": ["CLEAN", "CAPTURED"], "default": "CLEAN"},
+                "note": {"type": "string"},
+                "insight_title": {"type": "string"},
+                "insight_summary": {"type": "string"},
+                "memory_tier": {"type": "string", "enum": ["SEMANTIC", "PROCEDURAL"], "default": "SEMANTIC"},
+                "scope": _SCOPE_PROP,
                 "workspace": {"type": "string"},
             },
         },
@@ -175,14 +222,11 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     {
         "name": "supermemory_audit_gates",
         "description": "Run all active Constitutional CodeGates across the workspace and return violations.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"workspace": {"type": "string"}},
-        },
+        "inputSchema": {"type": "object", "properties": {"workspace": {"type": "string"}}},
     },
     {
         "name": "supermemory_record_audit",
-        "description": "Record Challenger / Victory Auditor verdict on a Proposal or Experiment, or generate HANDOFF_BRIEFING.md.",
+        "description": "Record Challenger / VictoryAuditor verdict on a Proposal/Experiment, or generate HANDOFF_BRIEFING.md.",
         "inputSchema": {
             "type": "object",
             "properties": {

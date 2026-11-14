@@ -133,8 +133,13 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
             "pending_lesson_category": "",
             "dirty_files": [],
             "unlogged_exp_cmds": [],
+            "turn_memory_handled": False,
+            "last_seen_user_input": "",
+            "pending_sync_reason": "",
             "compaction_count": 0,
         }
+    raw_extra = str(row["unlogged_exp_cmds_json"] or "[]").strip()
+    extra_obj = json.loads(raw_extra) if raw_extra.startswith("{") else {"cmds": json.loads(raw_extra or "[]")}
     return {
         "conversation_id": str(row["conversation_id"]),
         "invocation_num": int(row["invocation_num"]),
@@ -143,13 +148,22 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
         "pending_lesson_quote": str(row["pending_lesson_quote"]),
         "pending_lesson_category": str(row["pending_lesson_category"]),
         "dirty_files": json.loads(row["dirty_files_json"] or "[]"),
-        "unlogged_exp_cmds": json.loads(row["unlogged_exp_cmds_json"] or "[]"),
+        "unlogged_exp_cmds": list(extra_obj.get("cmds") or []),
+        "turn_memory_handled": bool(extra_obj.get("turn_memory_handled", False)),
+        "last_seen_user_input": str(extra_obj.get("last_seen_user_input") or ""),
+        "pending_sync_reason": str(extra_obj.get("pending_sync_reason") or ""),
         "compaction_count": int(row["compaction_count"]),
     }
 
 
 def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
     """Persist hook session tracking state atomically."""
+    extra_envelope = {
+        "cmds": list(state.get("unlogged_exp_cmds") or []),
+        "turn_memory_handled": bool(state.get("turn_memory_handled", False)),
+        "last_seen_user_input": str(state.get("last_seen_user_input") or ""),
+        "pending_sync_reason": str(state.get("pending_sync_reason") or ""),
+    }
     store.conn.execute(
         """
         INSERT INTO session_state(conversation_id, invocation_num, last_step_idx,
@@ -173,9 +187,22 @@ def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
             str(state.get("pending_lesson_quote", "")),
             str(state.get("pending_lesson_category", "")),
             json.dumps(state.get("dirty_files") or [], ensure_ascii=False),
-            json.dumps(state.get("unlogged_exp_cmds") or [], ensure_ascii=False),
+            json.dumps(extra_envelope, ensure_ascii=False),
             int(state.get("compaction_count", 0)),
             utc_now_iso(),
         ),
     )
     store.conn.commit()
+
+
+def mark_turn_memory_handled(store: GraphStore, clear_lesson_lock: bool = False) -> None:
+    """Mark all active conversation sessions in this store as having persisted/attested memory."""
+    rows = store.conn.execute("SELECT conversation_id FROM session_state").fetchall()
+    for r in rows:
+        st = get_session_state(store, str(r["conversation_id"]))
+        st["turn_memory_handled"] = True
+        st["dirty_files"] = []
+        st["pending_sync_reason"] = ""
+        if clear_lesson_lock:
+            st["pending_lesson_lock"] = False
+        save_session_state(store, st)

@@ -77,13 +77,15 @@ def test_stdio_mcp_server_end_to_end(tmp_path: Path) -> None:
 
     assert by_id[1]["result"]["serverInfo"]["name"] == "supermemory"
     tools = by_id[2]["result"]["tools"]
-    assert len(tools) == 12
+    assert len(tools) == 14
     assert {t["name"] for t in tools} >= {
         "supermemory_init",
         "supermemory_recall",
         "supermemory_record_lesson",
         "supermemory_log_experiment",
         "supermemory_manage_proposal",
+        "supermemory_checkpoint",
+        "supermemory_consolidate",
     }
 
     lesson_res = json.loads(by_id[4]["result"]["content"][0]["text"])
@@ -116,7 +118,7 @@ def test_graph_observatory_web_ui_server(tmp_path: Path) -> None:
         assert node_data["node"]["id"] == "LAW-01"
 
         search_data = json.loads(urlopen(f"{base}/api/search?q=hardcoding").read().decode("utf-8"))
-        assert search_data["match_count"] >= 1
+        assert len(search_data["results"]) >= 1
     finally:
         srv.shutdown()
         srv.server_close()

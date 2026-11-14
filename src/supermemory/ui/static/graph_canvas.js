@@ -2,6 +2,7 @@
 (function () {
   const TYPE_COLORS = {
     LAW: "#10b981",
+    PROCEDURE: "#34d399",
     GATE: "#06b6d4",
     LESSON: "#f43f5e",
     EXPERIMENT: "#8b5cf6",
@@ -23,6 +24,7 @@
       this.edges = [];
       this.nodeMap = new Map();
       this.hiddenTypes = new Set();
+      this.hiddenTiers = new Set();
       this.highlightIds = new Set();
       this.selectedId = null;
       this.hoveredNode = null;
@@ -85,7 +87,9 @@
     }
 
     _visibleNodes() {
-      return this.nodes.filter((n) => !this.hiddenTypes.has(n.node_type));
+      return this.nodes.filter(
+        (n) => !this.hiddenTypes.has(n.node_type) && !this.hiddenTiers.has(n.memory_tier)
+      );
     }
 
     _stepPhysics() {

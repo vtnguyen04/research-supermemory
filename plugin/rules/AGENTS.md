@@ -1,18 +1,17 @@
-# SuperMemory Constitutional Harness (Global Antigravity Protocol)
+# SuperMemory v2.0 Cognitive & Federated Harness (Global Antigravity Protocol)
 
-When working inside any workspace initialized with SuperMemory (`memory/00_MEMORY_GRAPH.md` or `.supermemory/supermemory.db`), you MUST enforce Zero-Amnesia and Self-Learning Anti-Regression discipline across compactions and agent handoffs:
+You operate with a **2-Level Federated Memory** (`Local` per-project folder `.supermemory/` + `Global` cross-project `~/.supermemory/global`) organized into **4 Cognitive Tiers** (`L0 WORKING`, `L1 PROCEDURAL`, `L2 SEMANTIC`, `L3 EPISODIC`) so you NEVER forget across `/compact` or agent switches and NEVER suffer context bloat:
 
-1. **Recall Before Proposing or Coding (`supermemory_recall`):**
-   - Before proposing an idea, refactoring a module, or launching an experiment, query `supermemory_recall` (or CLI `supermemory recall "<topic>"`) to retrieve Constitutional `LAW`s, past `LESSON`s, prior `EXPERIMENT` verdicts, and `REJECTED` dead-end ideas. Never repeat a recorded dead-end without a new falsifiable mechanism.
-2. **Self-Learning Mistake-to-Gate Loop (`supermemory_record_lesson`):**
-   - Whenever the user corrects/scolds an error, or a bug/regression is uncovered, IMMEDIATELY call `supermemory_record_lesson` (or `supermemory learn`) BEFORE ending your turn.
-   - Consolidate the root cause into an existing `LAW` (never bloat `02_CONSTITUTION_AND_LESSONS.md` past 200 lines) and attach a `forbid_regex` / `forbid_cmd_regex` / `FROZEN_SHA256` `CodeGate` whenever mechanically enforceable so `PreToolUse` blocks any recurrence.
-3. **Clean Code & Anti-Sprawl (`LAW-02`):**
-   - Keep source files modular (`< 300` lines by default unless workspace config specifies otherwise).
-   - Never create throwaway scripts (`debug_*.py`, `tmp_*.py`, `*_v2.py`) in the project tree.
-   - Never modify frozen evaluators/verifiers protected by `FROZEN_SHA256` gates.
-4. **OpenSpec Lifecycle & Scientific Single-Variable Experiments:**
-   - Track non-trivial architecture changes via `supermemory_propose_idea` and `supermemory_manage_proposal` (`PROPOSED -> DESIGNED -> IMPLEMENTING -> CHALLENGED -> AUDITED -> ARCHIVED`).
-   - Log every benchmark/experiment run via `supermemory_log_experiment` with an explicit `hypothesis`, `single_var_diff`, CV/Test metrics, baseline comparison, and `post_mortem`.
-5. **Compaction & Handoff Survival (`supermemory_update_state`):**
-   - Before `/compact`, milestone completion, or switching to another agent, call `supermemory_update_state` (and `supermemory_record_audit` with `generate_handoff: true` when handing off) so `memory/01_ACTIVE_STATE.md` and `memory/graph_snapshot.json` remain 100% up to date.
+1. **Progressive Recall Before Proposing or Coding (`supermemory_recall`):**
+   - Query `supermemory_recall` (searches both Local + Global `PROCEDURAL` & `SEMANTIC` tiers via BM25 + 2-hop graph without dumping raw `EPISODIC` logs). Never repeat a recorded `REJECTED` idea, `REVERT`ed experiment, or `FAILURE_INSIGHT`.
+   - If the current folder has no Local `.supermemory/` yet, Global SuperMemory (`scope: "global"`) is still active; run `supermemory_init` (`supermemory init`) whenever the user wants a dedicated Local SuperMemory for that folder.
+
+2. **Agent-Native Semantic Self-Triage on EVERY Turn (Zero Keyword Dependence):**
+   - Do NOT wait for explicit keywords — use your **full semantic understanding** of the user's tone, subtle hints, and tool outputs on every turn:
+     - **Any user critique, frustration, or mistake uncovered:** Immediately call `supermemory_record_lesson` (consolidate into `LAW-XX` + bind `forbid_regex` / `forbid_cmd_regex` / `freeze_path` `CodeGate`).
+     - **Any new user rule, coding preference, or workflow:** Persist via `supermemory_record_lesson` / `supermemory_add_gate` (`scope: "local"` for repo-specific, `scope: "global"` for cross-project preferences).
+     - **Any failed experiment, debugging discovery, or reusable insight:** Call `supermemory_log_experiment` (with non-empty `post_mortem` & `insights` -> auto-creates `OBS-XXX` Semantic nodes) or `supermemory_link_knowledge` (`PROCEDURE` / `KNOWLEDGE_NODE`).
+     - **Pure read-only Q&A with zero memory delta:** Call `supermemory_checkpoint(status="CLEAN")` before ending your turn so the `Stop` turn-attestation gate passes cleanly.
+
+3. **Anti-Bloat Memory Consolidation (`supermemory_consolidate`):**
+   - Keep `01_ACTIVE_STATE.md < 150` lines and `02_CONSTITUTION_AND_LESSONS.md < 200` lines. Periodically merge clusters of raw `EPISODIC` runs/lessons into compact `SEMANTIC` or `PROCEDURAL` nodes (`supermemory_consolidate`), and promote universal breakthroughs to Global (`mode: "promote"`).

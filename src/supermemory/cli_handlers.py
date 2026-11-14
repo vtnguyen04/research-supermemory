@@ -9,11 +9,14 @@ import subprocess
 from pathlib import Path
 
 from supermemory.bootstrap import init_workspace
+from supermemory.cognitive.federation import ensure_global_memory, federated_recall
+from supermemory.cognitive.tiers import build_tiered_capsule, compute_tier_telemetry
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.lifecycle.manager import LifecycleManager
 from supermemory.models import CodeGate
 from supermemory.self_learning.consolidator import LessonConsolidator
+from supermemory.storage.snapshot_io import mark_turn_memory_handled
 from supermemory.storage.sqlite_store import GraphStore
 from supermemory.sync.agent_adapters import generate_agent_files, generate_handoff_briefing
 from supermemory.sync.markdown_compiler import MarkdownCompiler
@@ -36,32 +39,35 @@ def handle_init(args: argparse.Namespace) -> int:
 
 
 def handle_status(args: argparse.Namespace) -> int:
-    ws = Path(args.workspace).resolve()
+    ws = ensure_global_memory() if getattr(args, "use_global", False) else Path(args.workspace).resolve()
+    if not (ws / ".supermemory").is_dir() and not (ws / "memory" / "graph_snapshot.json").is_file():
+        print(f"ℹ️ No Local SuperMemory in `{ws}` yet — showing Global SuperMemory (`{ensure_global_memory()}`).")
+        ws = ensure_global_memory()
     with GraphStore(ws) as store:
         qe = QueryEngine(store)
-        print(qe.build_session_capsule())
-        stats = qe.graph_analytics()
-        print("\n📊 Graph Telemetry:", json.dumps(stats, ensure_ascii=False))
+        print(build_tiered_capsule(store))
+        print("\n📊 Graph Telemetry:", json.dumps(qe.graph_analytics(), ensure_ascii=False))
+        print("🧠 Cognitive Tiers:", json.dumps(compute_tier_telemetry(store), ensure_ascii=False))
     return 0
 
 
 def handle_recall(args: argparse.Namespace) -> int:
     ws = Path(args.workspace).resolve()
-    with GraphStore(ws) as store:
-        res = QueryEngine(store).recall(args.query, limit=args.limit, hops=args.hops)
+    local_ok = ((ws / ".supermemory").is_dir() or (ws / "memory" / "graph_snapshot.json").is_file()) and not getattr(args, "use_global", False)
+    res = federated_recall(args.query, local_ws=ws if local_ok else None, include_global=True, limit=args.limit, hops=args.hops)
     if res["anti_repeat_warnings"]:
         print("⚠️ ANTI-REPEAT WARNINGS:")
         for w in res["anti_repeat_warnings"]:
             print(f"  • {w}")
-    print(f"\n🔍 Recalled {len(res['results'])} graph entities for '{args.query}':")
+    print(f"\n🔍 Recalled {len(res['results'])} federated entities for '{args.query}':")
     for r in res["results"]:
         via = f" (hop={r['hop']} via {r.get('via_relation')})" if r.get("hop") else ""
-        print(f"  [{r['type']}] {r['id']} [{r['status']}]{via}: {r['title']}\n     {r['summary'][:160]}")
+        print(f"  [{r.get('scope', 'LOCAL')}/{r.get('tier', '')}/{r['type']}] {r['id']} [{r['status']}]{via}: {r['title']}\n     {r['summary'][:160]}")
     return 0
 
 
 def handle_learn(args: argparse.Namespace) -> int:
-    ws = Path(args.workspace).resolve()
+    ws = ensure_global_memory() if getattr(args, "use_global", False) else Path(args.workspace).resolve()
     with GraphStore(ws) as store:
         out = LessonConsolidator(store).record_lesson(
             title=args.title,
@@ -76,6 +82,7 @@ def handle_learn(args: argparse.Namespace) -> int:
             forbid_cmd_regex=args.forbid_cmd_regex or "",
             source_exp_id=args.exp_id or "",
         )
+        mark_turn_memory_handled(store, clear_lesson_lock=True)
         MarkdownCompiler(store).compile_all()
         generate_agent_files(store, install_workspace_hooks=False)
     print(f"✅ Self-Learning Committed: {out['lesson_id']} -> {out['law_id']} (Gate: {out['gate_id'] or 'Policy'})")
@@ -177,7 +184,9 @@ def handle_exp(args: argparse.Namespace) -> int:
             runtime_summary=args.runtime or "",
             verdict=args.verdict,
             post_mortem=args.post_mortem or "",
+            insights=list(args.insight or []),
         )
+        mark_turn_memory_handled(store)
         MarkdownCompiler(store).compile_all()
     print(
         f"🧪 Logged {res['exp_id']} (Δ={res['delta_vs_baseline']}, regression={res['regression_detected']}) -> {res['log_path']}"
@@ -189,6 +198,7 @@ def handle_audit_and_sync(args: argparse.Namespace) -> int:
     ws = Path(args.workspace).resolve()
     with GraphStore(ws) as store:
         if args.command == "sync":
+            mark_turn_memory_handled(store)
             files = MarkdownCompiler(store).compile_all()
             generate_agent_files(store, install_workspace_hooks=False)
             print(f"🔄 Synced SuperMemory Markdown & Snapshot ({len(files)} artifacts).")

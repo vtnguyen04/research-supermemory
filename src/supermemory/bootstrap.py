@@ -18,6 +18,7 @@ def init_workspace(
     max_lines: int = 300,
     active_goal: str = "",
     install_workspace_hooks: bool = True,
+    register_in_global: bool = True,
 ) -> Dict[str, Any]:
     """Idempotently initialize SuperMemory in any repository."""
     root = Path(workspace_dir).resolve()
@@ -67,6 +68,11 @@ def init_workspace(
         md_files = MarkdownCompiler(store).compile_all()
         agent_files = generate_agent_files(store, install_workspace_hooks=install_workspace_hooks)
         store.log_event("WORKSPACE_INIT", name, f"Initialized SuperMemory in {root}")
+
+    if register_in_global:
+        from supermemory.cognitive.federation import register_local_workspace
+
+        register_local_workspace(root, project_name=name)
 
     return {
         "workspace": str(root),

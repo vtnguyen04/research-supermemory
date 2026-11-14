@@ -17,6 +17,7 @@ class NodeType(str, Enum):
     """Canonical node types in the project knowledge graph."""
 
     LAW = "LAW"
+    PROCEDURE = "PROCEDURE"
     LESSON = "LESSON"
     GATE = "GATE"
     IDEA = "IDEA"
@@ -29,6 +30,15 @@ class NodeType(str, Enum):
     KNOWLEDGE_NODE = "KNOWLEDGE_NODE"
     ARTIFACT = "ARTIFACT"
     AGENT_RUN = "AGENT_RUN"
+
+
+class MemoryTier(str, Enum):
+    """Cognitive architecture memory tiers (CoALA / ACT-R progressive disclosure)."""
+
+    WORKING = "WORKING"
+    PROCEDURAL = "PROCEDURAL"
+    SEMANTIC = "SEMANTIC"
+    EPISODIC = "EPISODIC"
 
 
 class EdgeType(str, Enum):

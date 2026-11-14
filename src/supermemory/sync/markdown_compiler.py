@@ -8,6 +8,7 @@ from typing import Dict, List
 from supermemory.models import CodeGate, MemoryNode, NodeType, utc_now_iso
 from supermemory.storage.snapshot_io import export_snapshot
 from supermemory.storage.sqlite_store import GraphStore
+from supermemory.sync.agent_adapters import generate_agent_files
 
 
 def _md_cell(text: str, max_len: int = 160) -> str:
@@ -31,6 +32,7 @@ class MarkdownCompiler:
         c_path = self._write_constitution()
         e_path = self._write_experiments_registry()
         snap_path = export_snapshot(self.store)
+        generate_agent_files(self.store, install_workspace_hooks=False)
         return {
             "graph": str(g_path),
             "active_state": str(s_path),

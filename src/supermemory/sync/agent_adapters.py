@@ -40,12 +40,10 @@ def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True
         f"## ⚖️ 1. Non-Negotiable Constitutional Laws (Enforced by PreToolUse & Audit Gates)\n\n"
         f"{law_bullets}\n\n"
         f"---\n\n"
-        f"## 🔄 2. Mandatory R&D Project Lifecycle & Self-Learning Loop\n\n"
-        f"1. **Anti-Repeat Check (`IDEA` / `ALGORITHM`):** Never re-attempt a rejected idea or reverted experiment. Log new ideas via `supermemory idea add` or MCP `supermemory_propose_idea`.\n"
-        f"2. **Spec Before Code (`PROPOSAL`):** Non-trivial features/changes start as a Proposal (`memory/04_PROPOSALS/`) tracking `PROPOSED -> DESIGNED -> IMPLEMENTING -> CHALLENGED -> AUDITED -> ARCHIVED`.\n"
-        f"3. **Scientific Experimentation (`EXPERIMENT`):** Isolate 1 variable per run, verify Clean Code (`< {max_lines}` lines/file), and log CV/Test metrics + post-mortem in [03_EXPERIMENTS_REGISTRY.md](file://{exp_uri}) (`supermemory exp log`).\n"
-        f"4. **Self-Learning Crystallization (`LESSON` -> `LAW` + `GATE`):** Whenever the user corrects you or an unexpected bug/regression occurs, IMMEDIATELY run `supermemory learn` (or MCP `supermemory_record_lesson`) to fold the root cause into `LAW-01..N` AND bind an executable `CodeGate`.\n"
-        f"5. **Atomic Sync:** Keep [00_MEMORY_GRAPH.md](file://{graph_uri}) and `01_ACTIVE_STATE.md` updated in the exact same turn (`supermemory sync`).\n"
+        f"## 🔄 2. Cognitive Tiers, Semantic Self-Triage & Federated Loop\n\n"
+        f"1. **Federated Progressive Recall (`L1 PROCEDURAL` + `L2 SEMANTIC`):** Query `supermemory recall \"<topic>\"` (`supermemory_recall`) before proposing/coding. Raw `L3 EPISODIC` logs stay paged on disk so context never bloats.\n"
+        f"2. **Agent-Native Semantic Self-Triage (Every Turn):** Use YOUR semantic comprehension (never wait for magic keywords): autonomously persist any subtle/explicit user critique (`supermemory_record_lesson` + `CodeGate`), new rule/preference (`scope='local'` or `'global'`), failed experiment/insight (`supermemory_log_experiment` with `insights` -> [03_EXPERIMENTS_REGISTRY.md](file://{exp_uri})), or state update; if pure read-only Q&A, call `supermemory_checkpoint`.\n"
+        f"3. **Spec-First & Clean Code (`< {max_lines}` lines/file):** Track non-trivial work via `PROPOSAL` (`PROPOSED -> ... -> AUDITED -> ARCHIVED`), consolidate episodic clusters via `supermemory consolidate`, and keep [00_MEMORY_GRAPH.md](file://{graph_uri}) & `01_ACTIVE_STATE.md` synced atomically.\n"
     )
 
     written: Dict[str, str] = {}

@@ -1,4 +1,4 @@
-"""Lightweight stdlib HTTP JSON API + SPA Server for the SuperMemory Graph Observatory."""
+"""Stdlib HTTP JSON API + SPA Server for the Multi-Project & Tiered SuperMemory Observatory."""
 
 from __future__ import annotations
 
@@ -9,8 +9,21 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 from urllib.parse import parse_qs, unquote, urlparse
 
+from supermemory.cognitive.federation import (
+    ensure_global_memory,
+    federated_recall,
+    list_registered_workspaces,
+    promote_node_to_global,
+)
+from supermemory.cognitive.tiers import (
+    auto_consolidate_episodic,
+    classify_tier,
+    compute_tier_telemetry,
+    consolidate_nodes,
+)
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.storage.sqlite_store import GraphStore
+from supermemory.sync.markdown_compiler import MarkdownCompiler
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -23,21 +36,42 @@ _MIME_TYPES: Dict[str, str] = {
 }
 
 
+def _resolve_scope_workspace(default_ws: Path, scope_param: str) -> Path:
+    clean = (scope_param or "").strip()
+    if not clean or clean == "local":
+        return default_ws
+    if clean == "global":
+        return ensure_global_memory()
+    cand = Path(clean).resolve()
+    if cand.is_dir() and ((cand / ".supermemory").is_dir() or (cand / "memory" / "graph_snapshot.json").is_file()):
+        return cand
+    return default_ws
+
+
 def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
-    """Assemble full Knowledge Graph, Gates, Experiments, Analytics, and Event Stream JSON."""
+    """Assemble full Tiered Knowledge Graph, Gates, Experiments, Analytics & Workspaces."""
     with GraphStore(workspace_root) as store:
         qe = QueryEngine(store)
-        nodes = [n.to_dict() for n in store.list_nodes(limit=5000)]
+        nodes = []
+        for n in store.list_nodes(limit=5000):
+            d = n.to_dict()
+            d["memory_tier"] = classify_tier(n)
+            nodes.append(d)
         edges = [e.to_dict() for e in store.list_edges()]
         gates = [g.to_dict() for g in store.list_gates()]
         experiments = [x.to_dict() for x in store.list_experiments()]
         events = store.list_events(limit=100)
         analytics = qe.graph_analytics()
+        tiers = compute_tier_telemetry(store)
         meta = store.get_all_meta()
     return {
+        "workspace_path": str(workspace_root),
+        "is_global": workspace_root == ensure_global_memory(),
         "project": meta.get("project_name") or workspace_root.name,
         "meta": meta,
         "analytics": analytics,
+        "cognitive_tiers": tiers,
+        "workspaces": list_registered_workspaces(),
         "nodes": nodes,
         "edges": edges,
         "gates": gates,
@@ -46,33 +80,43 @@ def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
     }
 
 
-def _make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
+def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
     class GraphRequestHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
             parsed = urlparse(self.path)
             route = parsed.path
             qs = parse_qs(parsed.query)
+            scope = (qs.get("scope") or ["local"])[0]
+            ws = _resolve_scope_workspace(default_ws, scope)
+
+            if route == "/api/workspaces":
+                self._send_json({"default_workspace": str(default_ws), "workspaces": list_registered_workspaces()})
+                return
 
             if route == "/api/graph":
-                self._send_json(build_graph_api_payload(workspace_root))
+                self._send_json(build_graph_api_payload(ws))
                 return
 
             if route == "/api/search":
                 q = (qs.get("q") or [""])[0]
-                with GraphStore(workspace_root) as store:
-                    res = QueryEngine(store).recall(q, limit=15, hops=1) if q.strip() else {"results": [], "anti_repeat_warnings": []}
+                if not q.strip():
+                    self._send_json({"results": [], "anti_repeat_warnings": []})
+                    return
+                res = federated_recall(q, local_ws=ws, include_global=True, limit=15, hops=1)
                 self._send_json(res)
                 return
 
             if route.startswith("/api/node/"):
                 nid = unquote(route.removeprefix("/api/node/"))
-                with GraphStore(workspace_root) as store:
+                with GraphStore(ws) as store:
                     node = store.get_node(nid)
                     edges = [e.to_dict() for e in store.list_edges(nid)] if node else []
                 if not node:
                     self._send_json({"error": f"Node not found: {nid}"}, status=HTTPStatus.NOT_FOUND)
                     return
-                self._send_json({"node": node.to_dict(), "edges": edges})
+                nd = node.to_dict()
+                nd["memory_tier"] = classify_tier(node)
+                self._send_json({"node": nd, "edges": edges})
                 return
 
             rel_static = "index.html" if route in ("/", "/index.html") else route.lstrip("/")
@@ -88,6 +132,45 @@ def _make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
+
+        def do_POST(self) -> None:  # noqa: N802
+            parsed = urlparse(self.path)
+            route = parsed.path
+            length = int(self.headers.get("Content-Length") or "0")
+            body = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            ws = _resolve_scope_workspace(default_ws, str(body.get("scope") or "local"))
+
+            try:
+                with GraphStore(ws) as store:
+                    if route == "/api/consolidate":
+                        out = consolidate_nodes(
+                            store,
+                            source_ids=list(body.get("source_ids") or []),
+                            target_tier=str(body.get("target_tier") or "SEMANTIC"),
+                            title=str(body.get("title") or "Consolidated Memory"),
+                            summary=str(body.get("summary") or ""),
+                            content=str(body.get("content") or ""),
+                        )
+                        MarkdownCompiler(store).compile_all()
+                        self._send_json(out)
+                        return
+
+                    if route == "/api/auto-consolidate":
+                        out = auto_consolidate_episodic(store, min_cluster_size=int(body.get("min_cluster_size") or 2))
+                        MarkdownCompiler(store).compile_all()
+                        self._send_json(out)
+                        return
+
+                    if route == "/api/promote":
+                        out = promote_node_to_global(store, str(body["node_id"]))
+                        MarkdownCompiler(store).compile_all()
+                        self._send_json(out)
+                        return
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+                return
+
+            self._send_json({"error": f"Unknown route: {route}"}, status=HTTPStatus.NOT_FOUND)
 
         def _send_json(self, obj: Dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
             data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -114,8 +197,8 @@ def create_http_server(workspace_root: Path, host: str = "127.0.0.1", port: int 
 def run_ui_server(workspace_root: Path, host: str = "127.0.0.1", port: int = 8765) -> int:
     """Start blocking Graph Observatory Web UI server."""
     srv, actual_port = create_http_server(workspace_root, host=host, port=port)
-    print(f"🧠 SuperMemory Graph Observatory live at: http://{host}:{actual_port}")
-    print(f"   Workspace: {workspace_root.resolve()}")
+    print(f"🧠 SuperMemory v2.0 Multi-Project & Tiered Observatory live at: http://{host}:{actual_port}")
+    print(f"   Default Workspace: {workspace_root.resolve()}")
     print("   Press Ctrl+C to stop.")
     try:
         srv.serve_forever()

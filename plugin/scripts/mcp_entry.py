@@ -11,7 +11,7 @@ def _bootstrap_path() -> None:
     plugin_root = Path(__file__).resolve().parents[1]
     bundled_lib = plugin_root / "lib"
     repo_src = plugin_root.parent / "src"
-    for candidate in (bundled_lib, repo_src):
+    for candidate in (repo_src, bundled_lib):
         if (candidate / "supermemory").is_dir():
             sys.path.insert(0, str(candidate))
             return

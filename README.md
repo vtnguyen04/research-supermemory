@@ -14,13 +14,14 @@ Standard coding agent harnesses suffer from **Context Compaction Amnesia**, **Ag
 **SuperMemory** solves all three permanently with **zero external runtime dependencies** (pure Python 3.10+ stdlib + SQLite WAL + FTS5 BM25):
 
 - **Hybrid Dual-Persistence Memory:** Every entity (`LAW`, `LESSON`, `GATE`, `IDEA`, `ALGORITHM`, `PROPOSAL`, `EXPERIMENT`, `KNOWLEDGE_NODE`, `AGENT_RUN`) lives in both ACID SQLite FTS5 (`.supermemory/supermemory.db`) AND Git-versioned JSON/Markdown (`memory/graph_snapshot.json`, `00_MEMORY_GRAPH.md`, `01_ACTIVE_STATE.md` `< 150`L, `02_CONSTITUTION_AND_LESSONS.md` `< 200`L, `03_EXPERIMENTS_REGISTRY.md`). Deleting `.db` on a fresh `git clone` auto-hydrates 100% of the graph from `graph_snapshot.json`.
-- **Self-Learning Toolkit Plugged into Antigravity Hooks (`hooks.json`):**
-  - `SessionStart`: Injects Constitutional Capsule + Active State + Pending Proposals.
-  - `PreInvocation`: Detects context compaction (`step_idx` drop), detects bilingual (Vietnamese + English) user scoldings/corrections & strategic directives, engages `pending_lesson_lock`, and surfaces Hybrid BM25 + 2-hop **Anti-Repeat Dead-End Warnings**.
+- **4-Tier Cognitive Memory Hierarchy (`WORKING` · `PROCEDURAL` · `SEMANTIC` · `EPISODIC`):** Inspired by CoALA/ACT-R progressive disclosure so the Agent never suffers context overload (`< 850` token prompt capsule; raw `L3 EPISODIC` logs remain paged out on disk and consolidate into `L2 SEMANTIC` / `L1 PROCEDURAL` nodes).
+- **Federated `Local` + `Global` SuperMemory:** Every project folder maintains an isolated Local SuperMemory (`<folder>/.supermemory/` + `<folder>/memory/`), while `~/.supermemory/global` stores cross-project preferences, universal `LAW`s/`PROCEDURE`s, and `workspaces.json`. Uninitialized legacy folders operate seamlessly against Global SuperMemory without polluting the repo until `supermemory init .` is run.
+- **Agent-Native Semantic Self-Triage & Structural Turn-Attestation (`hooks.json`):**
+  - `SessionStart` & `PreInvocation`: Inject Federated `LOCAL + GLOBAL` recall + Semantic Memory Triage protocol without relying on fragile hardcoded regex lists.
   - `PreToolUse` (`< 20ms`): Hard-blocks (`"decision": "deny"`) `MAX_LINES >= 300`, throwaway filenames (`debug_*`, `tmp_*`, `*_v2.py`), `FROZEN_SHA256` evaluator edits, forbidden code regexes, broken Python AST syntax, and destructive shell commands.
-  - `PostToolUse` & `Stop`: Prevents turn completion (`"decision": "continue"`) when a user correction has not yet been consolidated into a `LAW` + `CodeGate` via `supermemory learn` / `supermemory_record_lesson`.
-- **Native Stdio MCP Server (`mcp_config.json`):** Exposes 12 `supermemory_*` tools, 4 `supermemory://` resources, and boot prompts directly inside Antigravity, Claude Code, or Cursor.
-- **Interactive Knowledge Graph Web Observatory (`supermemory ui`):** Zero-CDN dark engineering dashboard with HTML5 Canvas Force-Directed Graph, BM25 + 2-hop search, 1-hop lineage inspector, Gate Shield telemetry, SVG Metric Progression curves, and OpenSpec Proposal Kanban.
+  - `PostToolUse` & `Stop`: Structural **Turn-Attestation Gate (`turn_memory_handled` / `supermemory_checkpoint`)** blocks turn exit whenever a subtle or explicit user critique, new rule, dirty edit, or failed experiment insight has not yet been persisted (and live-compiles updated `LAW`s straight into `AGENTS.md` / `GEMINI.md` / `CLAUDE.md`).
+- **Native Stdio MCP Server (`mcp_config.json`):** Exposes 14 `supermemory_*` tools (including `scope="local"|"global"`, `supermemory_consolidate`, and `supermemory_checkpoint`), 4 `supermemory://` resources, and boot prompts.
+- **Interactive Knowledge Graph & Merge Studio (`supermemory ui`):** Zero-CDN dark engineering dashboard with Workspace/Global Scope Switcher, HTML5 Force-Directed Graph, 4-Tier Token Budget gauge, **Interactive Memory Merge Studio** (checkbox multi-select + 1-click Episodic Auto-Consolidation), **"Promote to Global"** drawer action, Gate Shield telemetry, and OpenSpec Kanban.
 
 ---
 
@@ -45,9 +46,13 @@ supermemory init . --name "MyProject" --max-lines 300 --goal "Ship verified SOTA
 | Command | Purpose |
 | :--- | :--- |
 | `supermemory init [dir]` | Initialize Knowledge Graph, Universal Laws (`LAW-01..08`), default `CodeGate`s, and `AGENTS.md` / `GEMINI.md` / `CLAUDE.md` |
-| `supermemory status` | Print compact Constitutional + Active State capsule & graph telemetry |
-| `supermemory recall "<query>"` | Hybrid SQLite FTS5 BM25 + 2-hop graph retrieval + Anti-Repeat warnings |
-| `supermemory learn ...` | Consolidate a mistake/user correction into a `LAW` and bind an executable `CodeGate` |
+| `supermemory status [-g]` | Print compact 4-Tier Constitutional + Active State capsule (Local or Global) |
+| `supermemory workspaces` | List Global SuperMemory (`~/.supermemory/global`) and all registered Local project folders |
+| `supermemory recall "<query>"` | Federated `LOCAL + GLOBAL` SQLite FTS5 BM25 + 2-hop graph retrieval + Anti-Repeat warnings |
+| `supermemory learn ... [-g]` | Consolidate a mistake/user rule into a Local or Global `LAW` and bind an executable `CodeGate` |
+| `supermemory consolidate ...` | Merge Episodic/Semantic nodes into a `SEMANTIC` or `PROCEDURAL` node (`--auto` for 1-click cluster merge) |
+| `supermemory promote <ID>` | Promote a high-value Local node (`LESSON`, `LAW`, `ALGORITHM`, `PROCEDURE`) into Global SuperMemory |
+| `supermemory checkpoint` | Attest turn semantic memory review (`CLEAN`) for read-only Q&A turns |
 | `supermemory gate list\|add\|freeze` | List active `PreToolUse` gates, add regex/command guards, or SHA-256 lock an evaluator |
 | `supermemory idea ...` | Record an `IDEA` or `ALGORITHM` (including `REJECTED` dead-ends so they are never repeated) |
 | `supermemory proposal create\|advance` | Manage OpenSpec lifecycle (`PROPOSED -> DESIGNED -> IMPLEMENTING -> CHALLENGED -> AUDITED -> ARCHIVED`) |

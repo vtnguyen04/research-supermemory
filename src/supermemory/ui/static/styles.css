@@ -83,6 +83,30 @@ body {
 .accent-rose strong { color: var(--rose); }
 .accent-cyan strong { color: var(--cyan); }
 .accent-violet strong { color: var(--violet); }
+.accent-sky strong { color: var(--sky); }
+.accent-amber strong { color: var(--amber); }
+
+.merge-banner {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px;
+}
+.merge-form-card {
+  background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.merge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.text-input, .text-area {
+  background: var(--bg-0); color: var(--text-0); border: 1px solid var(--border);
+  border-radius: 6px; padding: 7px 10px; font-size: 12.5px; flex: 1; min-width: 220px; font-family: inherit;
+}
+.tier-columns {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.tier-col {
+  background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+}
+.tier-col h3 { font-size: 12.5px; margin-bottom: 8px; color: var(--sky); }
+.check-row { display: flex; align-items: flex-start; gap: 8px; }
+.check-row input[type="checkbox"] { margin-top: 3px; cursor: pointer; }
 
 .tab-bar {
   display: flex; gap: 6px; padding: 8px 20px 0; background: var(--bg-1);
