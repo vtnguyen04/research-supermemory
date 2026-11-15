@@ -106,16 +106,17 @@
         mount.innerHTML = `<div class="kanban-board">${cols.map(([cKey, cTitle]) => {
           const cItems = items.filter((x) => x.col === cKey);
           const cards = cItems.length ? cItems.map((it) => {
-            const stepsHtml = it.steps.slice(0, 3).map((s, idx) => `<label class="subtask-row ${s.done ? "is-done" : ""}">
+            const stepsHtml = it.steps.slice(0, 3).map((s, idx) => `<label class="subtask-row ${s.done ? "is-done" : ""}" title="${esc(s.text)}">
               <input type="checkbox" data-step-chk="${idx}" data-step-id="${esc(it.id)}" data-step-kind="${it.kind}" ${s.done ? "checked" : ""} /><span>${esc(s.text)}</span></label>`).join("");
             const more = it.steps.length > 3 ? `<span class="subtask-more">+${it.steps.length - 3} ${tr("more", "bước nữa")}</span>` : "";
+            const chipTxt = it.wave ? `W${it.wave} · ${it.badge}` : it.badge;
             const actBtn = cKey === "IN_PROGRESS"
               ? `<button type="button" class="btn btn-primary btn-xs" data-kmove="DONE" data-kid="${esc(it.id)}" data-kkind="${it.kind}">${tr("Done", "Hoàn tất")}</button>`
               : cKey === "DONE"
                 ? `<button type="button" class="btn btn-ghost btn-xs" data-kmove="READY" data-kid="${esc(it.id)}" data-kkind="${it.kind}">${tr("Requeue", "Chạy lại")}</button>`
                 : `<button type="button" class="btn btn-secondary btn-xs" data-kmove="IN_PROGRESS" data-kid="${esc(it.id)}" data-kkind="${it.kind}">${tr("Start", "Bắt đầu")}</button>`;
             return `<article class="kanban-card" draggable="true" data-drag-id="${esc(it.id)}" data-drag-kind="${it.kind}" data-task-id="${esc(it.id)}">
-              <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(it.id)}</span>${statusTag(it.status)}</span><span class="role-chip">${esc(it.wave ? `W${it.wave} · ${it.badge}` : it.badge)}</span></div>
+              <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(it.id)}</span>${statusTag(it.status)}</span><span class="role-chip" title="${esc(chipTxt)}">${esc(chipTxt)}</span></div>
               <h4 class="kanban-card-title" data-open-id="${esc(it.id)}" data-open-kind="${it.kind}">${esc(it.title)}</h4>
               <div class="pareto-row"><span>${it.stepsDone}/${it.stepsTotal} ${tr("steps", "bước")}</span><strong>${it.pct}%</strong></div>
               <progress class="pareto-meter kanban-meter" max="100" value="${it.pct}"></progress>

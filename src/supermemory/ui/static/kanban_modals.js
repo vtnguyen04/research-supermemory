@@ -25,9 +25,10 @@
     const props = (state.nodes || []).filter((n) => n.node_type === "PROPOSAL" && n.status !== "ARCHIVED").map((n) => {
       const md = n.metadata || {}, rawT = md.tasks || [], done = md.tasks_done || [];
       const steps = rawT.map((txt, i) => ({ text: txt, done: Boolean(done[i]) }));
+      const roi = Number(md.occam_roi);
       return {
         kind: "PROPOSAL", id: n.id, col: md.kanban_col || "BACKLOG", status: n.status || "PROPOSED",
-        title: n.title, summary: n.summary || "", badge: `Proposal · ROI ${md.occam_roi ?? 1.0}`, wave: 0,
+        title: n.title, summary: n.summary || "", badge: roi > 0 ? `Proposal · ROI ${roi}` : "Proposal", wave: 0,
         worker: (md.audits || []).length ? "audited" : "", deps: [], globs: [],
         targetId: md.bottleneck_id || "", smokeGate: md.kill_criterion || "", steps,
         stepsDone: steps.filter((s) => s.done).length, stepsTotal: steps.length,
@@ -128,5 +129,35 @@
     bindDel();
   }
 
-  window.SuperMemoryKanbanModals = { buildKanbanItems, openTaskModal, inspectTaskInDrawer };
+  function renderProposalChecklist(node) {
+    if (node?.node_type !== "PROPOSAL") return "";
+    const md = node.metadata || {}, rawT = md.tasks || [], done = md.tasks_done || [];
+    const finished = ["AUDITED", "ARCHIVED"].includes(node.status);
+    const steps = rawT.map((txt, i) => ({ text: txt, done: finished || Boolean(done[i]) }));
+    const sDone = steps.filter((s) => s.done).length, pct = finished ? 100 : (steps.length ? Math.round((sDone / steps.length) * 100) : 0);
+    const rows = steps.map((s, idx) => `<label class="subtask-row ${s.done ? "is-done" : ""}"><input type="checkbox" data-prop-step="${idx}" ${s.done ? "checked" : ""} /><span>${esc(s.text)}</span></label>`).join("");
+    return `<div class="inspector-section">
+      <div class="pareto-row"><h3 class="inspector-subhead">${tr("Implementation Checklist", "Danh sách bước triển khai")}</h3><span>${sDone}/${steps.length} &middot; ${pct}%</span></div>
+      <progress class="pareto-meter kanban-meter" max="100" value="${pct}"></progress>
+      <div class="subtask-list">${rows || `<p class="empty-desc">${tr("No checklist steps yet.", "Chưa có bước thực thi con.")}</p>`}</div>
+      <form id="insp-prop-step-form" class="step-add-row" novalidate>
+        <input id="insp-prop-new-step" class="control-input" placeholder="${tr("Add implementation step...", "Thêm bước triển khai...")}" />
+        <button type="submit" class="btn btn-secondary btn-sm">+ ${tr("Add", "Thêm")}</button>
+      </form>
+    </div>`;
+  }
+
+  function bindProposalChecklist(root, nodeId, postJson, onRefresh, notify, reInspect) {
+    root.querySelectorAll("[data-prop-step]").forEach((chk) => chk.addEventListener("change", async () => {
+      try { await postJson("/api/orchestrate", { action: "toggle_step", kind: "PROPOSAL", item_id: nodeId, step_idx: Number(chk.dataset.propStep), done: chk.checked }); await onRefresh(); await reInspect(); }
+      catch (err) { notify(err.message, true); }
+    }));
+    root.querySelector("#insp-prop-step-form")?.addEventListener("submit", async (ev) => {
+      ev.preventDefault(); const v = root.querySelector("#insp-prop-new-step")?.value.trim(); if (!v) return;
+      try { await postJson("/api/orchestrate", { action: "add_step", kind: "PROPOSAL", item_id: nodeId, text: v }); await onRefresh(); await reInspect(); }
+      catch (err) { notify(err.message, true); }
+    });
+  }
+
+  window.SuperMemoryKanbanModals = { buildKanbanItems, openTaskModal, inspectTaskInDrawer, renderProposalChecklist, bindProposalChecklist };
 })();

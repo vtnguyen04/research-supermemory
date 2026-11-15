@@ -244,6 +244,8 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
             assert f'data-gmode="{gmode}"' in html
         assert "paginate(" in fetched["/views.js"] and "paginate(" in fetched["/merge_studio.js"]
         assert ".pager-bar" in css and ".math-block" in css and "body.insp-center" in css
+        assert ".subtask-row > span" in css and "-webkit-line-clamp: 2" in css
+        assert "overflow-wrap: anywhere" in css and "min-width: 7.5rem" in css
         assert not re.search(r"repeat\(\s*[5-9]\s*,\s*minmax\(", css)
         assert ":focus-visible" in css
         assert "font-variant-numeric: tabular-nums" in css

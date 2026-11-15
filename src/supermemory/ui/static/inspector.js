@@ -2,8 +2,9 @@
 (function () {
   const { esc, statusTag, tr, cleanText, inlineMd, renderMarkdown, svg } = window.SuperMemoryIcons;
 
-  function formatMetaSection(meta) {
-    const entries = Object.entries(meta || {}).filter(([, v]) => v !== null && v !== "" && !(Array.isArray(v) && !v.length));
+  function formatMetaSection(meta, hideKeys = []) {
+    const skip = new Set(hideKeys);
+    const entries = Object.entries(meta || {}).filter(([k, v]) => !skip.has(k) && v !== null && v !== "" && !(Array.isArray(v) && !v.length));
     if (!entries.length) return "";
     const rows = entries.map(([k, v]) => {
       const label = k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bId\b/g, "ID").replace(/\bSha\b/g, "SHA");
@@ -37,14 +38,10 @@
       this.backdrop.addEventListener("click", () => this.close());
       this.backBtn.addEventListener("click", () => { const prev = this.history.pop(); if (prev) this.inspect(prev, false); });
       this.modeBtns.forEach((b) => b.addEventListener("click", () => this.setMode(b.dataset.imode)));
-      document.getElementById("inspector-header")?.addEventListener("dblclick", (ev) => {
-        if (!ev.target.closest("button")) this.toggleCenter();
-      });
+      document.getElementById("inspector-header")?.addEventListener("dblclick", (ev) => { if (!ev.target.closest("button")) this.toggleCenter(); });
       this.wideBtn.addEventListener("click", () => { this.isWide = !this.isWide; localStorage.setItem("sm_insp_wide", this.isWide ? "1" : "0"); this._syncModeClasses(Boolean(this.currentNodeId)); });
       window.addEventListener("keydown", (ev) => {
-        if (ev.key.toLowerCase() === "f" && !ev.ctrlKey && !ev.metaKey && !ev.altKey && this.currentNodeId && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName) && !document.getElementById("workbench-dialog")?.open) {
-          ev.preventDefault(); this.toggleCenter();
-        }
+        if (ev.key.toLowerCase() === "f" && !ev.ctrlKey && !ev.metaKey && !ev.altKey && this.currentNodeId && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName) && !document.getElementById("workbench-dialog")?.open) { ev.preventDefault(); this.toggleCenter(); }
       });
       document.addEventListener("click", (ev) => {
         if (this.mode === "dock" || !this.currentNodeId || ev.target.closest("#inspector-drawer, #graph-canvas, .row-trigger, .ledger-row, [data-nid], [data-inspect-rh], [data-gate-inspect], [data-task-id], [data-open-id], [data-jump], dialog, button, a, input, select, textarea, label")) return;
@@ -77,19 +74,15 @@
     }
 
     _openChrome(badgeTxt, headingTxt) {
-      this.drawer.classList.add("is-open");
-      this.drawer.setAttribute("aria-hidden", "false");
-      document.getElementById("insp-badge").textContent = badgeTxt;
-      document.getElementById("insp-id").textContent = headingTxt;
+      this.drawer.classList.add("is-open"); this.drawer.setAttribute("aria-hidden", "false");
+      document.getElementById("insp-badge").textContent = badgeTxt; document.getElementById("insp-id").textContent = headingTxt;
       this._syncModeClasses(true);
     }
 
     close() {
       this.currentNodeId = null; this.history = [];
-      this.drawer.classList.remove("is-open");
-      this.drawer.setAttribute("aria-hidden", "true");
-      this._syncModeClasses(false);
-      this.callbacks.onClearSelection?.();
+      this.drawer.classList.remove("is-open"); this.drawer.setAttribute("aria-hidden", "true");
+      this._syncModeClasses(false); this.callbacks.onClearSelection?.();
     }
 
     resetEmpty() { this.close(); document.getElementById("insp-body").innerHTML = ""; }
@@ -141,6 +134,7 @@
       const targetOpts = (state.nodes || []).filter((x) => x.id !== node.id).slice(0, 120).map((x) => `<option value="${esc(x.id)}">${esc(x.id)} — ${esc(cleanText(x.title, 36))}</option>`).join("");
       const relOpts = ["REFERENCES", "GOVERNED_BY", "DERIVED_FROM", "CONSOLIDATED_INTO", "VERIFIED_BY", "INSPIRED"].map((r) => `<option value="${r}">${r}</option>`).join("");
       const mdRaw = String(node.content || node.summary || "").trim();
+      const propChecklist = window.SuperMemoryKanbanModals?.renderProposalChecklist(node) || "";
 
       document.getElementById("insp-body").innerHTML = `
         <div class="row-actions">
@@ -158,6 +152,7 @@
           <span class="prop-key">${tr("Updated", "Cập nhật")}</span><span class="prop-val">${esc((node.updated_at || "").slice(0, 19))}</span>
           ${fileRow}
         </div>
+        ${propChecklist}
         <div class="inspector-section"><h3 class="inspector-subhead">${tr("Content & Details", "Nội dung chi tiết")}</h3><article class="md-prose">${renderMarkdown(mdRaw, true)}</article></div>
         <div class="inspector-section"><h3 class="inspector-subhead">${tr("Link Edge from", "Nối cạnh liên kết từ")} ${esc(node.id)}</h3>
           <div class="link-composer"><select id="link-rel" class="control-select" aria-label="Edge relation">${relOpts}</select>
@@ -165,8 +160,9 @@
             <button type="button" id="btn-add-edge" class="btn btn-secondary btn-sm">${tr("Link", "Nối cạnh")}</button></div></div>
         <div class="inspector-section"><h3 class="inspector-subhead">${tr("Graph Edges", "Liên kết đồ thị")} (${edges.length})</h3>
           <div class="edge-list">${edgeRows || `<p class="empty-desc">${tr("No direct graph edges yet.", "Chưa có cạnh liên kết trực tiếp.")}</p>`}</div></div>
-        ${formatMetaSection(node.metadata)}`;
+        ${formatMetaSection(node.metadata, node.node_type === "PROPOSAL" ? ["tasks", "tasks_done"] : [])}`;
       this._bindNodeActions(node, mdRaw);
+      window.SuperMemoryKanbanModals?.bindProposalChecklist(document.getElementById("insp-body"), node.id, this.postJson, this.onRefresh, this.notify, () => this.inspect(node.id, false));
     }
 
     _bindNodeActions(node, mdRaw) {

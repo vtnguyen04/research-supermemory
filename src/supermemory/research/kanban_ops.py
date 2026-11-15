@@ -61,7 +61,7 @@ def extract_task_steps(task_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
     is_done = str(task_dict.get("status") or "").upper() == "DONE"
     if isinstance(raw, list) and raw:
         out = [
-            {"text": str(s.get("text") if isinstance(s, dict) else s).strip()[:140], "done": True if is_done else (bool(s.get("done", False)) if isinstance(s, dict) else False)}
+            {"text": str(s.get("text") if isinstance(s, dict) else s).strip()[:260], "done": True if is_done else (bool(s.get("done", False)) if isinstance(s, dict) else False)}
             for s in raw[:16]
         ]
         out = [x for x in out if x["text"]]
@@ -125,7 +125,7 @@ def enrich_execution_state(tasks: List[Dict[str, Any]], ready_ids: List[str], no
         if finished:
             pct, col = 100, "DONE"
         elif st in ("IMPLEMENTING", "CHALLENGED"):
-            pct, col = (max(20, ratio_pct) if s_done == 0 else ratio_pct) if raw_tasks else 55, "IN_PROGRESS"
+            pct, col = (ratio_pct if raw_tasks else 55), "IN_PROGRESS"
         elif st == "DESIGNED":
             pct, col = (ratio_pct if raw_tasks else 25), "READY"
         else:
@@ -242,7 +242,7 @@ def toggle_subtask(store: GraphStore, item_kind: str, item_id: str, step_idx: in
 
 def add_subtask(store: GraphStore, item_kind: str, item_id: str, text: str) -> Dict[str, Any]:
     """Append a new checklist subtask to a DAG-XXX task or PROP-XXX proposal."""
-    clean = text.strip()[:140]
+    clean = text.strip()[:260]
     if not clean:
         raise ValueError("Subtask text cannot be empty.")
     if item_kind.strip().upper() == "PROPOSAL":

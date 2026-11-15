@@ -119,16 +119,24 @@ def test_kanban_transitions_subtask_progress_and_proposal_sync(
             {"action": "create", "title": "Kanban Sync Spec", "why": "Track proposal tasks", "tasks": "Write unit test\nRun audit"},
         )
         pid = prop["proposal_id"]
+        _post(base, "/api/proposals", {"action": "advance", "proposal_id": pid, "new_stage": "IMPLEMENTING"})
+        g_prop0 = _get(base, "/api/graph")
+        pnode0 = next(n for n in g_prop0["nodes"] if n["id"] == pid)
+        assert pnode0["metadata"]["progress_pct"] == 0
+
+        long_step = "Verify_setpoint_energy_carbon_regret_PlantOperatingPointOptimizer_" + ("x" * 160)
         _post(base, "/api/orchestrate", {"action": "toggle_step", "kind": "PROPOSAL", "item_id": pid, "step_idx": 0, "done": True})
-        _post(base, "/api/orchestrate", {"action": "add_step", "kind": "PROPOSAL", "item_id": pid, "text": "Capture Chrome screenshot"})
+        _post(base, "/api/orchestrate", {"action": "add_step", "kind": "PROPOSAL", "item_id": pid, "text": long_step})
         g3 = _get(base, "/api/graph")
         pnode = next(n for n in g3["nodes"] if n["id"] == pid)
         assert pnode["metadata"]["tasks_done"] == [True, False, False]
+        assert pnode["metadata"]["progress_pct"] == 33
+        assert len(pnode["metadata"]["tasks"][2]) > 200
         tasks_md_files = list((ws / "memory" / "04_PROPOSALS").glob(f"{pid}_*/tasks.md"))
         assert len(tasks_md_files) == 1
         md_txt = tasks_md_files[0].read_text(encoding="utf-8")
         assert "- [x] Write unit test" in md_txt
-        assert "- [ ] Capture Chrome screenshot" in md_txt
+        assert f"- [ ] {long_step}" in md_txt
     finally:
         srv.shutdown()
         srv.server_close()

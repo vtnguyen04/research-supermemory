@@ -81,14 +81,15 @@
 
     const chart = document.getElementById("exp-chart-box"), scored = [...filtered].reverse().filter((e) => Number.isFinite(numScore(e)));
     if (scored.length >= 2) {
-      const vals = scored.map(numScore), minV = Math.min(...vals), maxV = Math.max(...vals), span = maxV - minV || 1, W = 880, H = 144, px = 76, py = 26;
+      const vals = scored.map(numScore), minV = Math.min(...vals), maxV = Math.max(...vals), span = maxV - minV || 1, W = 880, H = 148, px = 82, py = 28;
+      const fmtV = (v) => (Math.abs(v) > 0 && Math.abs(v) < 1 ? v.toFixed(4) : Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(1));
       const pts = scored.map((e, i) => ({ x: px + (i / (scored.length - 1)) * (W - px * 2), y: H - py - ((vals[i] - minV) / span) * (H - py * 2), id: e.exp_id || e.id, v: vals[i] }));
-      chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="144" role="img" aria-label="${tr("Experiment score progression", "Đường cong điểm số thực nghiệm")}">
+      chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="${tr("Experiment score progression", "Đường cong điểm số thực nghiệm")}">
         <line x1="${px}" y1="${py}" x2="${W - px}" y2="${py}" stroke="#D5D1C7" stroke-dasharray="4 4"/><line x1="${px}" y1="${H - py}" x2="${W - px}" y2="${H - py}" stroke="#D5D1C7" stroke-dasharray="4 4"/>
-        <text x="6" y="${py + 4}" fill="#484C56" font-size="13" font-family="JetBrains Mono, monospace">${maxV.toFixed(1)}</text>
-        <text x="6" y="${H - py + 4}" fill="#484C56" font-size="13" font-family="JetBrains Mono, monospace">${minV.toFixed(1)}</text>
+        <text x="6" y="${py + 4}" fill="#484C56" font-size="13" font-family="JetBrains Mono, monospace">${fmtV(maxV)}</text>
+        <text x="6" y="${H - py + 4}" fill="#484C56" font-size="13" font-family="JetBrains Mono, monospace">${fmtV(minV)}</text>
         <polyline fill="none" stroke="#141518" stroke-width="2.25" points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />
-        ${pts.map((p, idx) => `<g class="chart-pt" data-nid="${esc(p.id)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" fill="#0284C7" stroke="#FFFFFF" stroke-width="2"/>${(idx % Math.max(1, Math.ceil(pts.length / 6)) === 0 || idx === pts.length - 1) ? `<text x="${p.x.toFixed(1)}" y="${Math.max(13, p.y - 10).toFixed(1)}" text-anchor="middle" fill="#141518" font-size="13" font-family="JetBrains Mono, monospace">${esc(p.id.replace(/^EXP-/, ""))}</text>` : ""}<title>${esc(p.id)}: ${p.v}</title></g>`).join("")}</svg>`;
+        ${pts.map((p, idx) => `<g class="chart-pt" data-nid="${esc(p.id)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="#0284C7" stroke="#FFFFFF" stroke-width="2"/>${(idx % Math.max(1, Math.ceil(pts.length / 6)) === 0 || idx === pts.length - 1) ? `<text class="chart-lbl" x="${p.x.toFixed(1)}" y="${Math.max(14, p.y - 10).toFixed(1)}" text-anchor="middle" fill="#141518" font-size="13" font-family="JetBrains Mono, monospace">${esc(p.id.replace(/^EXP-/, ""))}</text>` : ""}<title>${esc(p.id)}: ${p.v}</title></g>`).join("")}</svg>`;
       bindInspectTriggers(chart, h.onInspect);
     } else chart.innerHTML = `<div class="empty-state"><p class="empty-title">${tr("Need at least 2 numeric scores in filter to plot progression", "Cần ít nhất 2 điểm số định lượng để vẽ biểu đồ")}</p></div>`;
 

@@ -79,11 +79,12 @@
 
   function renderCommandAndTelemetry() {
     const meta = state.meta || {}, nodes = state.nodes || [], gates = state.gates || [], exps = state.experiments || [], ov = state.execution_overview || {};
-    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    setTxt("scope-indicator", state.is_global ? "GLOBAL" : "LOCAL"); setTxt("project-title", state.project || "SuperMemory");
-    setTxt("active-goal-line", meta.active_goal || "4-Tier Cognitive Graph & Constitutional Harness");
-    setTxt("l0-phase", (meta.current_phase || tr("Active Studio", "Đang hoạt động")).split("(")[0].trim());
-    setTxt("l0-next", meta.next_actions || meta.active_goal || tr("Ready for research & verification.", "Sẵn sàng thực nghiệm & kiểm định."));
+    const flat = (s) => String(s || "").replace(/\\n|\s+/g, " ").trim();
+    const setTxt = (id, v, tip = false) => { const el = document.getElementById(id); if (el) { el.textContent = v; if (tip) el.title = String(v); } };
+    setTxt("scope-indicator", state.is_global ? "GLOBAL" : "LOCAL"); setTxt("project-title", state.project || "SuperMemory", true);
+    setTxt("active-goal-line", flat(meta.active_goal) || "4-Tier Cognitive Graph & Constitutional Harness", true);
+    setTxt("l0-phase", flat((meta.current_phase || tr("Active Studio", "Đang hoạt động")).split("|")[0].split("(")[0]), true);
+    setTxt("l0-next", flat(meta.next_actions || meta.active_goal) || tr("Ready for research & verification.", "Sẵn sàng thực nghiệm & kiểm định."), true);
     const tiers = state.cognitive_tiers || {}, byTier = tiers.counts_by_tier || {}, activeTok = tiers.active_prompt_tokens || 0;
     setTxt("kpi-tokens", `${activeTok} / 850 tok`); document.getElementById("token-meter-bar").setAttribute("aria-valuenow", String(activeTok));
     document.getElementById("token-meter-fill").style.width = `${Math.min(100, Math.round((activeTok / 850) * 100))}%`;

@@ -123,9 +123,9 @@
 
       const mp = paginate(cards, "meth", 4);
       cardBox.innerHTML = (mp.slice.length ? mp.slice.map((m) => {
-        const md = m.metadata || {};
+        const md = m.metadata || {}, venueLbl = `${md.venue || "SOTA"} ${md.year || ""}`.trim();
         return `<article class="ledger-item-static ledger-item-clickable" data-inspect-rh="${esc(m.id)}">
-          <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(m.id)}</span><span class="role-chip">${esc(md.venue || "SOTA")} ${esc(md.year || "")}</span></span><span class="mono-tag">${esc(md.complexity_cost || "O(N)")}</span></div>
+          <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(m.id)}</span><span class="role-chip" title="${esc(venueLbl)}">${esc(venueLbl)}</span></span><span class="mono-tag" title="${esc(md.complexity_cost || "O(N)")}">${esc(md.complexity_cost || "O(N)")}</span></div>
           <h4 class="row-title">${esc(m.title)}</h4>
           <p class="row-desc">${inlineMd(md.core_mechanism || m.summary)}</p>
           <div class="dag-meta-row">${md.bottleneck_id ? `<span class="mono-tag">${tr("Targets", "Đích")}: ${esc(md.bottleneck_id)}</span>` : "<span></span>"}<button type="button" class="btn btn-secondary btn-xs" data-inspect-btn="${esc(m.id)}">${tr("Read Card", "Đọc thẻ")}</button></div>
