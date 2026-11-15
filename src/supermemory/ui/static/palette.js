@@ -25,7 +25,7 @@
         { kind: "cmd", id: "new-lesson", label: tr("+ Record Lesson & PreToolUse CodeGate", "+ Ghi Bài học & Ràng buộc CodeGate"), hint: "Law+Gate", run: this.commands.newLesson },
         { kind: "cmd", id: "audit", label: tr("Run Full Workspace CodeGate Audit", "Chạy kiểm định toàn bộ CodeGate"), hint: "Audit", run: this.commands.runAudit },
         { kind: "cmd", id: "handoff", label: tr("Generate Zero-Loss Handoff Briefing", "Xuất bản bàn giao Handoff Briefing"), hint: "Markdown", run: this.commands.handoff },
-        { kind: "cmd", id: "dock", label: tr("Toggle Docked / Floating Inspector Panel", "Chuyển chế độ Ghim cạnh / Nổi cho Inspector"), hint: "Layout", run: this.commands.toggleDock },
+        { kind: "cmd", id: "dock", label: tr("Toggle Center Modal / Split-Pane Inspector (F)", "Phóng to Giữa màn hình / Ghim cạnh Inspector (F)"), hint: "F", run: this.commands.toggleDock },
       ];
     }
 

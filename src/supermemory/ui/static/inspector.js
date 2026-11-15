@@ -1,4 +1,4 @@
-// Flexible Split-Pane / Floating Inspector with History, Graph Focus, Copy MD & Gate View
+// Flexible 3-Mode Inspector (Center Modal / Split-Pane / Floating) with History & Gate View
 (function () {
   const { esc, statusTag, tr, cleanText, renderMarkdown, svg } = window.SuperMemoryIcons;
 
@@ -20,13 +20,14 @@
   class InspectorController {
     constructor(getState, getScope, postJson, onRefresh, modals, notify, callbacks = {}) {
       Object.assign(this, { getState, getScope, postJson, onRefresh, modals, notify, callbacks, currentNodeId: null, history: [] });
-      this.isDocked = localStorage.getItem("sm_insp_dock") !== "float";
+      const saved = localStorage.getItem("sm_insp_mode");
+      this.mode = ["center", "dock", "float"].includes(saved) ? saved : (localStorage.getItem("sm_insp_dock") === "float" ? "float" : "dock");
       this.isWide = localStorage.getItem("sm_insp_wide") === "1";
       this.drawer = document.getElementById("inspector-drawer");
       this.backdrop = document.getElementById("inspector-backdrop");
       this.backBtn = document.getElementById("btn-insp-back");
-      this.dockBtn = document.getElementById("btn-dock-inspector");
       this.wideBtn = document.getElementById("btn-wide-inspector");
+      this.modeBtns = Array.from(document.querySelectorAll("[data-imode]"));
       this._syncModeClasses(false);
       this._bindChrome();
     }
@@ -35,31 +36,49 @@
       document.getElementById("btn-close-inspector").addEventListener("click", () => this.close());
       this.backdrop.addEventListener("click", () => this.close());
       this.backBtn.addEventListener("click", () => { const prev = this.history.pop(); if (prev) this.inspect(prev, false); });
-      this.dockBtn.addEventListener("click", () => this.toggleDock());
+      this.modeBtns.forEach((b) => b.addEventListener("click", () => this.setMode(b.dataset.imode)));
+      document.getElementById("inspector-header")?.addEventListener("dblclick", (ev) => {
+        if (!ev.target.closest("button")) this.toggleCenter();
+      });
       this.wideBtn.addEventListener("click", () => { this.isWide = !this.isWide; localStorage.setItem("sm_insp_wide", this.isWide ? "1" : "0"); this._syncModeClasses(Boolean(this.currentNodeId)); });
+      window.addEventListener("keydown", (ev) => {
+        if (ev.key.toLowerCase() === "f" && !ev.ctrlKey && !ev.metaKey && !ev.altKey && this.currentNodeId && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName) && !document.getElementById("workbench-dialog")?.open) {
+          ev.preventDefault(); this.toggleCenter();
+        }
+      });
       document.addEventListener("click", (ev) => {
-        if (this.isDocked || !this.currentNodeId || ev.target.closest("#inspector-drawer, #graph-canvas, .row-trigger, .ledger-row, [data-nid], [data-gate-inspect], [data-jump], dialog, button, a, input, select, textarea, label")) return;
+        if (this.mode === "dock" || !this.currentNodeId || ev.target.closest("#inspector-drawer, #graph-canvas, .row-trigger, .ledger-row, [data-nid], [data-gate-inspect], [data-jump], dialog, button, a, input, select, textarea, label")) return;
         this.close();
       });
     }
-    toggleDock() { this.isDocked = !this.isDocked; localStorage.setItem("sm_insp_dock", this.isDocked ? "dock" : "float"); this._syncModeClasses(Boolean(this.currentNodeId)); }
+
+    setMode(m) {
+      if (!["center", "dock", "float"].includes(m)) return;
+      this.mode = m; localStorage.setItem("sm_insp_mode", m);
+      this._syncModeClasses(Boolean(this.currentNodeId));
+    }
+    toggleDock() { this.setMode(this.mode === "dock" ? "center" : "dock"); }
+    toggleCenter() { this.setMode(this.mode === "center" ? "dock" : "center"); }
 
     _syncModeClasses(isOpen) {
-      const sig = `${this.isDocked}:${this.isWide}:${isOpen}`, changed = this._layoutSig !== sig;
+      const sig = `${this.mode}:${this.isWide}:${isOpen}`, changed = this._layoutSig !== sig;
       this._layoutSig = sig;
-      document.body.classList.toggle("insp-docked", this.isDocked);
+      document.body.classList.toggle("insp-docked", this.mode === "dock");
+      document.body.classList.toggle("insp-center", this.mode === "center");
       document.body.classList.toggle("insp-wide", this.isWide);
       document.body.classList.toggle("insp-open", isOpen);
-      this.dockBtn.setAttribute("aria-pressed", String(this.isDocked));
+      this.backdrop.classList.toggle("hidden", !isOpen || this.mode === "dock");
+      this.modeBtns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.imode === this.mode)));
       this.wideBtn.setAttribute("aria-pressed", String(this.isWide));
       this.backBtn.disabled = !this.history.length;
+      const expBtn = document.getElementById("btn-expand-center");
+      if (expBtn) expBtn.innerHTML = `${svg("maximize", 13)} ${this.mode === "center" ? tr("Dock to Side (F)", "Thu về cạnh phải (F)") : tr("Expand to Center (F)", "Phóng to giữa màn (F)")}`;
       if (changed) requestAnimationFrame(() => this.callbacks.onLayoutChange?.());
     }
 
     _openChrome(badgeTxt, headingTxt) {
       this.drawer.classList.add("is-open");
       this.drawer.setAttribute("aria-hidden", "false");
-      this.backdrop.classList.toggle("hidden", this.isDocked);
       document.getElementById("insp-badge").textContent = badgeTxt;
       document.getElementById("insp-id").textContent = headingTxt;
       this._syncModeClasses(true);
@@ -69,7 +88,6 @@
       this.currentNodeId = null; this.history = [];
       this.drawer.classList.remove("is-open");
       this.drawer.setAttribute("aria-hidden", "true");
-      this.backdrop.classList.add("hidden");
       this._syncModeClasses(false);
       this.callbacks.onClearSelection?.();
     }
@@ -94,17 +112,12 @@
           <span class="prop-key">Target Glob</span><span class="prop-val"><code class="md-code">${esc(gate.target_glob)}</code></span>
           <span class="prop-key">${tr("Blocks", "Đã chặn")}</span><span class="prop-val">${esc(gate.blocked_count || 0)}${gate.last_blocked_at ? ` (${esc(gate.last_blocked_at.slice(0, 19))})` : ""}</span>
         </div>
-        <div class="inspector-section">
-          <h3 class="inspector-subhead">${tr("Full Rule Pattern / SHA-256 Signature", "Biểu thức Regex / Chữ ký SHA-256 đầy đủ")}</h3>
-          <pre class="code-block"><code>${esc(gate.pattern || "—")}</code></pre>
-        </div>
+        <div class="inspector-section"><h3 class="inspector-subhead">${tr("Full Rule Pattern / SHA-256 Signature", "Biểu thức Regex / Chữ ký SHA-256 đầy đủ")}</h3><pre class="code-block"><code>${esc(gate.pattern || "—")}</code></pre></div>
         ${formatMetaSection(gate.config)}`;
       document.getElementById("btn-edit-gate-insp").addEventListener("click", () => this.modals.openAddGate(gate));
       document.getElementById("btn-toggle-gate-insp").addEventListener("click", async () => {
         await this.postJson("/api/gates", { action: "toggle", gate_id: gate.id, enabled: !gate.enabled });
-        await this.onRefresh();
-        const updated = (this.getState().gates || []).find((x) => x.id === gate.id);
-        if (updated) this.inspectGate(updated);
+        await this.onRefresh(); const updated = (this.getState().gates || []).find((x) => x.id === gate.id); if (updated) this.inspectGate(updated);
       });
       document.getElementById("btn-jump-gate-law")?.addEventListener("click", () => this.inspect(gate.law_id));
     }
@@ -116,7 +129,7 @@
       if (!res.ok) { this.notify(tr(`Entity not found: ${nodeId}`, `Không tìm thấy thực thể ${nodeId}`), true); return; }
       const { node, edges } = await res.json(), state = this.getState();
       this.currentNodeId = node.id;
-      this._openChrome(`${node.memory_tier || "SEMANTIC"} / ${node.node_type}`, `${node.id} — ${cleanText(node.title, 96)}`);
+      this._openChrome(`${node.memory_tier || "SEMANTIC"} / ${node.node_type}`, `${node.id} — ${cleanText(node.title, 110)}`);
 
       const promoteBtn = !state.is_global ? `<button type="button" id="btn-promote-global" class="btn btn-secondary btn-sm">${tr("Promote", "Lên Global")}</button>` : "";
       const fileRow = node.file_path ? `<span class="prop-key">${tr("Source File", "Tệp nguồn")}</span><span class="prop-val"><a class="file-anchor" href="file://${esc(node.file_path)}" target="_blank" rel="noreferrer">${esc(node.file_path)}</a></span>` : "";
@@ -132,6 +145,7 @@
       document.getElementById("insp-body").innerHTML = `
         <div class="row-actions">
           <button type="button" id="btn-edit-node" class="btn btn-primary btn-sm">${tr("Edit", "Chỉnh sửa")}</button>
+          <button type="button" id="btn-expand-center" class="btn btn-secondary btn-sm">${svg("maximize", 13)} ${this.mode === "center" ? tr("Dock to Side (F)", "Thu về cạnh phải (F)") : tr("Expand to Center (F)", "Phóng to giữa màn (F)")}</button>
           <button type="button" id="btn-focus-graph" class="btn btn-secondary btn-sm">${svg("crosshair", 14)} ${tr("Focus in Graph", "Định vị Graph")}</button>
           <button type="button" id="btn-copy-md" class="btn btn-secondary btn-sm">${svg("copy", 14)} ${tr("Copy", "Sao chép")}</button>
           ${promoteBtn}
@@ -157,30 +171,20 @@
 
     _bindNodeActions(node, mdRaw) {
       document.getElementById("btn-edit-node").addEventListener("click", () => this.modals.openUpsertNode(node));
-      document.getElementById("btn-focus-graph").addEventListener("click", () => this.callbacks.onFocusGraph?.(node.id));
-      document.getElementById("btn-copy-md").addEventListener("click", async () => {
-        await navigator.clipboard?.writeText(`# ${node.id}: ${node.title}\n\n${mdRaw}`);
-        this.notify(tr(`Copied ${node.id} Markdown`, `Đã sao chép Markdown của ${node.id}`));
-      });
-      document.getElementById("btn-promote-global")?.addEventListener("click", async () => {
-        try { const out = await this.postJson("/api/promote", { node_id: node.id }); this.notify(tr(`Promoted: ${out.global_id}`, `Đã chuyển lên Global: ${out.global_id}`)); await this.onRefresh(); }
-        catch (err) { this.notify(err.message, true); }
-      });
+      document.getElementById("btn-expand-center").addEventListener("click", () => { this.toggleCenter(); this.inspect(node.id, false); });
+      document.getElementById("btn-focus-graph").addEventListener("click", () => { if (this.mode === "center") this.setMode("dock"); this.callbacks.onFocusGraph?.(node.id); });
+      document.getElementById("btn-copy-md").addEventListener("click", async () => { await navigator.clipboard?.writeText(`# ${node.id}: ${node.title}\n\n${mdRaw}`); this.notify(tr(`Copied ${node.id} Markdown`, `Đã sao chép Markdown của ${node.id}`)); });
+      document.getElementById("btn-promote-global")?.addEventListener("click", async () => { try { const out = await this.postJson("/api/promote", { node_id: node.id }); this.notify(tr(`Promoted: ${out.global_id}`, `Đã chuyển lên Global: ${out.global_id}`)); await this.onRefresh(); } catch (err) { this.notify(err.message, true); } });
       const bindArm = () => document.getElementById("btn-arm-del-node")?.addEventListener("click", () => {
         const z = document.getElementById("insp-del-zone");
         z.innerHTML = `<button type="button" id="btn-confirm-del-node" class="btn btn-danger btn-sm">${tr("Confirm", "Xác nhận")}</button><button type="button" id="btn-cancel-del-node" class="btn btn-ghost btn-sm">${tr("Cancel", "Hủy")}</button>`;
         document.getElementById("btn-cancel-del-node").addEventListener("click", () => { z.innerHTML = `<button type="button" id="btn-arm-del-node" class="btn btn-danger btn-sm">${tr("Delete", "Xóa")}</button>`; bindArm(); });
-        document.getElementById("btn-confirm-del-node").addEventListener("click", async () => {
-          try { await this.postJson("/api/node/delete", { node_id: node.id }); this.notify(tr(`Deleted ${node.id}`, `Đã xóa ${node.id}`)); this.resetEmpty(); await this.onRefresh(); }
-          catch (err) { this.notify(err.message, true); }
-        });
+        document.getElementById("btn-confirm-del-node").addEventListener("click", async () => { try { await this.postJson("/api/node/delete", { node_id: node.id }); this.notify(tr(`Deleted ${node.id}`, `Đã xóa ${node.id}`)); this.resetEmpty(); await this.onRefresh(); } catch (err) { this.notify(err.message, true); } });
       });
       bindArm();
       document.getElementById("btn-add-edge").addEventListener("click", async () => {
-        const dst = document.getElementById("link-dst").value, rel = document.getElementById("link-rel").value;
-        if (!dst) return;
-        try { await this.postJson("/api/edge/add", { source_id: node.id, target_id: dst, relation: rel }); await this.onRefresh(); await this.inspect(node.id, false); }
-        catch (err) { this.notify(err.message, true); }
+        const dst = document.getElementById("link-dst").value, rel = document.getElementById("link-rel").value; if (!dst) return;
+        try { await this.postJson("/api/edge/add", { source_id: node.id, target_id: dst, relation: rel }); await this.onRefresh(); await this.inspect(node.id, false); } catch (err) { this.notify(err.message, true); }
       });
       document.getElementById("insp-body").querySelectorAll("[data-jump]").forEach((b) => b.addEventListener("click", () => this.inspect(b.getAttribute("data-jump"), true)));
       document.getElementById("insp-body").querySelectorAll("[data-del-src]").forEach((b) => b.addEventListener("click", async () => {

@@ -79,9 +79,9 @@ flowchart TB
 
 ---
 
-## 3. Daylight Architectural Studio (`Web UI v2.6`)
+## 3. Daylight Architectural Studio (`Web UI v2.6.1`)
 
-A zero-CDN local management studio (`http://127.0.0.1:8765`) built with **Daylight Utilitarian Minimalism**, **English by default** with a 1-click **`VI` / `EN` language toggle**, **Docked Split-Pane vs Floating Inspector** (`←` Back history, Wide mode, 1-click `Focus in Graph`, `Copy MD`, Edge Unlink `×`, and full untruncated CodeGate regex inspection), **`/` & `Ctrl+K` Federated Command Popover**, collapsible sidebar rail, live L0 Working Memory strip, and zero horizontal overflow on Desktop (`1440x900`) and Mobile (`375x812`):
+A zero-CDN local management studio (`http://127.0.0.1:8765`) built with **Daylight Utilitarian Minimalism**, **English by default** with a 1-click **`VI` / `EN` language toggle**, **Zero-CDN Scientific LaTeX Math & Markdown Renderer** (`$...$`, `$$...$$`, `\mathcal`, `\mathbb`, `\frac`, `\sqrt`, stacked sub/superscripts, accents, and Markdown tables), **3-Mode Expandable Inspector (`Center Modal` · `Split-Pane` · `Floating` via `F` shortcut or double-click header)** (`←` Back history, Extra-Wide mode, 1-click `Focus in Graph`, `Copy MD`, Edge Unlink `×`, and full untruncated CodeGate regex inspection), **`/` & `Ctrl+K` Federated Command Popover**, collapsible sidebar rail, live L0 Working Memory strip, and zero horizontal overflow on Desktop (`1440x900`) and Mobile (`375x812`):
 
 ### 4-Mode Directed Knowledge Graph (`Force` · `Radial` · `Hierarchy` · `Lanes`) & Split-Pane Studio
 ![Force Network Mode](docs/screenshots/graph_force.png)

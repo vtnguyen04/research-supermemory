@@ -202,6 +202,7 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         "/",
         "/styles.css",
         "/icons.js",
+        "/math_md.js",
         "/graph_layouts.js",
         "/graph_canvas.js",
         "/inspector.js",
@@ -234,10 +235,12 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         assert "search-popover" in html
         assert "l0-context-strip" in html
         assert "btn-dock-inspector" in html
+        assert "btn-center-inspector" in html
+        assert "renderTex(" in fetched["/math_md.js"]
         for gmode in ("FORCE", "RADIAL", "HIERARCHY", "LANES"):
             assert f'data-gmode="{gmode}"' in html
         assert "paginate(" in fetched["/views.js"] and "paginate(" in fetched["/merge_studio.js"]
-        assert ".pager-bar" in css
+        assert ".pager-bar" in css and ".math-block" in css and "body.insp-center" in css
         assert not re.search(r"repeat\(\s*[5-9]\s*,\s*minmax\(", css)
         assert ":focus-visible" in css
         assert "font-variant-numeric: tabular-nums" in css
@@ -246,7 +249,7 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         assert not micro_font_rx.search(css), "Microscopic font-size (<13px) detected in styles.css"
 
         js_files = sorted(STATIC_DIR.glob("*.js"))
-        assert len(js_files) == 9
+        assert len(js_files) == 10
         for js_path in js_files:
             lines = js_path.read_text(encoding="utf-8").splitlines()
             assert len(lines) < 200, f"{js_path.name} exceeds 200 lines ({len(lines)})"

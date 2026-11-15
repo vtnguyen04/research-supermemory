@@ -391,19 +391,23 @@
       </main>
     </div>
 
-    <!-- FLEXIBLE DOCKED SPLIT-PANE / FLOATING INSPECTOR -->
+    <!-- FLEXIBLE 3-MODE INSPECTOR: CENTER MODAL / SPLIT-PANE / FLOATING -->
     <aside id="inspector-drawer" class="inspector-sheet" aria-label="Entity inspector and editor" aria-hidden="true">
-      <div class="inspector-top">
-        <div class="inspector-title-group">
+      <div class="inspector-top" id="inspector-header">
+        <div class="inspector-bar">
           <span id="insp-badge" class="status-tag" data-vi="CHI TIẾT THỰC THỂ">ENTITY INSPECTOR</span>
-          <h2 id="insp-id" class="inspector-heading" data-vi="Thanh tra thực thể">Entity Details</h2>
+          <div class="inspector-controls">
+            <button type="button" id="btn-insp-back" class="icon-btn" title="Back to previous entity" data-vi-title="Quay lại thực thể trước" aria-label="Back to previous entity" disabled><span data-icon="arrowLeft"></span></button>
+            <div class="segmented-tray insp-mode-tray" role="group" aria-label="Inspector view mode" id="insp-mode-bar">
+              <button type="button" id="btn-center-inspector" class="seg-btn seg-btn-icon" aria-pressed="false" data-imode="center" title="Expand to Center Modal (Shortcut: F)" data-vi-title="Phóng to ra giữa màn hình (Phím F)"><span data-icon="maximize"></span><span data-vi="Giữa màn">Center</span></button>
+              <button type="button" id="btn-dock-inspector" class="seg-btn" aria-pressed="true" data-imode="dock" title="Side-by-side Split-Pane" data-vi-title="Ghim chia đôi bên phải" data-vi="Chia đôi">Split</button>
+              <button type="button" id="btn-float-inspector" class="seg-btn" aria-pressed="false" data-imode="float" title="Floating Right Panel" data-vi-title="Cửa sổ nổi bên phải" data-vi="Nổi">Float</button>
+            </div>
+            <button type="button" id="btn-wide-inspector" class="icon-btn" aria-pressed="false" title="Toggle Extra Wide Width" data-vi-title="Mở rộng tối đa chiều ngang" aria-label="Toggle Extra Wide Width"><span data-icon="expand"></span></button>
+            <button type="button" id="btn-close-inspector" class="icon-btn" title="Close inspector (Esc)" data-vi-title="Đóng bảng chi tiết (Esc)" aria-label="Close inspector">&times;</button>
+          </div>
         </div>
-        <div class="inspector-controls">
-          <button type="button" id="btn-insp-back" class="icon-btn" title="Back to previous entity" data-vi-title="Quay lại thực thể trước" aria-label="Back to previous entity" disabled><span data-icon="arrowLeft"></span></button>
-          <button type="button" id="btn-dock-inspector" class="icon-btn" aria-pressed="true" title="Toggle Docked Split-Pane / Floating Overlay" data-vi-title="Chuyển chế độ Ghim chia đôi / Cửa sổ nổi" aria-label="Toggle Docked Split-Pane / Floating Overlay"><span data-icon="dockRight"></span></button>
-          <button type="button" id="btn-wide-inspector" class="icon-btn" aria-pressed="false" title="Toggle Wide Reading Mode" data-vi-title="Mở rộng / Thu hẹp chiều ngang đọc" aria-label="Toggle Wide Reading Mode"><span data-icon="expand"></span></button>
-          <button type="button" id="btn-close-inspector" class="icon-btn" title="Close inspector (Esc)" data-vi-title="Đóng bảng chi tiết (Esc)" aria-label="Close inspector">&times;</button>
-        </div>
+        <h2 id="insp-id" class="inspector-heading" data-vi="Thanh tra thực thể">Entity Details</h2>
       </div>
       <div id="insp-body" class="inspector-content"></div>
     </aside>
@@ -426,6 +430,7 @@
   <div id="toast-region" class="toast-region hidden" role="status" aria-live="polite"></div>
 
   <script src="/icons.js"></script>
+  <script src="/math_md.js"></script>
   <script src="/graph_layouts.js"></script>
   <script src="/graph_canvas.js"></script>
   <script src="/inspector.js"></script>

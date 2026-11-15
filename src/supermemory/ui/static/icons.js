@@ -1,4 +1,4 @@
-// Crisp 1.5px Icons, EN/VI i18n, Safe Markdown Renderer, Text Excerpts & Pagination
+// Crisp 1.5px Icons, EN/VI i18n, Status Badges & Pagination Helpers
 (function () {
   const esc = (val) =>
     String(val ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -27,81 +27,11 @@
     document.querySelectorAll("[data-vi-title]").forEach((el) => {
       if (el.dataset.enTitle === undefined) el.dataset.enTitle = el.getAttribute("title") || "";
       const val = curLang === "vi" ? el.dataset.viTitle : el.dataset.enTitle;
-      el.setAttribute("title", val); el.setAttribute("aria-label", val);
+      el.setAttribute("title", val);
+      el.setAttribute("aria-label", val);
     });
     const btn = document.getElementById("btn-lang-toggle");
     if (btn) btn.textContent = curLang === "vi" ? "EN" : "VI";
-  }
-
-  function cleanText(raw, maxLen = 0, stripTag = true) {
-    const rawStr = String(raw ?? ""), hadTag = /^\[[A-Z0-9_ -]+\]\s*/.test(rawStr);
-    let s = rawStr.replace(/^#+\s+/gm, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-    if (stripTag) s = s.replace(/^(?:\[[A-Z0-9_ -]+\]\s*)+/, "");
-    s = s.replace(/\s+/g, " ").trim();
-    const unclosedParen = (s.match(/\(/g) || []).length > (s.match(/\)/g) || []).length;
-    if (unclosedParen || (hadTag && s.length >= 68 && !/[.!?)…]$/.test(s))) {
-      const sp = s.lastIndexOf(" ");
-      s = (sp > 24 ? s.slice(0, sp) : s).replace(/[,;:\-(]+$/, "") + "…";
-    }
-    if (maxLen > 0 && s.length > maxLen) {
-      const cut = s.slice(0, maxLen - 1), sp = cut.lastIndexOf(" ");
-      s = (sp > maxLen * 0.55 ? cut.slice(0, sp) : cut).replace(/[,;:\-(]+$/, "") + "…";
-    }
-    return s;
-  }
-
-  function inlineMd(raw) {
-    const codes = [];
-    let s = esc(raw).replace(/`([^`]+)`/g, (_, c) => { codes.push(`<code class="md-code">${c}</code>`); return `\x00C${codes.length - 1}\x00`; });
-    s = s.replace(/\[([^\]]+)\]\(((?:https?:\/\/|file:\/\/)[^\s)]+)\)/g, '<a class="file-anchor" href="$2" target="_blank" rel="noreferrer">$1</a>');
-    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, "$1<em>$2</em>");
-    return s.replace(/\x00C(\d+)\x00/g, (_, idx) => codes[Number(idx)] || "");
-  }
-
-  function renderMarkdown(raw, stripTopH1 = false) {
-    const lines = String(raw ?? "").replace(/\r\n/g, "\n").split("\n"), out = [];
-    let i = 0, skippedH1 = false;
-    while (i < lines.length) {
-      const ln = lines[i], t = ln.trim();
-      if (!t) { i++; continue; }
-      if (stripTopH1 && !skippedH1 && /^#\s+/.test(t)) { skippedH1 = true; i++; continue; }
-      skippedH1 = true;
-      if (t.startsWith("```")) {
-        const buf = []; i++;
-        while (i < lines.length && !lines[i].trim().startsWith("```")) buf.push(esc(lines[i++]));
-        i++; out.push(`<pre class="code-block"><code>${buf.join("\n")}</code></pre>`); continue;
-      }
-      if (/^(?:---|\*\*\*|___)\s*$/.test(t)) { out.push('<hr class="md-hr" />'); i++; continue; }
-      const hm = t.match(/^(#{1,4})\s+(.+)$/);
-      if (hm) { const tag = hm[1].length <= 2 ? "h4" : "h5"; out.push(`<${tag} class="md-h">${inlineMd(hm[2])}</${tag}>`); i++; continue; }
-      if (t.startsWith(">")) {
-        const q = [];
-        while (i < lines.length && lines[i].trim().startsWith(">")) q.push(inlineMd(lines[i++].trim().replace(/^>\s?/, "")));
-        out.push(`<blockquote class="md-quote">${q.join("<br/>")}</blockquote>`); continue;
-      }
-      if (t.startsWith("|") && i + 1 < lines.length && /^\|\s*[-:]+/.test(lines[i + 1].trim())) {
-        const cells = (r) => r.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
-        const hdr = cells(t).map((c) => `<th>${inlineMd(c)}</th>`).join(""); i += 2;
-        const rows = [];
-        while (i < lines.length && lines[i].trim().startsWith("|")) rows.push(`<tr>${cells(lines[i++]).map((c) => `<td>${inlineMd(c)}</td>`).join("")}</tr>`);
-        out.push(`<div class="md-table-wrap"><table class="md-table"><thead><tr>${hdr}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`); continue;
-      }
-      if (/^(?:[-*•]|\d+\.)\s+/.test(t)) {
-        const ord = /^\d+\.\s+/.test(t), tag = ord ? "ol" : "ul", items = [];
-        const rx = ord ? /^\d+\.\s+(.*)$/ : /^(?:[-*•])\s+(.*)$/;
-        while (i < lines.length && rx.test(lines[i].trim())) {
-          let body = lines[i++].trim().replace(rx, "$1");
-          body = body.replace(/^\[([ xX])\]\s+/, (_, c) => `[${c.trim() ? "x" : " "}] `);
-          items.push(`<li>${inlineMd(body)}</li>`);
-        }
-        out.push(`<${tag} class="md-list${ord ? " md-ol" : ""}">${items.join("")}</${tag}>`); continue;
-      }
-      if (/^N\/A$/i.test(t)) { out.push('<p class="md-na">&mdash;</p>'); i++; continue; }
-      const p = [];
-      while (i < lines.length && lines[i].trim() && !/^(?:#{1,4}\s|```|>|\||(?:---|\*\*\*)|(?:[-*•]|\d+\.)\s)/.test(lines[i].trim())) p.push(inlineMd(lines[i++].trim()));
-      out.push(`<p class="md-p">${p.join(" ")}</p>`);
-    }
-    return out.join("") || `<p class="md-na">&mdash;</p>`;
   }
 
   const PATHS = {
@@ -120,6 +50,7 @@
     sidebarLeft: '<rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M6.25 2.5v11"/>',
     dockRight: '<rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M10 2.5v11"/>',
     expand: '<path d="M2.5 8h11M5.25 5.25L2.5 8l2.75 2.75M10.75 5.25L13.5 8l-2.75 2.75"/>',
+    maximize: '<path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/><path d="M2.75 2.75L6.25 6.25M13.25 2.75L9.75 6.25M13.25 13.25L9.75 9.75M2.75 13.25L6.25 9.75"/>',
     crosshair: '<circle cx="8" cy="8" r="4.25"/><path d="M8 1.75v2.25M8 12v2.25M1.75 8H4M12 8h2.25"/>',
     copy: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3 10.5V3.5A1.5 1.5 0 014.5 2h7"/>',
     download: '<path d="M8 2.25v7.5M5.25 7L8 9.75 10.75 7M3 13.25h10"/>',
@@ -169,5 +100,5 @@
     });
   }
 
-  window.SuperMemoryIcons = { svg, hydrateIcons, statusTag, esc, cleanText, inlineMd, renderMarkdown, paginate, bindPagers, tr, getLang, setLang, applyStaticLang };
+  window.SuperMemoryIcons = { svg, hydrateIcons, statusTag, esc, paginate, bindPagers, tr, getLang, setLang, applyStaticLang };
 })();

@@ -172,7 +172,11 @@
     const on = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
     on("btn-collapse-rail", "click", () => { const c = document.body.classList.toggle("rail-collapsed"); localStorage.setItem("sm_rail_collapsed", c ? "1" : "0"); requestAnimationFrame(() => graphView.fitView()); });
     on("btn-toggle-l0", "click", () => { const el = document.getElementById("l0-context-strip"), c = el.classList.toggle("is-compact"); localStorage.setItem("sm_l0_hidden", c ? "1" : "0"); requestAnimationFrame(() => graphView.fitView()); });
-    on("btn-lang-toggle", "click", () => { setLang(getLang() === "en" ? "vi" : "en"); rerenderAll(); if (inspector.currentNodeId && !inspector.currentNodeId.startsWith("GATE:")) inspector.inspect(inspector.currentNodeId, false); });
+    on("btn-lang-toggle", "click", () => {
+      setLang(getLang() === "en" ? "vi" : "en"); rerenderAll();
+      if (inspector.currentNodeId?.startsWith("GATE:")) inspector.inspectGate((state.gates || []).find((g) => `GATE:${g.id}` === inspector.currentNodeId));
+      else if (inspector.currentNodeId) inspector.inspect(inspector.currentNodeId, false);
+    });
     document.querySelectorAll("[data-gmode]").forEach((b) => b.addEventListener("click", () => setGraphMode(b.dataset.gmode)));
     on("chk-hide-aux", "change", (ev) => graphView.setHideAux(ev.target.checked));
     on("workspace-switcher", "change", (ev) => { currentScope = ev.target.value; inspector.resetEmpty(); loadGraph(); });
