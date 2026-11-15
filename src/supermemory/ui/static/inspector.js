@@ -24,6 +24,10 @@
       this.backdrop = document.getElementById("inspector-backdrop");
       document.getElementById("btn-close-inspector").addEventListener("click", () => this.close());
       this.backdrop.addEventListener("click", () => this.close());
+      document.addEventListener("click", (ev) => {
+        if (!this.currentNodeId || ev.target.closest("#inspector-drawer, #graph-canvas, .row-trigger, [data-jump], dialog, button, a, input, select, textarea, label")) return;
+        this.close();
+      });
     }
 
     close() {

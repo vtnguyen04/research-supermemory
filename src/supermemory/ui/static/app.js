@@ -173,7 +173,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     applyStaticLang(); hydrateIcons(document); Views.renderSkeletons();
-    graphView = new ForceGraphCanvas(document.getElementById("graph-canvas"), document.getElementById("graph-tooltip"), (n) => inspector.inspect(n.id));
+    graphView = new ForceGraphCanvas(document.getElementById("graph-canvas"), document.getElementById("graph-tooltip"), (n) => (n ? inspector.inspect(n.id) : inspector.close()));
     modals = new ModalController(() => state, (sc) => { currentScope = sc; }, postJson, loadGraph, toast);
     inspector = new InspectorController(() => state, () => currentScope, postJson, loadGraph, (n) => modals.openUpsertNode(n), toast, () => { graphView.selectedId = null; });
     mergeStudio = new MergeStudioController(() => state, postJson, loadGraph, (id) => { graphView.selectedId = id; inspector.inspect(id); }, toast);

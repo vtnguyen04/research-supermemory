@@ -15,11 +15,8 @@
 
   class ForceGraphCanvas {
     constructor(canvas, tooltip, onSelectNode) {
-      Object.assign(this, { canvas, ctx: canvas.getContext("2d"), tooltip, onSelectNode, nodes: [], edges: [], nodeMap: new Map(), laneBoxes: [] });
-      Object.assign(this, { mode: "FORCE", hideAux: true, activeTier: "ALL", activeType: "ALL", highlightIds: new Set() });
-      Object.assign(this, { selectedId: null, hoveredId: null, dragNode: null, panX: 0, panY: 0, scale: 1, alpha: 0, isPanning: false });
-      this._bindEvents();
-      this._loop();
+      Object.assign(this, { canvas, ctx: canvas.getContext("2d"), tooltip, onSelectNode, nodes: [], edges: [], nodeMap: new Map(), laneBoxes: [], mode: "FORCE", hideAux: true, activeTier: "ALL", activeType: "ALL", highlightIds: new Set(), selectedId: null, hoveredId: null, dragNode: null, downPos: null, didDrag: false, panX: 0, panY: 0, scale: 1, alpha: 0, isPanning: false });
+      this._bindEvents(); this._loop();
     }
 
     setData(nodes, edges) {
@@ -33,12 +30,10 @@
       this.edges = edges.filter((e) => this.nodeMap.has(e.source_id) && this.nodeMap.has(e.target_id));
       this._applyLayout(!prev.size);
     }
-
     setMode(mode) { this.mode = mode || "FORCE"; this.nodes.forEach((n) => { n.pinned = false; }); this._applyLayout(true); }
     setHideAux(flag) { this.hideAux = Boolean(flag); this._applyLayout(true); }
     setFilter(tier, ntype) { this.activeTier = tier || "ALL"; this.activeType = ntype || "ALL"; this._applyLayout(true); }
     relayout() { this.nodes.forEach((n) => { n.pinned = false; }); this._applyLayout(true); }
-
     _visibleNodes() {
       return this.nodes.filter((n) => (this.activeTier === "ALL" || n.memory_tier === this.activeTier) &&
         (this.activeType === "ALL" || n.node_type === this.activeType) && (!this.hideAux || this.activeType === "AGENT_RUN" || n.node_type !== "AGENT_RUN"));
@@ -69,24 +64,24 @@
 
     _stepForce(vis) {
       if (this.alpha < 0.008) return;
-      const visSet = new Set(vis.map((n) => n.id));
+      const visSet = new Set(vis.map((n) => n.id)), free = (n) => !n.pinned && n !== this.dragNode;
       for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
         const a = vis[i], b = vis[j], dx0 = b.x - a.x || 0.5, dy0 = b.y - a.y || 0.5, d2 = Math.max(640, dx0 * dx0 + dy0 * dy0), d = Math.sqrt(d2), f = (8400 * this.alpha) / d2;
-        if (!a.pinned) { a.vx -= (dx0 / d) * f; a.vy -= (dy0 / d) * f; }
-        if (!b.pinned) { b.vx += (dx0 / d) * f; b.vy += (dy0 / d) * f; }
+        if (free(a)) { a.vx -= (dx0 / d) * f; a.vy -= (dy0 / d) * f; }
+        if (free(b)) { b.vx += (dx0 / d) * f; b.vy += (dy0 / d) * f; }
         if (Math.abs(dx0) < 108 && Math.abs(dy0) < 48) {
           const px = (108 - Math.abs(dx0)) * 0.09 * Math.sign(dx0), py = (48 - Math.abs(dy0)) * 0.14 * Math.sign(dy0);
-          if (!a.pinned) { a.vx -= px; a.vy -= py; }
-          if (!b.pinned) { b.vx += px; b.vy += py; }
+          if (free(a)) { a.vx -= px; a.vy -= py; }
+          if (free(b)) { b.vx += px; b.vy += py; }
         }
       }
       for (const e of this.edges) {
         if (!visSet.has(e.source_id) || !visSet.has(e.target_id)) continue;
         const s = this.nodeMap.get(e.source_id), t = this.nodeMap.get(e.target_id), dx = t.x - s.x, dy = t.y - s.y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - 185) * 0.018 * this.alpha;
-        if (!s.pinned) { s.vx += (dx / d) * f; s.vy += (dy / d) * f; }
-        if (!t.pinned) { t.vx -= (dx / d) * f; t.vy -= (dy / d) * f; }
+        if (free(s)) { s.vx += (dx / d) * f; s.vy += (dy / d) * f; }
+        if (free(t)) { t.vx -= (dx / d) * f; t.vy -= (dy / d) * f; }
       }
-      for (const n of vis) if (!n.pinned) { n.vx = (n.vx - n.x * 0.004 * this.alpha) * 0.78; n.vy = (n.vy - n.y * 0.009 * this.alpha) * 0.78; n.x += n.vx; n.y += n.vy; }
+      for (const n of vis) if (free(n)) { n.vx = (n.vx - n.x * 0.004 * this.alpha) * 0.78; n.vy = (n.vy - n.y * 0.009 * this.alpha) * 0.78; n.x += n.vx; n.y += n.vy; }
       this.alpha *= 0.95;
     }
 
@@ -143,7 +138,7 @@
           ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
           const txt = active ? `${n.id} · ${lbl.slice(0, 22)}` : n.id;
           ctx.font = active ? `700 ${fs + 1}px "Bear Sans UI", "Noto Sans", sans-serif` : `600 ${fs}px "JetBrains Mono", monospace`;
-          const tw = ctx.measureText(txt).width + 12;
+          const tw = ctx.measureText(txt).width + 12; n.pillW = tw; n.pillH = pillH;
           ctx.fillStyle = "rgba(255,255,255,0.94)"; ctx.strokeStyle = active ? "#141518" : "#DEDAD0"; ctx.lineWidth = 1;
           ctx.beginPath(); ctx.roundRect(n.x - tw / 2, n.y + n.r + 4, tw, pillH, 6); ctx.fill(); ctx.stroke();
           ctx.fillStyle = "#141518"; ctx.textAlign = "center"; ctx.fillText(txt, n.x, n.y + n.r + 4 + Math.round(pillH * 0.72)); ctx.textAlign = "start";
@@ -153,29 +148,47 @@
     }
 
     _bindEvents() {
+      const crossedSlop = (ev) => Math.hypot(ev.clientX - this.downPos.x, ev.clientY - this.downPos.y) > 5;
       this.canvas.addEventListener("mousedown", (ev) => {
+        if (ev.button !== 0) return;
         const r = this.canvas.getBoundingClientRect(), pt = this.screenToWorld(ev.clientX - r.left, ev.clientY - r.top), hit = this._findNode(pt.x, pt.y);
-        if (hit) { this.dragNode = hit; this.dragOff = { x: pt.x - hit.x, y: pt.y - hit.y }; hit.pinned = true; this.selectedId = hit.id; this.onSelectNode(hit); }
+        this.downPos = { x: ev.clientX, y: ev.clientY }; this.didDrag = false;
+        if (hit) { this.dragNode = hit; this.dragOff = { x: pt.x - hit.x, y: pt.y - hit.y }; }
         else { this.isPanning = true; this.lastMouse = { x: ev.clientX, y: ev.clientY }; }
       });
       window.addEventListener("mousemove", (ev) => {
         const r = this.canvas.getBoundingClientRect();
-        if (this.dragNode) { const pt = this.screenToWorld(ev.clientX - r.left, ev.clientY - r.top); this.dragNode.x = pt.x - this.dragOff.x; this.dragNode.y = pt.y - this.dragOff.y; if (this.mode === "FORCE") this.alpha = 0.25; return; }
-        if (this.isPanning) { this.panX += ev.clientX - this.lastMouse.x; this.panY += ev.clientY - this.lastMouse.y; this.lastMouse = { x: ev.clientX, y: ev.clientY }; return; }
+        if (this.dragNode || this.isPanning) {
+          if (!this.didDrag && crossedSlop(ev)) {
+            this.didDrag = true; if (this.dragNode) this.dragNode.pinned = true;
+            this.tooltip.classList.add("hidden"); this.canvas.style.cursor = "grabbing";
+          }
+          if (this.didDrag && this.dragNode) { const pt = this.screenToWorld(ev.clientX - r.left, ev.clientY - r.top); this.dragNode.x = pt.x - this.dragOff.x; this.dragNode.y = pt.y - this.dragOff.y; if (this.mode === "FORCE") this.alpha = 0.25; }
+          else if (this.didDrag) { this.panX += ev.clientX - this.lastMouse.x; this.panY += ev.clientY - this.lastMouse.y; this.lastMouse = { x: ev.clientX, y: ev.clientY }; }
+          return;
+        }
         if (ev.target !== this.canvas) { this.hoveredId = null; this.tooltip.classList.add("hidden"); return; }
         const pt = this.screenToWorld(ev.clientX - r.left, ev.clientY - r.top), hit = this._findNode(pt.x, pt.y);
-        this.hoveredId = hit ? hit.id : null;
+        this.hoveredId = hit ? hit.id : null; this.canvas.style.cursor = hit ? "pointer" : "grab";
         if (hit) { this.tooltip.classList.remove("hidden"); this.tooltip.style.left = `${Math.min(r.width - 280, ev.clientX - r.left + 14)}px`; this.tooltip.style.top = `${Math.max(12, ev.clientY - r.top + 14)}px`; this.tooltip.innerHTML = `<div class="mono-id">${esc(hit.node_type)} &middot; ${esc(hit.id)}</div><div class="row-title">${esc(hit.title)}</div>`; }
         else this.tooltip.classList.add("hidden");
       });
-      window.addEventListener("mouseup", () => { this.dragNode = null; this.isPanning = false; });
+      window.addEventListener("mouseup", () => {
+        const clickedNode = this.dragNode && !this.didDrag ? this.dragNode : null, clickedBlank = this.isPanning && !this.didDrag;
+        this.dragNode = null; this.isPanning = false; this.canvas.style.cursor = this.hoveredId ? "pointer" : "grab";
+        if (clickedNode) { this.selectedId = clickedNode.id; this.tooltip.classList.add("hidden"); this.onSelectNode(clickedNode); }
+        else if (clickedBlank) { this.selectedId = null; this.onSelectNode(null); }
+      });
       this.canvas.addEventListener("wheel", (ev) => { ev.preventDefault(); const r = this.canvas.getBoundingClientRect(); this._zoomAt(ev.clientX - r.left, ev.clientY - r.top, ev.deltaY < 0 ? 1.1 : 0.9); }, { passive: false });
       this.canvas.addEventListener("keydown", (ev) => { if (ev.key === "+" || ev.key === "=") { ev.preventDefault(); this.zoomBy(1.15); } else if (ev.key === "-") { ev.preventDefault(); this.zoomBy(0.86); } else if (ev.key === "0") { ev.preventDefault(); this.fitView(); } });
     }
 
     _findNode(wx, wy) {
       const vis = this._visibleNodes(), isCard = this.mode === "LANES";
-      for (let i = vis.length - 1; i >= 0; i--) { const n = vis[i]; if ((isCard && wx >= n.x && wx <= n.x + n.w && wy >= n.y && wy <= n.y + n.h) || (!isCard && Math.hypot(wx - n.x, wy - n.y) <= n.r + 8)) return n; }
+      for (let i = vis.length - 1; i >= 0; i--) {
+        const n = vis[i], pill = !isCard && Math.abs(wx - n.x) <= (n.pillW || 56) / 2 && wy >= n.y + n.r + 2 && wy <= n.y + n.r + 6 + (n.pillH || 20);
+        if ((isCard && wx >= n.x && wx <= n.x + n.w && wy >= n.y && wy <= n.y + n.h) || (!isCard && (Math.hypot(wx - n.x, wy - n.y) <= n.r + 8 || pill))) return n;
+      }
       return null;
     }
     _loop() { this._draw(); requestAnimationFrame(() => this._loop()); }
