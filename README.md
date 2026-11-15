@@ -25,27 +25,15 @@ Standard coding agent harnesses suffer from **Context Compaction Amnesia**, **Ag
 
 ---
 
-## Quick Install (From GitHub)
+## 1-Command Install (No Clone, No `cd`)
 
-### Option A — 1-Command Direct Install via `uv` or `pipx` (No Clone Needed)
-
-```bash
-# Using uv (recommended):
-uv tool install git+https://github.com/<your-username>/supermemory.git
-supermemory install-plugin
-
-# Or using pipx:
-pipx install git+https://github.com/<your-username>/supermemory.git
-supermemory install-plugin
-```
-
-### Option B — `git clone` + Universal `./install.sh` (Works With `uv`, `pipx`, or Plain `python3`)
+Run **one single command** from anywhere on Linux or macOS — installs both the `supermemory` CLI/Web Studio and the global Antigravity Plugin automatically (supports `uv`, `pipx`, or plain `python3`):
 
 ```bash
-git clone https://github.com/<your-username>/supermemory.git
-cd supermemory
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/vtnguyen04/supermemory/main/install.sh | bash
 ```
+
+*(Or directly via `uv` in a single line: `uv tool install git+https://github.com/vtnguyen04/supermemory.git && ~/.local/bin/supermemory install-plugin`)*
 
 ### Bootstrap Inside Any Project or Open Global Studio
 
