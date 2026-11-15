@@ -47,7 +47,7 @@
         }
       });
       document.addEventListener("click", (ev) => {
-        if (this.mode === "dock" || !this.currentNodeId || ev.target.closest("#inspector-drawer, #graph-canvas, .row-trigger, .ledger-row, [data-nid], [data-inspect-rh], [data-gate-inspect], [data-jump], dialog, button, a, input, select, textarea, label")) return;
+        if (this.mode === "dock" || !this.currentNodeId || ev.target.closest("#inspector-drawer, #graph-canvas, .row-trigger, .ledger-row, [data-nid], [data-inspect-rh], [data-gate-inspect], [data-task-id], [data-open-id], [data-jump], dialog, button, a, input, select, textarea, label")) return;
         this.close();
       });
     }
@@ -96,7 +96,7 @@
 
     inspectGate(gate) {
       if (!gate) return;
-      if (this.currentNodeId && !this.currentNodeId.startsWith("GATE:")) this.history.push(this.currentNodeId);
+      if (this.currentNodeId && !/^(GATE|TASK):/.test(this.currentNodeId)) this.history.push(this.currentNodeId);
       this.currentNodeId = `GATE:${gate.id}`;
       this._openChrome(`PROCEDURAL / ${gate.gate_type}`, `${gate.id} — ${gate.name}`);
       document.getElementById("insp-body").innerHTML = `
@@ -124,7 +124,7 @@
 
     async inspect(nodeId, pushHistory = true) {
       if (!nodeId) return;
-      if (pushHistory && this.currentNodeId && this.currentNodeId !== nodeId && !this.currentNodeId.startsWith("GATE:")) this.history.push(this.currentNodeId);
+      if (pushHistory && this.currentNodeId && this.currentNodeId !== nodeId && !/^(GATE|TASK):/.test(this.currentNodeId)) this.history.push(this.currentNodeId);
       const res = await fetch(`/api/node/${encodeURIComponent(nodeId)}?scope=${encodeURIComponent(this.getScope())}`);
       if (!res.ok) { this.notify(tr(`Entity not found: ${nodeId}`, `Không tìm thấy thực thể ${nodeId}`), true); return; }
       const { node, edges } = await res.json(), state = this.getState();

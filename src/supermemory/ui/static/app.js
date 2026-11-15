@@ -3,9 +3,11 @@
   const { hydrateIcons, esc, tr, getLang, setLang, applyStaticLang } = window.SuperMemoryIcons;
   const { ForceGraphCanvas } = window.SuperMemoryGraph, { InspectorController } = window.SuperMemoryInspector;
   const { MergeStudioController } = window.SuperMemoryMergeStudio, { ModalController } = window.SuperMemoryModals;
-  const { SearchPaletteController } = window.SuperMemoryPalette, Views = window.SuperMemoryViews, { ResearchHubController } = window.SuperMemoryResearchHub;
+  const { SearchPaletteController } = window.SuperMemoryPalette, Views = window.SuperMemoryViews;
+  const { ResearchHubController } = window.SuperMemoryResearchHub, { KanbanBoardController } = window.SuperMemoryKanbanBoard;
   let state = { nodes: [], edges: [], gates: [], experiments: [], events: [], meta: {}, analytics: {}, cognitive_tiers: {}, workspaces: [] };
-  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, graphView = null, inspector = null, mergeStudio = null, modals = null, researchHub = null, activateTabFn = null;
+  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, liveTimer = null;
+  let graphView = null, inspector = null, mergeStudio = null, modals = null, researchHub = null, kanbanBoard = null, activateTabFn = null;
 
   function toast(msg, isError = false) {
     const el = document.getElementById("toast-region"); el.textContent = msg; el.className = `toast-region${isError ? " toast-error" : ""}`;
@@ -29,8 +31,7 @@
   }
 
   function focusInGraph(nodeId) {
-    const graphTab = document.getElementById("tabbtn-graph");
-    if (activateTabFn && graphTab) activateTabFn(graphTab);
+    activateTabFn?.(document.getElementById("tabbtn-graph"));
     requestAnimationFrame(() => {
       if (graphView.focusNode(nodeId)) {
         document.getElementById("chk-hide-aux").checked = graphView.hideAux;
@@ -41,10 +42,10 @@
 
   function rerenderAll() {
     renderWorkspaceSwitcher(); renderCommandAndTelemetry(); renderGraphToolbar();
-    graphView._applyLayout(false); mergeStudio.render();
+    graphView._applyLayout(false); mergeStudio.render(); kanbanBoard.render(state);
     const h = buildViewHandlers();
-    Views.renderConstitution(state, h); Views.renderExperiments(state, h);
-    Views.renderLifecycle(state, h); Views.renderEvents(state, h); researchHub.render(state);
+    Views.renderConstitution(state, h); Views.renderExperiments(state, h); Views.renderLifecycle(state, h); Views.renderEvents(state, h); researchHub.render(state);
+    if (inspector.currentNodeId?.startsWith("TASK:") && !document.activeElement?.closest("#insp-body input")) kanbanBoard.inspectTask(inspector.currentNodeId.slice(5));
   }
 
   async function loadGraph() {
@@ -52,12 +53,9 @@
     try {
       const res = await fetch(`/api/graph?scope=${encodeURIComponent(currentScope)}`);
       if (!res.ok) throw new Error(tr(`Failed to load graph (HTTP ${res.status})`, `Không thể tải dữ liệu đồ thị (HTTP ${res.status})`));
-      state = await res.json();
-      graphView.setData(state.nodes, state.edges);
-      rerenderAll();
-      const qs = new URLSearchParams(window.location.search), qMode = qs.get("mode");
+      state = await res.json(); graphView.setData(state.nodes, state.edges); rerenderAll();
+      const qs = new URLSearchParams(window.location.search), qMode = qs.get("mode"), qInspect = qs.get("inspect");
       if (qMode && ["FORCE", "RADIAL", "HIERARCHY", "LANES"].includes(qMode.toUpperCase())) setGraphMode(qMode.toUpperCase());
-      const qInspect = qs.get("inspect");
       if (qInspect && !inspector.currentNodeId) { graphView.selectedId = qInspect; inspector.inspect(qInspect); }
     } catch (err) {
       errStrip.classList.remove("hidden");
@@ -80,30 +78,26 @@
   }
 
   function renderCommandAndTelemetry() {
-    const meta = state.meta || {}, nodes = state.nodes || [], gates = state.gates || [], exps = state.experiments || [];
-    document.getElementById("scope-indicator").textContent = state.is_global ? "GLOBAL" : "LOCAL";
-    document.getElementById("project-title").textContent = state.project || "SuperMemory";
-    document.getElementById("active-goal-line").textContent = meta.active_goal || "4-Tier Cognitive Graph & Constitutional Harness";
-    document.getElementById("l0-phase").textContent = (meta.current_phase || tr("Active Studio", "Đang hoạt động")).split("(")[0].trim();
-    document.getElementById("l0-next").textContent = meta.next_actions || meta.active_goal || tr("Ready for research & verification.", "Sẵn sàng thực nghiệm & kiểm định.");
+    const meta = state.meta || {}, nodes = state.nodes || [], gates = state.gates || [], exps = state.experiments || [], ov = state.execution_overview || {};
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt("scope-indicator", state.is_global ? "GLOBAL" : "LOCAL"); setTxt("project-title", state.project || "SuperMemory");
+    setTxt("active-goal-line", meta.active_goal || "4-Tier Cognitive Graph & Constitutional Harness");
+    setTxt("l0-phase", (meta.current_phase || tr("Active Studio", "Đang hoạt động")).split("(")[0].trim());
+    setTxt("l0-next", meta.next_actions || meta.active_goal || tr("Ready for research & verification.", "Sẵn sàng thực nghiệm & kiểm định."));
     const tiers = state.cognitive_tiers || {}, byTier = tiers.counts_by_tier || {}, activeTok = tiers.active_prompt_tokens || 0;
-    document.getElementById("kpi-tokens").textContent = `${activeTok} / 850 tok`;
-    document.getElementById("token-meter-bar").setAttribute("aria-valuenow", String(activeTok));
+    setTxt("kpi-tokens", `${activeTok} / 850 tok`); document.getElementById("token-meter-bar").setAttribute("aria-valuenow", String(activeTok));
     document.getElementById("token-meter-fill").style.width = `${Math.min(100, Math.round((activeTok / 850) * 100))}%`;
-    document.getElementById("kpi-compression").textContent = `${tiers.context_compression_pct || 0}%`;
-    document.getElementById("kpi-blocks").textContent = (state.analytics || {}).total_blocked_regressions || 0;
-    document.getElementById("nav-count-nodes").textContent = nodes.length;
-    document.getElementById("nav-count-research").textContent = (state.bottlenecks || []).filter((b) => b.status !== "RESOLVED").length + (state.method_cards || []).length;
-    document.getElementById("nav-count-episodic").textContent = byTier.EPISODIC || 0;
-    document.getElementById("nav-count-gates").textContent = gates.length;
-    document.getElementById("nav-count-exps").textContent = exps.length;
-    document.getElementById("nav-count-props").textContent = nodes.filter((n) => n.node_type === "PROPOSAL").length;
-    const lawsCnt = nodes.filter((n) => n.node_type === "LAW").length, insCnt = nodes.filter((n) => ["OBSERVATION", "KNOWLEDGE_NODE", "ALGORITHM"].includes(n.node_type)).length, openProps = nodes.filter((n) => n.node_type === "PROPOSAL" && n.status !== "ARCHIVED").length;
+    setTxt("kpi-compression", `${tiers.context_compression_pct || 0}%`); setTxt("kpi-blocks", (state.analytics || {}).total_blocked_regressions || 0);
+    setTxt("nav-count-nodes", nodes.length); setTxt("nav-count-kanban", ov.total_items || 0);
+    setTxt("nav-count-research", (state.bottlenecks || []).filter((b) => b.status !== "RESOLVED").length + (state.method_cards || []).length);
+    setTxt("nav-count-episodic", byTier.EPISODIC || 0); setTxt("nav-count-gates", gates.length);
+    setTxt("nav-count-exps", exps.length); setTxt("nav-count-props", nodes.filter((n) => n.node_type === "PROPOSAL").length);
+    const lawsCnt = nodes.filter((n) => n.node_type === "LAW").length, insCnt = nodes.filter((n) => ["OBSERVATION", "KNOWLEDGE_NODE", "ALGORITHM"].includes(n.node_type)).length;
     const pills = [
+      ["tabbtn-kanban", `${ov.overall_pct ?? 0}% · ${ov.in_progress_count ?? 0}/${ov.total_items ?? 0} ${tr("Tasks", "Tác vụ")}`],
       ["tabbtn-constitution", `${lawsCnt} Laws · ${gates.filter((g) => g.enabled).length} Gates`],
       ["tabbtn-tiers", `${insCnt} ${tr("L2 Insights", "Insights L2")}`],
       ["tabbtn-experiments", `${exps.length} ${tr("Experiments", "Thực nghiệm")}`],
-      ["tabbtn-lifecycle", `${openProps} ${tr("Open Proposals", "Proposals mở")}`],
     ];
     const kpiBox = document.getElementById("l0-kpis");
     kpiBox.innerHTML = pills.map(([tid, txt]) => `<button type="button" class="l0-chip" data-jump-tab="${tid}">${esc(txt)}</button>`).join("");
@@ -121,18 +115,16 @@
     sel.innerHTML = `<option value="ALL">${tr("All Types", "Tất cả loại")} (${total})</option>` + keys.map((k) => `<option value="${esc(k)}" ${activeType === k ? "selected" : ""}>${esc(k)} (${nc[k]})</option>`).join("");
   }
 
-  function setGraphMode(mode) {
-    document.querySelectorAll("[data-gmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.gmode === mode)));
-    graphView.setMode(mode);
-  }
+  function setGraphMode(mode) { document.querySelectorAll("[data-gmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.gmode === mode))); graphView.setMode(mode); }
 
   function bindTabs() {
     const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
     activateTabFn = (tab, moveFocus = false) => {
       if (!tab) return;
       tabs.forEach((t) => {
-        const sel = t === tab; t.classList.toggle("active", sel); t.setAttribute("aria-selected", String(sel)); t.setAttribute("tabindex", sel ? "0" : "-1");
-        const p = document.getElementById(t.dataset.tab); p.classList.toggle("active", sel); p.hidden = !sel;
+        const sel = t === tab, p = document.getElementById(t.dataset.tab);
+        t.classList.toggle("active", sel); t.setAttribute("aria-selected", String(sel)); t.setAttribute("tabindex", sel ? "0" : "-1");
+        p.classList.toggle("active", sel); p.hidden = !sel;
       });
       if (tab.dataset.tab === "tab-graph") requestAnimationFrame(() => graphView.fitView());
       if (moveFocus) tab.focus();
@@ -155,28 +147,36 @@
     if (localStorage.getItem("sm_l0_hidden") === "1") document.getElementById("l0-context-strip")?.classList.add("is-compact");
     applyStaticLang(); hydrateIcons(document); Views.renderSkeletons();
     graphView = new ForceGraphCanvas(document.getElementById("graph-canvas"), document.getElementById("graph-tooltip"), (n) => (n ? inspector.inspect(n.id) : inspector.close()), (st) => {
-      const pTxt = st.pinned ? ` · ${st.pinned} ${tr("pinned", "ghim")}` : "";
-      document.getElementById("graph-stats-pill").textContent = `${st.visible}/${st.total} ${tr("nodes", "nút")} · ${st.edges} ${tr("edges", "cạnh")}${pTxt}`;
+      document.getElementById("graph-stats-pill").textContent = `${st.visible}/${st.total} ${tr("nodes", "nút")} · ${st.edges} ${tr("edges", "cạnh")}${st.pinned ? ` · ${st.pinned} ${tr("pinned", "ghim")}` : ""}`;
     });
     modals = new ModalController(() => state, async (sc) => { currentScope = sc; await loadGraph(); }, postJson, loadGraph, toast);
     inspector = new InspectorController(() => state, () => currentScope, postJson, loadGraph, modals, toast, {
-      onClearSelection: () => { graphView.selectedId = null; },
-      onFocusGraph: focusInGraph,
+      onClearSelection: () => { graphView.selectedId = null; }, onFocusGraph: focusInGraph,
       onLayoutChange: () => { if (document.getElementById("tab-graph").classList.contains("active")) graphView.fitView(); },
     });
-    mergeStudio = new MergeStudioController(() => state, postJson, loadGraph, (id) => { graphView.selectedId = id; inspector.inspect(id); }, toast);
-    researchHub = new ResearchHubController(() => state, postJson, loadGraph, (id) => { graphView.selectedId = id; inspector.inspect(id); }, modals, toast);
-    new SearchPaletteController(() => currentScope, async (sc) => { currentScope = sc; await loadGraph(); }, (nid) => { graphView.selectedId = nid; inspector.inspect(nid); }, focusInGraph, {
+    const inspectNode = (id) => { graphView.selectedId = id; inspector.inspect(id); };
+    mergeStudio = new MergeStudioController(() => state, postJson, loadGraph, inspectNode, toast);
+    researchHub = new ResearchHubController(() => state, postJson, loadGraph, inspectNode, modals, toast, (tid) => kanbanBoard.inspectTask(tid));
+    kanbanBoard = new KanbanBoardController({ getState: () => state, postJson, onRefresh: loadGraph, notify: toast, modals, inspector, onInspectNode: inspectNode, onOpenSprint: () => researchHub.openSprintModal() });
+    new SearchPaletteController(() => currentScope, async (sc) => { currentScope = sc; await loadGraph(); }, inspectNode, focusInGraph, {
       newNode: () => modals.openUpsertNode(), newExp: () => modals.openAddExperiment(), newProp: () => modals.openAddProposal(),
       newLesson: () => modals.openAddLesson(), runAudit: () => modals.runAuditDialog(), handoff: () => modals.openHandoffDialog(), toggleDock: () => inspector.toggleDock(),
     }, (ids) => { graphView.highlightIds = ids; });
     bindTabs();
     const on = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
     on("btn-collapse-rail", "click", () => { const c = document.body.classList.toggle("rail-collapsed"); localStorage.setItem("sm_rail_collapsed", c ? "1" : "0"); requestAnimationFrame(() => graphView.fitView()); });
-    on("btn-toggle-l0", "click", () => { const el = document.getElementById("l0-context-strip"), c = el.classList.toggle("is-compact"); localStorage.setItem("sm_l0_hidden", c ? "1" : "0"); requestAnimationFrame(() => graphView.fitView()); });
+    on("btn-toggle-l0", "click", () => { const c = document.getElementById("l0-context-strip").classList.toggle("is-compact"); localStorage.setItem("sm_l0_hidden", c ? "1" : "0"); requestAnimationFrame(() => graphView.fitView()); });
+    on("btn-live-sync", "click", (ev) => {
+      const btn = ev.currentTarget, next = !liveTimer; btn.setAttribute("aria-pressed", String(next)); btn.classList.toggle("is-live", next);
+      if (next) {
+        liveTimer = setInterval(() => { if (!document.hidden && !document.getElementById("workbench-dialog").open && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) loadGraph(); }, 4000);
+        toast(tr("Live auto-sync enabled (4s)", "Đã bật cập nhật tiến độ trực tiếp (4s)"));
+      } else { clearInterval(liveTimer); liveTimer = null; toast(tr("Live auto-sync paused", "Đã tắt cập nhật trực tiếp")); }
+    });
     on("btn-lang-toggle", "click", () => {
       setLang(getLang() === "en" ? "vi" : "en"); rerenderAll();
       if (inspector.currentNodeId?.startsWith("GATE:")) inspector.inspectGate((state.gates || []).find((g) => `GATE:${g.id}` === inspector.currentNodeId));
+      else if (inspector.currentNodeId?.startsWith("TASK:")) kanbanBoard.inspectTask(inspector.currentNodeId.slice(5));
       else if (inspector.currentNodeId) inspector.inspect(inspector.currentNodeId, false);
     });
     document.querySelectorAll("[data-gmode]").forEach((b) => b.addEventListener("click", () => setGraphMode(b.dataset.gmode)));

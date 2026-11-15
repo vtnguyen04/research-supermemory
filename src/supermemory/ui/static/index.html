@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SuperMemory Observatory — Constitutional Knowledge Studio</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111214' stroke-width='2'%3E%3Crect x='2.5' y='2.5' width='19' height='19' rx='5' fill='%23F7F6F3'/%3E%3Ccircle cx='8.5' cy='9' r='2'/%3E%3Ccircle cx='15.5' cy='9' r='2'/%3E%3Ccircle cx='12' cy='15.5' r='2'/%3E%3Cpath d='M10.5 9h3M9.5 10.7l1.7 3.1M14.5 10.7l-1.7 3.1'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/styles.css?v=3.0.2" />
+  <link rel="stylesheet" href="/styles.css?v=3.1.0" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-vi="Chuyển tới nội dung chính">Skip to main content</a>
@@ -24,7 +24,7 @@
         </span>
         <div class="brand-text">
           <span class="brand-name">SuperMemory</span>
-          <span class="version-tag">Studio 3.0</span>
+          <span class="version-tag">Studio 3.1</span>
         </div>
         <div class="rail-head-btns">
           <button type="button" id="btn-lang-toggle" class="btn btn-secondary btn-xs lang-pill" aria-label="Switch language EN / VI">VI</button>
@@ -47,6 +47,11 @@
           <span class="nav-icon" data-icon="topology" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Bản đồ Tri thức">Knowledge Graph</span>
           <span id="nav-count-nodes" class="nav-count">0</span>
+        </button>
+        <button type="button" role="tab" id="tabbtn-kanban" class="nav-item" aria-selected="false" aria-controls="tab-kanban" tabindex="-1" data-tab="tab-kanban" title="Kanban & Execution Progress" data-vi-title="Bảng Kanban & Tiến độ Công việc">
+          <span class="nav-icon" data-icon="kanban" aria-hidden="true"></span>
+          <span class="nav-label" data-vi="Kanban &amp; Tiến độ">Kanban &amp; Tasks</span>
+          <span id="nav-count-kanban" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-research" class="nav-item" aria-selected="false" aria-controls="tab-research" tabindex="-1" data-tab="tab-research" title="Research & Multi-Agent DAG" data-vi-title="Nghiên cứu & Điều phối Đa Agent">
           <span class="nav-icon" data-icon="crosshair" aria-hidden="true"></span>
@@ -129,6 +134,10 @@
             </div>
             <div id="search-popover" class="search-popover hidden" role="listbox" aria-label="Search results and quick commands"></div>
           </div>
+          <button type="button" id="btn-live-sync" class="btn btn-secondary live-pill" aria-pressed="false" title="Toggle 4s live auto-refresh" data-vi-title="Bật/tắt tự động cập nhật tiến độ mỗi 4 giây">
+            <span class="live-dot" aria-hidden="true"></span>
+            <span data-vi="Trực tiếp">Live</span>
+          </button>
           <button type="button" id="btn-refresh" class="btn btn-secondary" data-vi="Đồng bộ">Sync</button>
           <button type="button" id="btn-open-quick-node" class="btn btn-primary" data-vi="+ Tạo thực thể">+ New Entity</button>
         </div>
@@ -197,6 +206,39 @@
                 <span class="legend-hint" data-vi="Kéo để di chuyển &middot; Nhấp đúp bỏ ghim &middot; Nhấp để xem chi tiết">Drag to move &middot; Double-click to unpin &middot; Click to inspect</span>
               </div>
             </div>
+          </div>
+        </section>
+
+        <!-- TAB 1A: INTERACTIVE KANBAN BOARD & GRANULAR TASK EXECUTION -->
+        <section id="tab-kanban" role="tabpanel" aria-labelledby="tabbtn-kanban" class="tab-panel" hidden>
+          <div class="content-wrap">
+            <div class="panel-header">
+              <div>
+                <h2 data-vi="Bảng Kanban &amp; Tiến độ Thực thi Công việc">Kanban Board &amp; Execution Progress</h2>
+                <p class="section-subtitle" data-vi="Kéo thả tác vụ giữa các giai đoạn, tích chọn từng bước công việc con theo thời gian thực và giám sát tiến độ đa Agent.">Drag tasks across stages, check off granular subtasks in real time, and monitor multi-agent execution progress.</p>
+              </div>
+              <div class="toolbar-right">
+                <div class="segmented-tray" role="group" aria-label="Execution view mode">
+                  <button type="button" class="seg-btn seg-btn-icon" aria-pressed="true" data-kview="BOARD"><span data-icon="kanban"></span><span data-vi="Bảng Kanban">Kanban</span></button>
+                  <button type="button" class="seg-btn seg-btn-icon" aria-pressed="false" data-kview="LIST"><span data-icon="list"></span><span data-vi="Danh sách chi tiết">Task List</span></button>
+                </div>
+                <button type="button" id="btn-kanban-sprint" class="btn btn-secondary" data-vi="Lập Sprint 3-Wave">Plan 3-Wave Sprint</button>
+                <button type="button" id="btn-new-kanban-task" class="btn btn-primary" data-vi="+ Tạo Task mới">+ New Task</button>
+              </div>
+            </div>
+
+            <div id="kanban-kpi-grid" class="kanban-kpi-grid" aria-label="Execution progress overview"></div>
+
+            <div class="kanban-toolbar">
+              <div id="kanban-source-bar" class="segmented-tray stage-filter-bar" role="group" aria-label="Filter work source"></div>
+              <div class="toolbar-right">
+                <label for="kanban-filter-input" class="sr-only">Filter tasks and proposals</label>
+                <input id="kanban-filter-input" type="search" class="control-input filter-inline" placeholder="Filter tasks, roles, workers, bottlenecks..." data-vi-ph="Lọc mã task, vai trò, worker, điểm nghẽn..." />
+                <button type="button" id="btn-kanban-clear-done" class="btn btn-ghost btn-sm" data-vi="Dọn mục đã xong">Clear Done</button>
+              </div>
+            </div>
+
+            <div id="kanban-stage-mount"></div>
           </div>
         </section>
 
@@ -480,16 +522,18 @@
 
   <div id="toast-region" class="toast-region hidden" role="status" aria-live="polite"></div>
 
-  <script src="/icons.js?v=3.0.2"></script>
-  <script src="/math_md.js?v=3.0.2"></script>
-  <script src="/graph_layouts.js?v=3.0.2"></script>
-  <script src="/graph_canvas.js?v=3.0.2"></script>
-  <script src="/inspector.js?v=3.0.2"></script>
-  <script src="/merge_studio.js?v=3.0.2"></script>
-  <script src="/modals.js?v=3.0.2"></script>
-  <script src="/palette.js?v=3.0.2"></script>
-  <script src="/views.js?v=3.0.2"></script>
-  <script src="/research_hub.js?v=3.0.2"></script>
-  <script src="/app.js?v=3.0.2"></script>
+  <script src="/icons.js?v=3.1.0"></script>
+  <script src="/math_md.js?v=3.1.0"></script>
+  <script src="/graph_layouts.js?v=3.1.0"></script>
+  <script src="/graph_canvas.js?v=3.1.0"></script>
+  <script src="/inspector.js?v=3.1.0"></script>
+  <script src="/merge_studio.js?v=3.1.0"></script>
+  <script src="/modals.js?v=3.1.0"></script>
+  <script src="/palette.js?v=3.1.0"></script>
+  <script src="/views.js?v=3.1.0"></script>
+  <script src="/research_hub.js?v=3.1.0"></script>
+  <script src="/kanban_modals.js?v=3.1.0"></script>
+  <script src="/kanban_board.js?v=3.1.0"></script>
+  <script src="/app.js?v=3.1.0"></script>
 </body>
 </html>

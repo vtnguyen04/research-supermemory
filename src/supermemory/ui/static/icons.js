@@ -54,6 +54,10 @@
     crosshair: '<circle cx="8" cy="8" r="4.25"/><path d="M8 1.75v2.25M8 12v2.25M1.75 8H4M12 8h2.25"/>',
     copy: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3 10.5V3.5A1.5 1.5 0 014.5 2h7"/>',
     download: '<path d="M8 2.25v7.5M5.25 7L8 9.75 10.75 7M3 13.25h10"/>',
+    kanban: '<rect x="2" y="2.5" width="3.2" height="11" rx="0.9"/><rect x="6.4" y="2.5" width="3.2" height="7.5" rx="0.9"/><rect x="10.8" y="2.5" width="3.2" height="9.5" rx="0.9"/>',
+    list: '<path d="M5.5 4h8.25M5.5 8h8.25M5.5 12h8.25"/><circle cx="2.75" cy="4" r="1"/><circle cx="2.75" cy="8" r="1"/><circle cx="2.75" cy="12" r="1"/>',
+    plus: '<path d="M8 3.25v9.5M3.25 8h9.5"/>',
+    play: '<path d="M5 3.5l7.5 4.5L5 12.5V3.5z"/>',
   };
 
   function svg(name, size = 16) {

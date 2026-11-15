@@ -7,8 +7,8 @@
   const row2 = (a, b) => `<div class="form-row-2">${a}${b}</div>`;
 
   class ResearchHubController {
-    constructor(getState, postJson, onRefresh, onInspect, modals, notify) {
-      Object.assign(this, { getState, postJson, onRefresh, onInspect, modals, notify });
+    constructor(getState, postJson, onRefresh, onInspect, modals, notify, onInspectTask = null) {
+      Object.assign(this, { getState, postJson, onRefresh, onInspect, modals, notify, onInspectTask });
       this._bindToolbar();
     }
 
@@ -138,14 +138,17 @@
       const waves = [[1, tr("Wave 1 · Parallel Discovery", "Đợt 1 · Khám phá Song song")], [2, tr("Wave 2 · Occam & Red-Team Gate", "Đợt 2 · Lọc Occam & Phản biện")], [3, tr("Wave 3 · Locked Slice & 10% Smoke", "Đợt 3 · Thực thi Khóa file & Smoke 10%")]];
       dagBox.innerHTML = waves.map(([w, title]) => {
         const wTasks = tasks.filter((t) => Number(t.wave) === w);
-        const body = wTasks.length ? wTasks.map((t) => `<div class="dag-card">
+        const body = wTasks.length ? wTasks.map((t) => `<div class="dag-card" data-task-id="${esc(t.task_id)}">
           <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(t.task_id)}</span>${statusTag(t.status)}</span><span class="role-chip">${esc(t.role)}</span></div>
           <strong class="dag-title">${esc(t.title)}</strong>
           <p class="row-desc">${inlineMd(t.brief)}</p>
+          <div class="pareto-row"><span>${esc(t.steps_done ?? 0)}/${esc(t.steps_total ?? 3)} ${tr("steps", "bước")}</span><strong>${esc(t.progress_pct ?? 0)}%</strong></div>
+          <progress class="pareto-meter kanban-meter" max="100" value="${esc(t.progress_pct ?? 0)}"></progress>
           ${(t.locked_globs || []).length || t.claimed_by ? `<div class="dag-meta-row">${(t.locked_globs || []).length ? `<span class="mono-tag">Lease: ${esc(t.locked_globs.join(", "))}</span>` : ""}${t.claimed_by ? `<span class="mono-tag">Worker: ${esc(t.claimed_by)}</span>` : ""}</div>` : ""}
           ${t.receipt?.note ? `<p class="mono-id">${esc(t.receipt.note)}</p>` : ""}
-          ${readySet.has(t.task_id) ? `<div class="row-actions"><button type="button" class="btn btn-secondary btn-xs" data-dag-claim="${esc(t.task_id)}">${tr("Claim Task", "Nhận việc")}</button></div>` : ""}
-          ${t.status === "RUNNING" ? `<div class="row-actions"><button type="button" class="btn btn-primary btn-xs" data-dag-done="${esc(t.task_id)}" data-dag-st="DONE">${tr("Complete", "Hoàn tất")}</button><button type="button" class="btn btn-danger btn-xs" data-dag-done="${esc(t.task_id)}" data-dag-st="EARLY_KILLED">${tr("10% Early-Kill", "Dừng sớm 10%")}</button></div>` : ""}
+          <div class="row-actions"><button type="button" class="btn btn-secondary btn-xs" data-dag-inspect="${esc(t.task_id)}">${tr("Details", "Chi tiết")}</button>
+          ${readySet.has(t.task_id) ? `<button type="button" class="btn btn-secondary btn-xs" data-dag-claim="${esc(t.task_id)}">${tr("Claim Task", "Nhận việc")}</button>` : ""}
+          ${t.status === "RUNNING" ? `<button type="button" class="btn btn-primary btn-xs" data-dag-done="${esc(t.task_id)}" data-dag-st="DONE">${tr("Complete", "Hoàn tất")}</button><button type="button" class="btn btn-danger btn-xs" data-dag-done="${esc(t.task_id)}" data-dag-st="EARLY_KILLED">${tr("10% Early-Kill", "Dừng sớm 10%")}</button>` : ""}</div>
         </div>`).join("") : `<div class="empty-state"><p class="empty-desc">${tr("No tasks in this wave.", "Chưa có tác vụ ở đợt này.")}</p></div>`;
         return `<div class="ledger-panel"><div class="ledger-header"><h3>${esc(title)}</h3><span class="nav-count">${wTasks.length}</span></div><div class="dag-col-body">${body}</div></div>`;
       }).join("");
@@ -155,6 +158,7 @@
       root.querySelectorAll("[data-inspect-btn]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); this.onInspect(b.dataset.inspectBtn); }));
       root.querySelectorAll("[data-inspect-rh]").forEach((el) => el.addEventListener("click", () => this.onInspect(el.dataset.inspectRh)));
       root.querySelectorAll("[data-dag-claim]").forEach((b) => b.addEventListener("click", () => this._claimTask(b.dataset.dagClaim)));
+      root.querySelectorAll("[data-dag-inspect]").forEach((b) => b.addEventListener("click", () => this.onInspectTask?.(b.dataset.dagInspect)));
       root.querySelectorAll("[data-resolve-bnk]").forEach((b) => b.addEventListener("click", async (e) => {
         e.stopPropagation();
         try { await this.postJson("/api/bottlenecks", { action: "resolve", bottleneck_id: b.dataset.resolveBnk }); this.notify(tr("Bottleneck marked RESOLVED", "Đã đóng điểm nghẽn")); await this.onRefresh(); }

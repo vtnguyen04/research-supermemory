@@ -61,7 +61,13 @@ def _compact_receipt(receipt: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         if idx >= 8:
             break
         key = str(k)[:32]
-        if isinstance(v, (int, float, bool)) or v is None:
+        if key == "steps" and isinstance(v, list):
+            compact["steps"] = [
+                {"text": str(s.get("text") if isinstance(s, dict) else s).strip()[:140], "done": bool(s.get("done", False)) if isinstance(s, dict) else False}
+                for s in v[:16]
+                if str(s.get("text") if isinstance(s, dict) else s).strip()
+            ]
+        elif isinstance(v, (int, float, bool)) or v is None:
             compact[key] = v
         elif isinstance(v, list):
             compact[key] = [str(x)[:60] for x in v[:6]]
@@ -81,36 +87,46 @@ def enqueue_task(
     target_id: str = "",
     smoke_gate: str = "",
     task_id: str = "",
+    steps: Optional[List[str]] = None,
 ) -> AgentTask:
     """Enqueue or update a DAG task node in SQLite `agent_tasks`."""
     tid = task_id.strip() or f"DAG-{_next_task_num(store):03d}"
     now = utc_now_iso()
+    existing = store.conn.execute("SELECT receipt_json, status, claimed_by FROM agent_tasks WHERE task_id = ?", (tid,)).fetchone()
+    prev_rec = json.loads(str(existing["receipt_json"] or "{}")) if existing else {}
+    if steps is not None:
+        clean_steps = [{"text": s.strip()[:140], "done": False} for s in steps if s.strip()][:16]
+        if clean_steps:
+            prev_rec["steps"] = clean_steps
     task = AgentTask(
         task_id=tid,
         wave=max(1, int(wave)),
         role=role.strip() or "self",
         title=title.strip(),
         brief=brief.strip(),
-        status="QUEUED",
+        status=str(existing["status"]) if (existing and task_id.strip()) else "QUEUED",
         depends_on=[d.strip() for d in (depends_on or []) if d.strip()],
         locked_globs=[g.strip() for g in (locked_globs or []) if g.strip()],
         target_id=target_id.strip(),
+        claimed_by=str(existing["claimed_by"] or "") if (existing and task_id.strip()) else "",
         smoke_gate=smoke_gate.strip(),
+        receipt=prev_rec,
         created_at=now,
         updated_at=now,
     )
+    rec_json = json.dumps(prev_rec, ensure_ascii=False)
     store.conn.execute(
         "INSERT INTO agent_tasks(task_id, wave, role, title, brief, status, depends_on_json, "
         "locked_globs_json, target_id, claimed_by, smoke_gate, receipt_json, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(task_id) DO UPDATE SET wave=excluded.wave, role=excluded.role, title=excluded.title, "
-        "brief=excluded.brief, status=excluded.status, depends_on_json=excluded.depends_on_json, "
+        "brief=excluded.brief, depends_on_json=excluded.depends_on_json, "
         "locked_globs_json=excluded.locked_globs_json, target_id=excluded.target_id, "
-        "smoke_gate=excluded.smoke_gate, updated_at=excluded.updated_at",
+        "smoke_gate=excluded.smoke_gate, receipt_json=excluded.receipt_json, updated_at=excluded.updated_at",
         (
             task.task_id, task.wave, task.role, task.title, task.brief, task.status,
             json.dumps(task.depends_on, ensure_ascii=False), json.dumps(task.locked_globs, ensure_ascii=False),
-            task.target_id, "", task.smoke_gate, "{}", task.created_at, task.updated_at,
+            task.target_id, task.claimed_by, task.smoke_gate, rec_json, task.created_at, task.updated_at,
         ),
     )
     store.conn.commit()
@@ -197,10 +213,19 @@ def complete_task(store: GraphStore, task_id: str, status: str = "DONE", receipt
     clean_st = status.strip().upper()
     if clean_st not in ("DONE", "FAILED", "EARLY_KILLED", "SKIPPED"):
         raise ValueError(f"Invalid task completion status: {status}")
-    if not store.conn.execute("SELECT 1 FROM agent_tasks WHERE task_id = ?", (task_id,)).fetchone():
+    existing_row = store.conn.execute("SELECT receipt_json FROM agent_tasks WHERE task_id = ?", (task_id,)).fetchone()
+    if not existing_row:
         raise ValueError(f"Task `{task_id}` not found.")
 
-    comp = _compact_receipt(receipt)
+    prev_rec = json.loads(str(existing_row["receipt_json"] or "{}"))
+    merged_rec = dict(receipt or {})
+    if "steps" not in merged_rec and isinstance(prev_rec.get("steps"), list):
+        merged_rec["steps"] = [
+            {"text": str(s.get("text", "")), "done": True if clean_st == "DONE" else bool(s.get("done", False))}
+            for s in prev_rec["steps"]
+            if isinstance(s, dict)
+        ]
+    comp = _compact_receipt(merged_rec)
     now = utc_now_iso()
     store.conn.execute("UPDATE agent_tasks SET status=?, receipt_json=?, updated_at=? WHERE task_id=?", (clean_st, json.dumps(comp, ensure_ascii=False), now, task_id))
     cascaded: List[str] = []

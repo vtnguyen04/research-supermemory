@@ -1,8 +1,8 @@
-"""Web Studio v3.0 HTTP API Extensions for Bottlenecks, SOTA Method Vault & Multi-Agent DAG."""
+"""Web Studio v3.1 HTTP API Extensions for Bottlenecks, SOTA Vault, Fast-DAG & Kanban."""
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from supermemory.models import NodeType
 from supermemory.research.bottleneck_engine import (
@@ -10,6 +10,13 @@ from supermemory.research.bottleneck_engine import (
     evaluate_occam_gate,
     rank_bottlenecks,
     resolve_bottleneck,
+)
+from supermemory.research.kanban_ops import (
+    add_subtask,
+    delete_task,
+    enrich_execution_state,
+    move_task_stage,
+    toggle_subtask,
 )
 from supermemory.research.orchestrator import (
     claim_next_task,
@@ -25,14 +32,27 @@ from supermemory.storage.sqlite_store import GraphStore
 from supermemory.sync.markdown_compiler import MarkdownCompiler
 
 
+def _split_list(raw: Any, sep: str = ",") -> List[str]:
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    return [x.strip() for x in str(raw or "").split(sep) if x.strip()]
+
+
 def enrich_graph_payload_v3(store: GraphStore, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Attach Pareto Bottlenecks, SOTA Method Cards, and Multi-Agent Fast-DAG state to `/api/graph`."""
+    """Attach Bottlenecks, SOTA Method Cards, Fast-DAG tasks, and Kanban execution KPIs."""
     payload["bottlenecks"] = rank_bottlenecks(store, include_resolved=True)
     payload["method_cards"] = [
         n.to_dict() for n in store.list_nodes(node_types=[NodeType.METHOD_CARD.value], limit=200)
     ]
-    payload["agent_tasks"] = [t.to_dict() for t in list_tasks(store)]
-    payload["dag_telemetry"] = dag_telemetry(store)
+    tasks = [t.to_dict() for t in list_tasks(store)]
+    telemetry = dag_telemetry(store)
+    payload["execution_overview"] = enrich_execution_state(
+        tasks,
+        telemetry.get("ready_parallel_task_ids", []),
+        payload.get("nodes", []),
+    )
+    payload["agent_tasks"] = tasks
+    payload["dag_telemetry"] = telemetry
     return payload
 
 
@@ -108,32 +128,30 @@ def dispatch_research_mutation(route: str, store: GraphStore, body: Dict[str, An
     if route == "/api/orchestrate":
         act = str(body.get("action") or "plan_sprint").lower()
         if act == "plan_sprint":
-            raw_globs = body.get("target_globs") or "src/**"
-            globs = [g.strip() for g in raw_globs.split(",") if g.strip()] if isinstance(raw_globs, str) else list(raw_globs)
             res = plan_research_sprint(
                 store,
                 goal=str(body["goal"]).strip(),
                 bottleneck_id=str(body.get("bottleneck_id") or "").strip(),
                 smoke_cmd=str(body.get("smoke_cmd") or "pytest -q").strip(),
-                target_globs=globs,
+                target_globs=_split_list(body.get("target_globs") or "src/**"),
             )
             MarkdownCompiler(store).compile_all()
             return res
-        if act == "enqueue":
-            raw_deps = body.get("depends_on") or ""
-            deps = [d.strip() for d in raw_deps.split(",") if d.strip()] if isinstance(raw_deps, str) else list(raw_deps)
-            raw_lk = body.get("locked_globs") or ""
-            lk = [g.strip() for g in raw_lk.split(",") if g.strip()] if isinstance(raw_lk, str) else list(raw_lk)
+        if act in ("enqueue", "update"):
+            raw_steps = body.get("steps")
+            steps = _split_list(raw_steps, "\n") if raw_steps is not None else None
             task = enqueue_task(
                 store,
                 role=str(body.get("role") or "self").strip(),
                 title=str(body["title"]).strip(),
                 brief=str(body.get("brief") or "").strip(),
                 wave=int(body.get("wave") or 1),
-                depends_on=deps,
-                locked_globs=lk,
+                depends_on=_split_list(body.get("depends_on")),
+                locked_globs=_split_list(body.get("locked_globs")),
                 target_id=str(body.get("bottleneck_id") or "").strip(),
                 smoke_gate=str(body.get("smoke_cmd") or "").strip(),
+                task_id=str(body.get("task_id") or "").strip(),
+                steps=steps,
             )
             MarkdownCompiler(store).compile_all()
             return {"task": task.to_dict()}
@@ -146,6 +164,39 @@ def dispatch_research_mutation(route: str, store: GraphStore, body: Dict[str, An
                     task_id=str(body.get("task_id") or "").strip(),
                 )
             }
+        if act == "move":
+            out = move_task_stage(
+                store,
+                task_id=str(body["task_id"]).strip(),
+                target_stage=str(body["target_stage"]).strip(),
+                agent_name=str(body.get("agent_name") or "studio"),
+            )
+            MarkdownCompiler(store).compile_all()
+            return out
+        if act == "toggle_step":
+            done_val = body.get("done")
+            out = toggle_subtask(
+                store,
+                item_kind=str(body.get("kind") or "TASK"),
+                item_id=str(body["item_id"]).strip(),
+                step_idx=int(body["step_idx"]),
+                done=bool(done_val) if done_val is not None else None,
+            )
+            MarkdownCompiler(store).compile_all()
+            return out
+        if act == "add_step":
+            out = add_subtask(
+                store,
+                item_kind=str(body.get("kind") or "TASK"),
+                item_id=str(body["item_id"]).strip(),
+                text=str(body["text"]).strip(),
+            )
+            MarkdownCompiler(store).compile_all()
+            return out
+        if act == "delete":
+            deleted = delete_task(store, task_id=str(body["task_id"]).strip())
+            MarkdownCompiler(store).compile_all()
+            return {"deleted": deleted}
         if act == "clear_done":
             return {"cleared": clear_completed_tasks(store)}
         if act == "complete":

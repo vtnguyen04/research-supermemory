@@ -2,8 +2,8 @@
   "$schema": "https://antigravity.google/schemas/plugin.json",
   "name": "supermemory",
   "displayName": "Research SuperMemory",
-  "version": "3.0.3",
-  "description": "Research SuperMemory v3.0: Bottleneck-First Diagnostic Ledger, SOTA Literature Scout, Hybrid Utility PageRank Graph, Multi-Agent Fast-DAG Orchestrator & Daylight Studio.",
+  "version": "3.1.0",
+  "description": "Research SuperMemory v3.1: Interactive Kanban & Subtask Execution Studio, Bottleneck-First Diagnostic Ledger, SOTA Literature Scout, Hybrid Utility PageRank Graph & Multi-Agent Fast-DAG.",
   "author": {
     "name": "SuperMemory Engineering"
   },

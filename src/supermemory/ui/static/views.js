@@ -88,7 +88,7 @@
         <text x="6" y="${py + 4}" fill="#484C56" font-size="13" font-family="JetBrains Mono, monospace">${maxV.toFixed(1)}</text>
         <text x="6" y="${H - py + 4}" fill="#484C56" font-size="13" font-family="JetBrains Mono, monospace">${minV.toFixed(1)}</text>
         <polyline fill="none" stroke="#141518" stroke-width="2.25" points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />
-        ${pts.map((p) => `<g class="chart-pt" data-nid="${esc(p.id)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" fill="#0284C7" stroke="#FFFFFF" stroke-width="2"/><text x="${p.x.toFixed(1)}" y="${Math.max(13, p.y - 10).toFixed(1)}" text-anchor="middle" fill="#141518" font-size="13" font-family="JetBrains Mono, monospace">${esc(p.id.replace(/^EXP-/, ""))}</text><title>${esc(p.id)}: ${p.v}</title></g>`).join("")}</svg>`;
+        ${pts.map((p, idx) => `<g class="chart-pt" data-nid="${esc(p.id)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" fill="#0284C7" stroke="#FFFFFF" stroke-width="2"/>${(idx % Math.max(1, Math.ceil(pts.length / 6)) === 0 || idx === pts.length - 1) ? `<text x="${p.x.toFixed(1)}" y="${Math.max(13, p.y - 10).toFixed(1)}" text-anchor="middle" fill="#141518" font-size="13" font-family="JetBrains Mono, monospace">${esc(p.id.replace(/^EXP-/, ""))}</text>` : ""}<title>${esc(p.id)}: ${p.v}</title></g>`).join("")}</svg>`;
       bindInspectTriggers(chart, h.onInspect);
     } else chart.innerHTML = `<div class="empty-state"><p class="empty-title">${tr("Need at least 2 numeric scores in filter to plot progression", "Cần ít nhất 2 điểm số định lượng để vẽ biểu đồ")}</p></div>`;
 
