@@ -335,6 +335,8 @@ Initializing a project with `supermemory init .` produces a clean, Git-friendly 
 ├── AGENTS.md / GEMINI.md / CLAUDE.md         # Synchronized rules for Claude Code, Codex & Gemini CLI
 ```
 
+> **Public vs. Private Repositories:** Keep `memory/` tracked in **private team repositories** so collaborators and multiple agents share the same verified graph. When publishing a **public open-source package**, add `.supermemory/`, `memory/`, `.agents/`, `/AGENTS.md`, `/CLAUDE.md`, and `/GEMINI.md` to `.gitignore` so your personal workspace memory stays strictly local on your machine.
+
 ---
 
 ## 10. Troubleshooting & Self-Audit Suite

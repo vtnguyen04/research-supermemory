@@ -336,6 +336,8 @@ Khi một dự án được khởi tạo `supermemory init .`, cấu trúc tệp
 ├── AGENTS.md / GEMINI.md / CLAUDE.md         # Quy tắc đồng bộ cho Claude Code, Codex, Gemini CLI
 ```
 
+> **Lưu ý Repo Nội bộ vs. Repo Công khai (Public Open-Source):** Với repo nhóm nội bộ (private), bạn có thể commit `memory/` để đồng bộ tri thức giữa các thành viên. Khi đẩy **mã nguồn công khai (public)** lên GitHub cho người khác tải về, hãy thêm `.supermemory/`, `memory/`, `.agents/`, `/AGENTS.md`, `/CLAUDE.md`, `/GEMINI.md` vào `.gitignore` để toàn bộ bộ nhớ và bài học cá nhân chỉ nằm riêng trên máy của bạn.
+
 ---
 
 ## 10. Xử lý Sự cố Thường gặp & Kiểm định Chất lượng
