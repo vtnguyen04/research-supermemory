@@ -6,6 +6,7 @@ import argparse
 import json
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from supermemory.bootstrap import init_workspace
@@ -226,34 +227,37 @@ def handle_import_zaloai(args: argparse.Namespace) -> int:
 
 
 def handle_install_plugin(args: argparse.Namespace) -> int:
-    repo_root = Path(__file__).resolve().parents[2]
-    plugin_root = repo_root / "plugin"
     src_pkg = Path(__file__).resolve().parent
-    if not plugin_root.is_dir():
-        print(f"❌ Plugin bundle directory not found: {plugin_root}")
+    repo_plugin = src_pkg.parents[1] / "plugin"
+    wheel_plugin = src_pkg / "_plugin_bundle"
+    plugin_src = repo_plugin if (repo_plugin / "plugin.json").is_file() else wheel_plugin
+    if not (plugin_src / "plugin.json").is_file():
+        print(f"❌ Plugin bundle directory not found: {plugin_src}")
         return 1
-    staged_pkg = plugin_root / "lib" / "supermemory"
-    if staged_pkg.exists():
-        shutil.rmtree(staged_pkg)
-    shutil.copytree(src_pkg, staged_pkg, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
 
     agy_bin = shutil.which("agy") or str(Path.home() / ".local" / "bin" / "agy")
     if not Path(agy_bin).is_file():
         print("❌ Could not find `agy` binary in PATH or ~/.local/bin/agy")
         return 1
-    val_cmd = [agy_bin, "plugin", "validate", "--strict", str(plugin_root)]
-    val_res = subprocess.run(val_cmd, check=False)
-    if val_res.returncode != 0:
-        return val_res.returncode
-    if not args.validate_only:
+
+    with tempfile.TemporaryDirectory(prefix="supermemory_pkg_") as stage_dir:
+        staged_plugin = Path(stage_dir) / "plugin"
+        shutil.copytree(plugin_src, staged_plugin, ignore=shutil.ignore_patterns("lib", "__pycache__", "*.pyc"))
+        shutil.copytree(
+            src_pkg,
+            staged_plugin / "lib" / "supermemory",
+            ignore=shutil.ignore_patterns("_plugin_bundle", "__pycache__", "*.pyc"),
+        )
+        val_res = subprocess.run([agy_bin, "plugin", "validate", "--strict", str(staged_plugin)], check=False)
+        if val_res.returncode != 0 or args.validate_only:
+            return val_res.returncode
         installed_dir = Path.home() / ".gemini" / "config" / "plugins" / "supermemory"
         if installed_dir.exists():
             subprocess.run([agy_bin, "plugin", "uninstall", "supermemory"], check=False)
-        inst_res = subprocess.run([agy_bin, "plugin", "install", str(plugin_root)], check=False)
+        inst_res = subprocess.run([agy_bin, "plugin", "install", str(staged_plugin)], check=False)
         if inst_res.returncode == 0:
             subprocess.run([agy_bin, "plugin", "enable", "supermemory"], check=False)
         return inst_res.returncode
-    return 0
 
 
 def handle_ui(args: argparse.Namespace) -> int:

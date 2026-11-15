@@ -8,7 +8,7 @@ version = "2.5.0"
 description = "Anti-Amnesia Knowledge Graph, Self-Learning Constitutional Harness, Scientific Experiment Registry, and Lifecycle Extension for Antigravity & Multi-Agent Engineering."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "SuperMemory Engineering" }]
 keywords = [
     "antigravity",
@@ -35,7 +35,7 @@ supermemory = "supermemory.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-supermemory = ["ui/static/*"]
+supermemory = ["ui/static/*", "_plugin_bundle/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

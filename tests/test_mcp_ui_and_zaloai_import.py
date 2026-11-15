@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -18,7 +19,7 @@ from supermemory.sync.zaloai_importer import import_zaloai_workspace
 from supermemory.ui.server import create_http_server
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ZALOAI_ROOT = Path("/home/quynhthu/Documents/AI-project/ZALOAI")
+ZALOAI_ROOT = Path(os.environ.get("ZALOAI_REF_DIR", str(Path.home() / "Documents" / "AI-project" / "ZALOAI")))
 
 
 def test_stdio_mcp_server_end_to_end(tmp_path: Path) -> None:

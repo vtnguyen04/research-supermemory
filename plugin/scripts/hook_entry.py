@@ -1,5 +1,5 @@
-#!/home/quynhthu/.local/bin/python3.11
-"""Antigravity Lifecycle Hook Entrypoint for the SuperMemory Plugin."""
+#!/usr/bin/env python3
+"""Antigravity Lifecycle Hook Entrypoint for the SuperMemory Plugin (Cross-Platform Portable)."""
 
 from __future__ import annotations
 
@@ -8,13 +8,19 @@ import shutil
 import sys
 from pathlib import Path
 
-if sys.version_info < (3, 11):
+if sys.version_info < (3, 10):
+    _home = Path.home()
     for _py in (
-        "/home/quynhthu/.local/bin/python3.11",
-        shutil.which("python3.11"),
-        shutil.which("python3.12"),
+        str(_home / ".local/share/uv/tools/supermemory-harness/bin/python"),
+        str(_home / ".local/share/supermemory-venv/bin/python"),
+        str(_home / ".local/bin/python3.13"),
+        str(_home / ".local/bin/python3.12"),
+        str(_home / ".local/bin/python3.11"),
+        str(_home / ".local/bin/python3.10"),
         shutil.which("python3.13"),
-        str(Path.home() / ".local/share/uv/tools/supermemory-harness/bin/python"),
+        shutil.which("python3.12"),
+        shutil.which("python3.11"),
+        shutil.which("python3.10"),
     ):
         if _py and os.path.isfile(_py) and os.access(_py, os.X_OK):
             os.execv(_py, [_py, *sys.argv])

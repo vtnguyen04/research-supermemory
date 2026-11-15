@@ -1,0 +1,6 @@
+include README.md
+include pyproject.toml
+include install.sh
+recursive-include plugin *
+recursive-exclude plugin/lib *
+global-exclude __pycache__ *.py[cod]
