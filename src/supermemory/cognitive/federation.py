@@ -151,16 +151,28 @@ def promote_node_to_global(local_store: GraphStore, node_id: str) -> Dict[str, A
     return {"local_id": node.id, "global_id": global_id, "global_node": promoted.to_dict()}
 
 
+_SIBLING_REUSABLE_TYPES = {
+    "METHOD_CARD",
+    "ALGORITHM",
+    "OBSERVATION",
+    "PROCEDURE",
+    "KNOWLEDGE_NODE",
+    "LAW",
+}
+
+
 def federated_recall(
     query: str,
     local_ws: Optional[Path] = None,
     include_global: bool = True,
+    include_siblings: bool = False,
     limit: int = 8,
     hops: int = 1,
 ) -> Dict[str, Any]:
-    """Query Local project SuperMemory + Global SuperMemory with consolidated-episode filtering."""
+    """Query Local project SuperMemory + Global + optional Sibling Research Vaults."""
     merged_results: List[Dict[str, Any]] = []
     warnings: List[str] = []
+    local_resolved = local_ws.resolve() if local_ws is not None else None
 
     if local_ws is not None and (
         (local_ws / ".supermemory").is_dir() or (local_ws / "memory" / "graph_snapshot.json").is_file()
@@ -174,7 +186,7 @@ def federated_recall(
 
     if include_global:
         g_root = ensure_global_memory()
-        if local_ws is None or local_ws.resolve() != g_root:
+        if local_resolved is None or local_resolved != g_root:
             with GraphStore(g_root) as g_store:
                 g_rec = QueryEngine(g_store).recall(query, limit=max(4, limit // 2), hops=1)
                 for w in g_rec["anti_repeat_warnings"]:
@@ -185,9 +197,31 @@ def federated_recall(
                             {**r, "scope": "GLOBAL", "tier": classify_tier({"node_type": r["type"], "metadata": {}})}
                         )
 
+    if include_siblings:
+        for ws_item in list_registered_workspaces():
+            if ws_item.get("scope") != "LOCAL":
+                continue
+            sib_path = Path(str(ws_item.get("path") or "")).resolve()
+            if local_resolved is not None and sib_path == local_resolved:
+                continue
+            sib_name = str(ws_item.get("name") or sib_path.name)
+            with GraphStore(sib_path) as sib_store:
+                s_rec = QueryEngine(sib_store).recall(query, limit=4, hops=1)
+                for w in s_rec["anti_repeat_warnings"][:2]:
+                    warnings.append(f"[SIBLING:{sib_name}] {w}")
+                for r in s_rec["results"]:
+                    if r.get("status") != "CONSOLIDATED" and r.get("type") in _SIBLING_REUSABLE_TYPES:
+                        merged_results.append(
+                            {
+                                **r,
+                                "scope": f"SIBLING:{sib_name}",
+                                "tier": classify_tier({"node_type": r["type"], "metadata": {}}),
+                            }
+                        )
+
     return {
         "query": query,
         "local_initialized": local_ws is not None,
-        "anti_repeat_warnings": warnings[:8],
-        "results": merged_results[: limit + 6],
+        "anti_repeat_warnings": warnings[:10],
+        "results": merged_results[: limit + 10],
     }

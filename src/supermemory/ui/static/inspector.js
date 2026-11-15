@@ -1,6 +1,6 @@
 // Flexible 3-Mode Inspector (Center Modal / Split-Pane / Floating) with History & Gate View
 (function () {
-  const { esc, statusTag, tr, cleanText, renderMarkdown, svg } = window.SuperMemoryIcons;
+  const { esc, statusTag, tr, cleanText, inlineMd, renderMarkdown, svg } = window.SuperMemoryIcons;
 
   function formatMetaSection(meta) {
     const entries = Object.entries(meta || {}).filter(([, v]) => v !== null && v !== "" && !(Array.isArray(v) && !v.length));
@@ -11,7 +11,7 @@
         ? v.map((x) => `<code class="md-code">${esc(typeof x === "object" ? JSON.stringify(x) : x)}</code>`).join(" ")
         : typeof v === "object"
           ? Object.entries(v).map(([sk, sv]) => `<code class="md-code">${esc(sk)}: ${esc(sv)}</code>`).join(" ")
-          : `<span class="prop-val">${esc(v)}</span>`;
+          : `<span class="prop-val">${inlineMd(String(v))}</span>`;
       return `<span class="prop-key">${esc(label)}</span><span>${valHtml}</span>`;
     }).join("");
     return `<div class="inspector-section"><h3 class="inspector-subhead">${tr("Attributes & Metadata", "Thuộc tính mở rộng")}</h3><div class="prop-grid meta-grid">${rows}</div></div>`;
@@ -47,7 +47,7 @@
         }
       });
       document.addEventListener("click", (ev) => {
-        if (this.mode === "dock" || !this.currentNodeId || ev.target.closest("#inspector-drawer, #graph-canvas, .row-trigger, .ledger-row, [data-nid], [data-gate-inspect], [data-jump], dialog, button, a, input, select, textarea, label")) return;
+        if (this.mode === "dock" || !this.currentNodeId || ev.target.closest("#inspector-drawer, #graph-canvas, .row-trigger, .ledger-row, [data-nid], [data-inspect-rh], [data-gate-inspect], [data-jump], dialog, button, a, input, select, textarea, label")) return;
         this.close();
       });
     }

@@ -49,8 +49,9 @@ class MarkdownCompiler:
         meta = self.store.get_all_meta()
         proj = meta.get("project_name") or self.root.name
         proposals = self.store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=20)
+        bottlenecks = self.store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=15)
         knodes = self.store.list_nodes(
-            node_types=[NodeType.KNOWLEDGE_NODE.value, NodeType.OBSERVATION.value], limit=30
+            node_types=[NodeType.KNOWLEDGE_NODE.value, NodeType.OBSERVATION.value, NodeType.METHOD_CARD.value], limit=30
         )
         ideas = self.store.list_nodes(
             node_types=[NodeType.IDEA.value, NodeType.ALGORITHM.value], limit=25
@@ -86,6 +87,13 @@ class MarkdownCompiler:
             f"| **`MEM-SNAP`** | {self._file_link('graph_snapshot.json', 'memory/graph_snapshot.json')} | Portable Git-versioned property graph snapshot auto-hydrating SQLite + Web UI. |",
         ]
 
+        if bottlenecks:
+            lines.extend(["", "## 🎯 2B. Pareto Bottlenecks & Research Questions", "", "| ID | Status | Share | Ceiling | Title |", "| :--- | :---: | :---: | :---: | :--- |"])
+            for b in bottlenecks[:10]:
+                sh = b.metadata.get("error_share_pct", "—")
+                cg = b.metadata.get("ceiling_gain", "—")
+                lines.append(f"| **`{b.id}`** | `{b.status}` | `{sh}%` | `+{cg}` | {_md_cell(b.title, 85)} |")
+
         if proposals:
             lines.extend(["", "## 🚀 3. Lifecycle Proposals (`IDEA -> DESIGN -> IMPLEMENT -> CHALLENGE -> AUDIT`)", "", "| ID | Stage | Title | Artifact |", "| :--- | :---: | :--- | :--- |"])
             for p in proposals:
@@ -120,6 +128,10 @@ class MarkdownCompiler:
             p for p in self.store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=8)
             if p.status not in ("ARCHIVED", "REJECTED")
         ]
+        open_bnks = [
+            b for b in self.store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=6)
+            if b.status not in ("RESOLVED", "ARCHIVED")
+        ]
         exps = self.store.list_experiments()[-8:]
         gates = self.store.list_gates(enabled_only=True)
         total_blocks = sum(g.blocked_count for g in gates)
@@ -144,6 +156,11 @@ class MarkdownCompiler:
 
         if notes.strip():
             lines.extend(["", "## 🧭 3. Architecture & Operational Context", notes.strip()[:1800]])
+
+        if open_bnks:
+            lines.extend(["", "## 🎯 3B. Open Pareto Bottlenecks", ""])
+            for b in open_bnks[:4]:
+                lines.append(f"- **`{b.id}`** (`{b.metadata.get('error_share_pct', 0)}%` err | `+{b.metadata.get('ceiling_gain', 0)}` ceil): {b.title}")
 
         if proposals:
             lines.extend(["", "## 📋 4. Active Proposals", ""])

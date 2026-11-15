@@ -24,7 +24,7 @@
         </span>
         <div class="brand-text">
           <span class="brand-name">SuperMemory</span>
-          <span class="version-tag">Studio 2.6</span>
+          <span class="version-tag">Studio 3.0</span>
         </div>
         <div class="rail-head-btns">
           <button type="button" id="btn-lang-toggle" class="btn btn-secondary btn-xs lang-pill" aria-label="Switch language EN / VI">VI</button>
@@ -47,6 +47,11 @@
           <span class="nav-icon" data-icon="topology" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Bản đồ Tri thức">Knowledge Graph</span>
           <span id="nav-count-nodes" class="nav-count">0</span>
+        </button>
+        <button type="button" role="tab" id="tabbtn-research" class="nav-item" aria-selected="false" aria-controls="tab-research" tabindex="-1" data-tab="tab-research" title="Research & Multi-Agent DAG" data-vi-title="Nghiên cứu & Điều phối Đa Agent">
+          <span class="nav-icon" data-icon="crosshair" aria-hidden="true"></span>
+          <span class="nav-label" data-vi="Nghiên cứu &amp; DAG">Research &amp; DAG</span>
+          <span id="nav-count-research" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-constitution" class="nav-item" aria-selected="false" aria-controls="tab-constitution" tabindex="-1" data-tab="tab-constitution" title="Constitution & Gates" data-vi-title="Hiến pháp & Gates">
           <span class="nav-icon" data-icon="shield" aria-hidden="true"></span>
@@ -191,6 +196,51 @@
                 <span class="legend-item"><span class="legend-swatch" data-tone="LESSON"></span><span data-vi="Bài học sai lầm">Mistake Lessons</span></span>
                 <span class="legend-hint" data-vi="Kéo để di chuyển &middot; Nhấp đúp bỏ ghim &middot; Nhấp để xem chi tiết">Drag to move &middot; Double-click to unpin &middot; Click to inspect</span>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 1B: BOTTLENECK-FIRST RESEARCH, SOTA VAULT & MULTI-AGENT FAST-DAG -->
+        <section id="tab-research" role="tabpanel" aria-labelledby="tabbtn-research" class="tab-panel" hidden>
+          <div class="content-wrap">
+            <div class="panel-header">
+              <div>
+                <h2 data-vi="Nghiên cứu Hướng Điểm nghẽn, Kho SOTA &amp; Điều phối Đa Agent">Bottleneck-First Research, SOTA Vault &amp; Fast-DAG</h2>
+                <p class="section-subtitle" data-vi="Định lượng phân khúc lỗi Pareto trước khi đề xuất, săn thẻ phương pháp SOTA, chấm Occam ROI và điều phối Sprint 3-Wave song song.">Profile Pareto failure slices before ideation, harvest SOTA method cards, enforce Occam ROI, and orchestrate 3-Wave parallel sprints.</p>
+              </div>
+              <div class="toolbar-right">
+                <button type="button" id="btn-open-scout" class="btn btn-secondary" data-vi="Săn bài báo SOTA">Scout SOTA Papers</button>
+                <button type="button" id="btn-open-sprint" class="btn btn-secondary" data-vi="Lập Sprint 3-Wave">Plan 3-Wave Sprint</button>
+                <button type="button" id="btn-open-bottleneck" class="btn btn-primary" data-vi="+ Chẩn đoán Điểm nghẽn">+ Diagnose Bottleneck</button>
+              </div>
+            </div>
+
+            <div class="bento-constitution">
+              <div class="surface-card">
+                <div class="card-header">
+                  <h3 data-vi="Sổ cái Điểm nghẽn Pareto &amp; Câu hỏi Nghiên cứu (BNK / RQ)">Pareto Bottlenecks &amp; Research Questions (BNK / RQ)</h3>
+                </div>
+                <div id="bottlenecks-list" class="ledger-list" role="list"></div>
+              </div>
+
+              <div class="surface-card">
+                <div class="card-header">
+                  <h3 data-vi="Kho Thẻ Phương pháp SOTA (07_METHOD_VAULT)">SOTA Method Vault (07_METHOD_VAULT)</h3>
+                  <button type="button" id="btn-open-method-card" class="btn btn-secondary btn-xs" data-vi="+ Thêm thẻ SOTA">+ Add Method Card</button>
+                </div>
+                <div id="method-vault-list" class="ledger-list" role="list"></div>
+              </div>
+            </div>
+
+            <div class="surface-card">
+              <div class="card-header">
+                <h3 data-vi="Bảng Điều phối Đa Agent Fast-DAG &amp; Khóa vùng File">Multi-Agent Fast-DAG Scheduler &amp; Glob Lease Bus</h3>
+                <div class="toolbar-right">
+                  <span id="dag-summary-pill" class="stats-pill">0 tasks</span>
+                  <button type="button" id="btn-dag-claim" class="btn btn-secondary btn-xs" data-vi="Nhận tác vụ sẵn sàng">Claim Next Ready</button>
+                </div>
+              </div>
+              <div id="dag-waves-board" class="tier-board dag-board"></div>
             </div>
           </div>
         </section>
@@ -438,6 +488,7 @@
   <script src="/modals.js"></script>
   <script src="/palette.js"></script>
   <script src="/views.js"></script>
+  <script src="/research_hub.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

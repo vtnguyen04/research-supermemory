@@ -3,9 +3,9 @@
   const { hydrateIcons, esc, tr, getLang, setLang, applyStaticLang } = window.SuperMemoryIcons;
   const { ForceGraphCanvas } = window.SuperMemoryGraph, { InspectorController } = window.SuperMemoryInspector;
   const { MergeStudioController } = window.SuperMemoryMergeStudio, { ModalController } = window.SuperMemoryModals;
-  const { SearchPaletteController } = window.SuperMemoryPalette, Views = window.SuperMemoryViews;
+  const { SearchPaletteController } = window.SuperMemoryPalette, Views = window.SuperMemoryViews, { ResearchHubController } = window.SuperMemoryResearchHub;
   let state = { nodes: [], edges: [], gates: [], experiments: [], events: [], meta: {}, analytics: {}, cognitive_tiers: {}, workspaces: [] };
-  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, graphView = null, inspector = null, mergeStudio = null, modals = null, activateTabFn = null;
+  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, graphView = null, inspector = null, mergeStudio = null, modals = null, researchHub = null, activateTabFn = null;
 
   function toast(msg, isError = false) {
     const el = document.getElementById("toast-region"); el.textContent = msg; el.className = `toast-region${isError ? " toast-error" : ""}`;
@@ -44,7 +44,7 @@
     graphView._applyLayout(false); mergeStudio.render();
     const h = buildViewHandlers();
     Views.renderConstitution(state, h); Views.renderExperiments(state, h);
-    Views.renderLifecycle(state, h); Views.renderEvents(state, h);
+    Views.renderLifecycle(state, h); Views.renderEvents(state, h); researchHub.render(state);
   }
 
   async function loadGraph() {
@@ -93,6 +93,7 @@
     document.getElementById("kpi-compression").textContent = `${tiers.context_compression_pct || 0}%`;
     document.getElementById("kpi-blocks").textContent = (state.analytics || {}).total_blocked_regressions || 0;
     document.getElementById("nav-count-nodes").textContent = nodes.length;
+    document.getElementById("nav-count-research").textContent = (state.bottlenecks || []).filter((b) => b.status !== "RESOLVED").length + (state.method_cards || []).length;
     document.getElementById("nav-count-episodic").textContent = byTier.EPISODIC || 0;
     document.getElementById("nav-count-gates").textContent = gates.length;
     document.getElementById("nav-count-exps").textContent = exps.length;
@@ -164,6 +165,7 @@
       onLayoutChange: () => { if (document.getElementById("tab-graph").classList.contains("active")) graphView.fitView(); },
     });
     mergeStudio = new MergeStudioController(() => state, postJson, loadGraph, (id) => { graphView.selectedId = id; inspector.inspect(id); }, toast);
+    researchHub = new ResearchHubController(() => state, postJson, loadGraph, (id) => { graphView.selectedId = id; inspector.inspect(id); }, modals, toast);
     new SearchPaletteController(() => currentScope, async (sc) => { currentScope = sc; await loadGraph(); }, (nid) => { graphView.selectedId = nid; inspector.inspect(nid); }, focusInGraph, {
       newNode: () => modals.openUpsertNode(), newExp: () => modals.openAddExperiment(), newProp: () => modals.openAddProposal(),
       newLesson: () => modals.openAddLesson(), runAudit: () => modals.runAuditDialog(), handoff: () => modals.openHandoffDialog(), toggleDock: () => inspector.toggleDock(),

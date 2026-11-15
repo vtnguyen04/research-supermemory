@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from supermemory.mcp.research_tools import RESEARCH_MCP_TOOLS
+
 _SCOPE_PROP = {
     "type": "string",
     "enum": ["local", "global"],
@@ -41,6 +43,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
                 "query": {"type": "string"},
                 "hops": {"type": "integer", "default": 1},
                 "include_global": {"type": "boolean", "default": True},
+                "include_siblings": {"type": "boolean", "default": False},
                 "workspace": {"type": "string"},
             },
             "required": ["query"],
@@ -120,6 +123,11 @@ MCP_TOOLS: List[Dict[str, Any]] = [
                 "design_notes": {"type": "string"},
                 "tasks": {"type": "array", "items": {"type": "string"}},
                 "novelty_diff": {"type": "string"},
+                "bottleneck_id": {"type": "string"},
+                "kill_criterion": {"type": "string"},
+                "est_loc": {"type": "integer", "default": 80},
+                "coupled_vars": {"type": "integer", "default": 1},
+                "strict_occam": {"type": "boolean", "default": False},
                 "new_stage": {"type": "string"},
                 "note": {"type": "string"},
                 "workspace": {"type": "string"},
@@ -241,4 +249,5 @@ MCP_TOOLS: List[Dict[str, Any]] = [
             },
         },
     },
+    *RESEARCH_MCP_TOOLS,
 ]

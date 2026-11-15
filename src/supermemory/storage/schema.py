@@ -137,6 +137,34 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
+
+CREATE TABLE IF NOT EXISTS http_cache (
+    cache_key TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    query TEXT NOT NULL,
+    response_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_tasks (
+    task_id TEXT PRIMARY KEY,
+    wave INTEGER NOT NULL DEFAULT 1,
+    role TEXT NOT NULL,
+    title TEXT NOT NULL,
+    brief TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'QUEUED',
+    depends_on_json TEXT NOT NULL DEFAULT '[]',
+    locked_globs_json TEXT NOT NULL DEFAULT '[]',
+    target_id TEXT NOT NULL DEFAULT '',
+    claimed_by TEXT NOT NULL DEFAULT '',
+    smoke_gate TEXT NOT NULL DEFAULT '',
+    receipt_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_wave ON agent_tasks(wave);
 """
 
 

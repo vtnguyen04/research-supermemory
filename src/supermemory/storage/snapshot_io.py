@@ -16,13 +16,34 @@ def export_snapshot(store: GraphStore, target_path: Path | None = None) -> Path:
     """Export deterministic Git-committable JSON snapshot of the Knowledge Graph."""
     out_path = target_path or store.snapshot_path
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    task_rows = store.conn.execute("SELECT * FROM agent_tasks ORDER BY wave ASC, task_id ASC").fetchall()
+    tasks_export = [
+        {
+            "task_id": str(r["task_id"]),
+            "wave": int(r["wave"]),
+            "role": str(r["role"]),
+            "title": str(r["title"]),
+            "brief": str(r["brief"]),
+            "status": str(r["status"]),
+            "depends_on": json.loads(str(r["depends_on_json"] or "[]")),
+            "locked_globs": json.loads(str(r["locked_globs_json"] or "[]")),
+            "target_id": str(r["target_id"] or ""),
+            "claimed_by": str(r["claimed_by"] or ""),
+            "smoke_gate": str(r["smoke_gate"] or ""),
+            "receipt": json.loads(str(r["receipt_json"] or "{}")),
+            "created_at": str(r["created_at"]),
+            "updated_at": str(r["updated_at"]),
+        }
+        for r in task_rows
+    ]
     payload = {
-        "schema_version": "1.0.0",
+        "schema_version": "3.0.0",
         "project_meta": store.get_all_meta(),
         "nodes": [n.to_dict() for n in store.list_nodes(limit=10000)],
         "edges": [e.to_dict() for e in store.list_edges()],
         "gates": [g.to_dict() for g in store.list_gates()],
         "experiments": [x.to_dict() for x in store.list_experiments()],
+        "agent_tasks": tasks_export,
     }
     out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return out_path
@@ -108,6 +129,25 @@ def import_snapshot(store: GraphStore, source_path: Path) -> Dict[str, int]:
                 created_at=ex.get("created_at", utc_now_iso()),
             )
         )
+    for tk in raw.get("agent_tasks") or []:
+        now = utc_now_iso()
+        store.conn.execute(
+            "INSERT INTO agent_tasks(task_id, wave, role, title, brief, status, depends_on_json, "
+            "locked_globs_json, target_id, claimed_by, smoke_gate, receipt_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(task_id) DO UPDATE SET status=excluded.status, claimed_by=excluded.claimed_by, "
+            "receipt_json=excluded.receipt_json, updated_at=excluded.updated_at",
+            (
+                tk["task_id"], int(tk.get("wave", 1)), tk.get("role", "self"), tk["title"],
+                tk.get("brief", ""), tk.get("status", "QUEUED"),
+                json.dumps(tk.get("depends_on") or [], ensure_ascii=False),
+                json.dumps(tk.get("locked_globs") or [], ensure_ascii=False),
+                tk.get("target_id", ""), tk.get("claimed_by", ""), tk.get("smoke_gate", ""),
+                json.dumps(tk.get("receipt") or {}, ensure_ascii=False),
+                tk.get("created_at", now), tk.get("updated_at", now),
+            ),
+        )
+    store.conn.commit()
     store.log_event("SNAPSHOT_IMPORT", str(source_path.name), f"Hydrated {len(nodes)} nodes, {len(edges)} edges")
     return {"nodes": len(nodes), "edges": len(edges), "gates": len(gates), "experiments": len(exps)}
 

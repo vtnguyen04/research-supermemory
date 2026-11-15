@@ -18,6 +18,7 @@ from supermemory.cognitive.tiers import classify_tier, compute_tier_telemetry
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.storage.sqlite_store import GraphStore
 from supermemory.ui.api_actions import dispatch_store_mutation, handle_workspace_action
+from supermemory.ui.api_research import enrich_graph_payload_v3
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -58,20 +59,21 @@ def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
         analytics = qe.graph_analytics()
         tiers = compute_tier_telemetry(store)
         meta = store.get_all_meta()
-    return {
-        "workspace_path": str(workspace_root),
-        "is_global": workspace_root == ensure_global_memory(),
-        "project": meta.get("project_name") or workspace_root.name,
-        "meta": meta,
-        "analytics": analytics,
-        "cognitive_tiers": tiers,
-        "workspaces": list_registered_workspaces(),
-        "nodes": nodes,
-        "edges": edges,
-        "gates": gates,
-        "experiments": experiments,
-        "events": events,
-    }
+        payload = {
+            "workspace_path": str(workspace_root),
+            "is_global": workspace_root == ensure_global_memory(),
+            "project": meta.get("project_name") or workspace_root.name,
+            "meta": meta,
+            "analytics": analytics,
+            "cognitive_tiers": tiers,
+            "workspaces": list_registered_workspaces(),
+            "nodes": nodes,
+            "edges": edges,
+            "gates": gates,
+            "experiments": experiments,
+            "events": events,
+        }
+        return enrich_graph_payload_v3(store, payload)
 
 
 def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
@@ -96,7 +98,8 @@ def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
                 if not q.strip():
                     self._send_json({"results": [], "anti_repeat_warnings": []})
                     return
-                res = federated_recall(q, local_ws=ws, include_global=True, limit=15, hops=1)
+                inc_sib = (qs.get("siblings") or ["0"])[0] in ("1", "true", "yes")
+                res = federated_recall(q, local_ws=ws, include_global=True, include_siblings=inc_sib, limit=15, hops=1)
                 self._send_json(res)
                 return
 
@@ -174,7 +177,7 @@ def create_http_server(workspace_root: Path, host: str = "127.0.0.1", port: int 
 def run_ui_server(workspace_root: Path, host: str = "127.0.0.1", port: int = 8765) -> int:
     """Start blocking SuperMemory Constitutional Graph Workbench server."""
     srv, actual_port = create_http_server(workspace_root, host=host, port=port)
-    print(f"[SuperMemory v2.6.1] Daylight Architectural Studio live at: http://{host}:{actual_port}")
+    print(f"[SuperMemory v3.0.0] Daylight Architectural Research Studio live at: http://{host}:{actual_port}")
     print(f"   Default Workspace: {workspace_root.resolve()}")
     print("   Press Ctrl+C to stop.")
     try:

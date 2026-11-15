@@ -22,6 +22,7 @@ from supermemory.cognitive.tiers import (
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.lifecycle.manager import LifecycleManager
+from supermemory.mcp.research_tools import RESEARCH_TOOL_NAMES, execute_research_mcp_tool
 from supermemory.mcp.tool_schemas import MCP_TOOLS
 from supermemory.models import CodeGate, MemoryEdge, MemoryNode, MemoryTier, NodeType
 from supermemory.self_learning.consolidator import LessonConsolidator
@@ -58,6 +59,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             str(args["query"]),
             local_ws=raw_ws if local_ok else None,
             include_global=bool(args.get("include_global", True)),
+            include_siblings=bool(args.get("include_siblings", False)),
             hops=int(args.get("hops") or 1),
         )
 
@@ -149,6 +151,11 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
                     tasks=list(args.get("tasks") or []),
                     proposal_id=str(args.get("proposal_id") or ""),
                     novelty_diff=str(args.get("novelty_diff") or ""),
+                    bottleneck_id=str(args.get("bottleneck_id") or ""),
+                    kill_criterion=str(args.get("kill_criterion") or ""),
+                    est_loc=int(args.get("est_loc") or 80),
+                    coupled_vars=int(args.get("coupled_vars") or 1),
+                    strict_occam=bool(args.get("strict_occam", False)),
                 )
             mark_turn_memory_handled(store)
             MarkdownCompiler(store).compile_all()
@@ -271,5 +278,8 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             mark_turn_memory_handled(store)
             MarkdownCompiler(store).compile_all()
             return out_res
+
+        if name in RESEARCH_TOOL_NAMES:
+            return execute_research_mcp_tool(name, store, args)
 
     raise ValueError(f"Unknown MCP tool: {name}")

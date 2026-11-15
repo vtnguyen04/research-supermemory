@@ -28,6 +28,12 @@ from supermemory.cli_handlers import (
     handle_status,
     handle_ui,
 )
+from supermemory.cli_research import (
+    handle_bottleneck,
+    handle_orchestrate,
+    handle_scout,
+    register_research_cli_parsers,
+)
 from supermemory.hooks.runner import main_from_stdin
 from supermemory.mcp.server import run_mcp_stdio_server
 
@@ -56,6 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_rec.add_argument("--hops", type=int, default=1)
     p_rec.add_argument("-w", "--workspace", default=".")
     p_rec.add_argument("-g", "--global", dest="use_global", action="store_true")
+    p_rec.add_argument("-s", "--siblings", action="store_true", help="Include sibling research vaults")
 
     p_learn = sub.add_parser("learn", help="Record a self-learning lesson/rule into Local or Global LAW + Gate")
     p_learn.add_argument("--title", required=True)
@@ -185,6 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_mcp = sub.add_parser("mcp", help="Run SuperMemory Stdio MCP Server")
     p_mcp.add_argument("-w", "--workspace", default="")
 
+    register_research_cli_parsers(sub)
     return parser
 
 
@@ -209,6 +217,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         "import-zaloai": handle_import_zaloai,
         "install-plugin": handle_install_plugin,
         "ui": handle_ui,
+        "bottleneck": handle_bottleneck,
+        "scout": handle_scout,
+        "orchestrate": handle_orchestrate,
     }
     if args.command in dispatch:
         return dispatch[args.command](args)

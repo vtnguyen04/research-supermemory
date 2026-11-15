@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-from supermemory.cognitive.novelty_guard import enforce_novelty_against_history
+from supermemory.cognitive.novelty_guard import enforce_novelty_against_history, extract_mechanism_signature
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.lifecycle.experiments import record_scientific_experiment
 from supermemory.models import (
@@ -17,6 +17,7 @@ from supermemory.models import (
     ProposalStage,
     utc_now_iso,
 )
+from supermemory.research.bottleneck_engine import evaluate_occam_gate
 from supermemory.storage.sqlite_store import GraphStore
 
 
@@ -54,9 +55,22 @@ class LifecycleManager:
         invariants: str = "",
         inspired_by: Optional[List[str]] = None,
         novelty_diff: str = "",
+        bottleneck_id: str = "",
+        est_loc: int = 60,
+        coupled_vars: int = 1,
+        kill_criterion: str = "",
+        strict_occam: bool = False,
     ) -> Dict[str, Any]:
         ntype = NodeType.ALGORITHM.value if is_algorithm else NodeType.IDEA.value
         prefix = "ALGO" if is_algorithm else "IDEA"
+        occam = (
+            evaluate_occam_gate(
+                self.store, title, f"{summary} {invariants}", bottleneck_id=bottleneck_id,
+                est_loc=est_loc, coupled_vars=coupled_vars, kill_criterion=kill_criterion, strict_occam=strict_occam,
+            )
+            if status.upper() != "REJECTED"
+            else {"occam_roi": 0.0, "coupled_vars": coupled_vars, "bloat_warnings": [], "mechanism_fingerprint": extract_mechanism_signature(f"{title} {summary}", bottleneck_id)}
+        )
         prior = self.query.recall(f"{title} {summary}", limit=5, hops=1)
         nid = self._next_id(prefix, ntype)
 
@@ -65,7 +79,8 @@ class LifecycleManager:
         rel_path = f"memory/05_IDEAS_AND_ALGORITHMS/{nid}_{_slugify(title)}.md"
         md = (
             f"# {nid}: {title}\n\n"
-            f"- **Type:** `{ntype}` | **Status:** `{status.upper()}`\n"
+            f"- **Type:** `{ntype}` | **Status:** `{status.upper()}` | **Occam ROI:** `{occam['occam_roi']}`\n"
+            f"- **Target Bottleneck:** `{bottleneck_id or 'UNLINKED'}`\n"
             f"- **Created:** `{utc_now_iso()}`\n"
             f"- **Summary:** {summary}\n"
             f"- **Expected Impact / Generalization Proof:** {expected_impact or 'N/A'}\n"
@@ -91,12 +106,19 @@ class LifecycleManager:
                     "risks": risks,
                     "invariants": invariants,
                     "rejection_reason": rejection_reason,
+                    "bottleneck_id": bottleneck_id,
+                    "occam_roi": occam["occam_roi"],
+                    "coupled_vars": occam["coupled_vars"],
+                    "bloat_warnings": occam["bloat_warnings"],
+                    "mechanism_fingerprint": occam["mechanism_fingerprint"],
                 },
             )
         )
         for src_id in inspired_by or []:
             self.store.add_edge(MemoryEdge(source_id=src_id, target_id=nid, relation=EdgeType.INSPIRED.value))
-        return {"node": node.to_dict(), "prior_warnings": prior["anti_repeat_warnings"]}
+        if bottleneck_id and self.store.get_node(bottleneck_id):
+            self.store.add_edge(MemoryEdge(source_id=nid, target_id=bottleneck_id, relation=EdgeType.CANDIDATE_FOR.value))
+        return {"node": node.to_dict(), "occam": occam, "prior_warnings": prior["anti_repeat_warnings"]}
 
     def create_proposal(
         self,
@@ -108,15 +130,30 @@ class LifecycleManager:
         idea_ids: Optional[List[str]] = None,
         proposal_id: str = "",
         novelty_diff: str = "",
+        bottleneck_id: str = "",
+        kill_criterion: str = "",
+        est_loc: int = 80,
+        coupled_vars: int = 1,
+        strict_occam: bool = False,
     ) -> Dict[str, Any]:
-        enforce_novelty_against_history(self.store, title, f"{why} {what_changes}", novelty_diff=novelty_diff)
+        enforce_novelty_against_history(
+            self.store, title, f"{why} {what_changes}", novelty_diff=novelty_diff, bottleneck_id=bottleneck_id
+        )
+        occam = evaluate_occam_gate(
+            self.store, title, f"{why} {what_changes} {design_notes}",
+            bottleneck_id=bottleneck_id, est_loc=est_loc, coupled_vars=coupled_vars,
+            kill_criterion=kill_criterion, strict_occam=strict_occam,
+        )
         pid = proposal_id.strip() or self._next_id("PROP", NodeType.PROPOSAL.value)
         slug = f"{pid}_{_slugify(title)}"
         prop_dir = self.store.mem_dir / "04_PROPOSALS" / slug
         prop_dir.mkdir(parents=True, exist_ok=True)
 
         (prop_dir / "proposal.md").write_text(
-            f"# {pid}: {title}\n\n## Why\n\n{why}\n\n## What Changes\n\n{what_changes}\n",
+            f"# {pid}: {title}\n\n"
+            f"- **Target Bottleneck:** `{occam['bottleneck_id'] or 'GENERAL'}` | **Occam ROI:** `{occam['occam_roi']}`\n"
+            + (f"- **10% Smoke Kill Criterion:** {occam['kill_criterion']}\n\n" if occam["kill_criterion"] else "\n")
+            + f"## Why\n\n{why}\n\n## What Changes\n\n{what_changes}\n",
             encoding="utf-8",
         )
         if design_notes:
@@ -140,12 +177,24 @@ class LifecycleManager:
                 file_path=rel_dir,
                 tags=["proposal", stage.lower()],
                 priority=88,
-                metadata={"slug": slug, "tasks": task_items, "audits": []},
+                metadata={
+                    "slug": slug,
+                    "tasks": task_items,
+                    "audits": [],
+                    "bottleneck_id": occam["bottleneck_id"],
+                    "kill_criterion": occam["kill_criterion"],
+                    "occam_roi": occam["occam_roi"],
+                    "coupled_vars": occam["coupled_vars"],
+                    "bloat_warnings": occam["bloat_warnings"],
+                    "mechanism_fingerprint": occam["mechanism_fingerprint"],
+                },
             )
         )
         for iid in idea_ids or []:
             self.store.add_edge(MemoryEdge(source_id=iid, target_id=pid, relation=EdgeType.PROMOTED_TO.value))
-        return {"proposal_id": pid, "stage": stage, "path": rel_dir, "node": node.to_dict()}
+        if occam["bottleneck_id"] and self.store.get_node(occam["bottleneck_id"]):
+            self.store.add_edge(MemoryEdge(source_id=pid, target_id=occam["bottleneck_id"], relation=EdgeType.CANDIDATE_FOR.value))
+        return {"proposal_id": pid, "stage": stage, "path": rel_dir, "occam": occam, "node": node.to_dict()}
 
     def advance_proposal(self, proposal_id: str, new_stage: str, note: str = "") -> MemoryNode:
         node = self.store.get_node(proposal_id)

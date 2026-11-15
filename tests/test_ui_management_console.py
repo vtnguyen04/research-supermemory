@@ -210,6 +210,7 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         "/modals.js",
         "/palette.js",
         "/views.js",
+        "/research_hub.js",
         "/app.js",
     ]
     emoji_rx = re.compile(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]")
@@ -249,7 +250,7 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         assert not micro_font_rx.search(css), "Microscopic font-size (<13px) detected in styles.css"
 
         js_files = sorted(STATIC_DIR.glob("*.js"))
-        assert len(js_files) == 10
+        assert len(js_files) == 11
         for js_path in js_files:
             lines = js_path.read_text(encoding="utf-8").splitlines()
             assert len(lines) < 200, f"{js_path.name} exceeds 200 lines ({len(lines)})"

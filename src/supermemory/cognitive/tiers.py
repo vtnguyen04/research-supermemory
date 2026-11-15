@@ -19,6 +19,9 @@ _SEMANTIC_TYPES = {
     NodeType.OBSERVATION.value,
     NodeType.IDEA.value,
     NodeType.DECISION.value,
+    NodeType.BOTTLENECK.value,
+    NodeType.RESEARCH_QUESTION.value,
+    NodeType.METHOD_CARD.value,
 }
 
 
@@ -86,6 +89,14 @@ def build_tiered_capsule(store: GraphStore, query: str = "", global_rules: List[
         p for p in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=6)
         if p.status not in ("ARCHIVED", "REJECTED", "CONSOLIDATED")
     ]
+    bottlenecks = [
+        b for b in store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=6)
+        if b.status not in ("RESOLVED", "ARCHIVED", "CONSOLIDATED")
+    ]
+    bottlenecks.sort(
+        key=lambda b: float(b.metadata.get("error_share_pct") or 0.0) * float(b.metadata.get("ceiling_gain") or 0.1),
+        reverse=True,
+    )
     exps_all = store.list_experiments()
     exps = exps_all[-2:]
     scored_exps = [
@@ -111,6 +122,12 @@ def build_tiered_capsule(store: GraphStore, query: str = "", global_rules: List[
         lines.append(f"• [L0 SCOREBOARD] {sota_txt} | Falsified Dead-Ends (Never Repeat): {dead_end_count}")
     if proposals:
         lines.append("• [L0 WORKING] Active Proposals: " + " | ".join(f"`{p.id}`[{p.status}] {p.title[:45]}" for p in proposals[:3]))
+    if bottlenecks:
+        bnk_txt = " | ".join(
+            f"`{b.id}`({b.metadata.get('error_share_pct', 0)}% err, +{b.metadata.get('ceiling_gain', 0)} ceil) {b.title[:40]}"
+            for b in bottlenecks[:3]
+        )
+        lines.append(f"• [L0 BOTTLENECKS — Fix Highest Pareto First]: {bnk_txt}")
 
     lines.append(f"• [L1 PROCEDURAL] {len(laws)} Laws | {len(procs)} Procedures | {len(gates)} PreToolUse Gates:")
     for lw in laws[:10]:

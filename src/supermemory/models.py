@@ -30,6 +30,9 @@ class NodeType(str, Enum):
     KNOWLEDGE_NODE = "KNOWLEDGE_NODE"
     ARTIFACT = "ARTIFACT"
     AGENT_RUN = "AGENT_RUN"
+    BOTTLENECK = "BOTTLENECK"
+    RESEARCH_QUESTION = "RESEARCH_QUESTION"
+    METHOD_CARD = "METHOD_CARD"
 
 
 class MemoryTier(str, Enum):
@@ -60,6 +63,9 @@ class EdgeType(str, Enum):
     SUPERSEDES = "SUPERSEDES"
     AUDITED_BY = "AUDITED_BY"
     REFERENCES = "REFERENCES"
+    DIAGNOSES = "DIAGNOSES"
+    CANDIDATE_FOR = "CANDIDATE_FOR"
+    DEPENDS_ON = "DEPENDS_ON"
 
 
 class GateType(str, Enum):
@@ -236,4 +242,42 @@ class ExperimentRecord:
             "log_path": self.log_path,
             "metadata": self.metadata,
             "created_at": self.created_at,
+        }
+
+
+@dataclass
+class AgentTask:
+    """Multi-agent Fast-DAG task unit with file-glob lease locking and compact JSON receipt."""
+
+    task_id: str
+    wave: int
+    role: str
+    title: str
+    brief: str
+    status: str = "QUEUED"
+    depends_on: List[str] = field(default_factory=list)
+    locked_globs: List[str] = field(default_factory=list)
+    target_id: str = ""
+    claimed_by: str = ""
+    smoke_gate: str = ""
+    receipt: Dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=utc_now_iso)
+    updated_at: str = field(default_factory=utc_now_iso)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "wave": self.wave,
+            "role": self.role,
+            "title": self.title,
+            "brief": self.brief,
+            "status": self.status,
+            "depends_on": self.depends_on,
+            "locked_globs": self.locked_globs,
+            "target_id": self.target_id,
+            "claimed_by": self.claimed_by,
+            "smoke_gate": self.smoke_gate,
+            "receipt": self.receipt,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
         }

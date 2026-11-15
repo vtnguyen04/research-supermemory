@@ -2,8 +2,8 @@
   "$schema": "https://antigravity.google/schemas/plugin.json",
   "name": "supermemory",
   "displayName": "Research SuperMemory",
-  "version": "2.6.1",
-  "description": "Federated Local+Global 4-Tier Cognitive Knowledge Graph, Agent-Native Semantic Self-Learning Harness, PreToolUse CodeGates, Scientific Experiment Registry & Interactive Merge Studio.",
+  "version": "3.0.0",
+  "description": "Research SuperMemory v3.0: Bottleneck-First Diagnostic Ledger, SOTA Literature Scout, Hybrid Utility PageRank Graph, Multi-Agent Fast-DAG Orchestrator & Daylight Studio.",
   "author": {
     "name": "SuperMemory Engineering"
   },

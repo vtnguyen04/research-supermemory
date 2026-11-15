@@ -55,7 +55,14 @@ def handle_status(args: argparse.Namespace) -> int:
 def handle_recall(args: argparse.Namespace) -> int:
     ws = Path(args.workspace).resolve()
     local_ok = ((ws / ".supermemory").is_dir() or (ws / "memory" / "graph_snapshot.json").is_file()) and not getattr(args, "use_global", False)
-    res = federated_recall(args.query, local_ws=ws if local_ok else None, include_global=True, limit=args.limit, hops=args.hops)
+    res = federated_recall(
+        args.query,
+        local_ws=ws if local_ok else None,
+        include_global=True,
+        include_siblings=bool(getattr(args, "siblings", False)),
+        limit=args.limit,
+        hops=args.hops,
+    )
     if res["anti_repeat_warnings"]:
         print("⚠️ ANTI-REPEAT WARNINGS:")
         for w in res["anti_repeat_warnings"]:

@@ -2,64 +2,29 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 
+from supermemory.graph.hybrid_ranker import rank_hybrid_graph
 from supermemory.models import ExperimentVerdict, MemoryNode, NodeType
 from supermemory.storage.sqlite_store import GraphStore
 
 
 class QueryEngine:
-    """Combines SQLite FTS5 BM25 ranking with 2-hop Knowledge Graph expansion."""
+    """Combines FTS5 BM25, Subword N-Gram TF-IDF, Empirical Utility & Personalized PageRank."""
 
     def __init__(self, store: GraphStore) -> None:
         self.store = store
 
     def recall(self, query: str, limit: int = 10, hops: int = 1) -> Dict[str, Any]:
-        """Search graph with BM25, expand neighbors, and surface prior failure warnings."""
-        seed_hits = self.store.search_fts(query, limit=limit)
-        seen_ids: Set[str] = {n.id for n, _ in seed_hits}
-        ranked: List[Dict[str, Any]] = [
-            {
-                "id": n.id,
-                "type": n.node_type,
-                "title": n.title,
-                "status": n.status,
-                "score": round(sc, 3),
-                "summary": n.summary or n.content[:200],
-                "file_path": n.file_path,
-                "hop": 0,
-            }
-            for n, sc in seed_hits
-        ]
-
-        frontier = {n.id for n, _ in seed_hits[:6]}
-        connected_edges = []
-        for hop_idx in range(1, hops + 1):
-            next_frontier: Set[str] = set()
-            for nid in frontier:
-                for edge in self.store.list_edges(nid):
-                    connected_edges.append(edge.to_dict())
-                    other_id = edge.target_id if edge.source_id == nid else edge.source_id
-                    if other_id not in seen_ids:
-                        other_node = self.store.get_node(other_id)
-                        if other_node:
-                            seen_ids.add(other_id)
-                            next_frontier.add(other_id)
-                            ranked.append(
-                                {
-                                    "id": other_node.id,
-                                    "type": other_node.node_type,
-                                    "title": other_node.title,
-                                    "status": other_node.status,
-                                    "score": round(1.0 / (hop_idx + 1), 3),
-                                    "summary": other_node.summary or other_node.content[:180],
-                                    "file_path": other_node.file_path,
-                                    "hop": hop_idx,
-                                    "via_relation": edge.relation,
-                                }
-                            )
-            frontier = next_frontier
-
+        """Search graph with Hybrid BM25 + N-gram TF-IDF + Utility PageRank & surface warnings."""
+        seed_hits = self.store.search_fts(query, limit=max(limit, 12))
+        ranked, connected_edges = rank_hybrid_graph(
+            self.store,
+            query=query,
+            fts_hits=seed_hits,
+            limit=limit,
+            hops=hops,
+        )
         warnings = self._extract_anti_repeat_warnings(ranked)
         return {
             "query": query,
@@ -130,8 +95,8 @@ class QueryEngine:
             status = item["status"]
             if ntype == NodeType.LESSON.value:
                 warnings.append(f"PAST MISTAKE `{nid}` ({item['title']}): {item['summary'][:150]}")
-            elif ntype == NodeType.IDEA.value and status == "REJECTED":
-                warnings.append(f"DEAD-END IDEA `{nid}` was previously REJECTED: {item['summary'][:150]}")
+            elif ntype in (NodeType.IDEA.value, NodeType.PROPOSAL.value) and status == "REJECTED":
+                warnings.append(f"DEAD-END {ntype} `{nid}` was previously REJECTED: {item['summary'][:150]}")
             elif ntype == NodeType.EXPERIMENT.value and status in (
                 ExperimentVerdict.REVERT.value,
                 ExperimentVerdict.FAILED.value,
@@ -142,11 +107,14 @@ class QueryEngine:
         return warnings
 
     def graph_analytics(self) -> Dict[str, Any]:
-        """Compute node/edge counts, gate shield stats, and experiment progression."""
+        """Compute node/edge counts, gate shield stats, bottlenecks, methods & experiment progression."""
         all_nodes: List[MemoryNode] = self.store.list_nodes(limit=10000)
         by_type: Dict[str, int] = {}
+        open_bottlenecks = 0
         for n in all_nodes:
             by_type[n.node_type] = by_type.get(n.node_type, 0) + 1
+            if n.node_type == NodeType.BOTTLENECK.value and n.status not in ("RESOLVED", "ARCHIVED"):
+                open_bottlenecks += 1
         gates = self.store.list_gates()
         exps = self.store.list_experiments()
         edges = self.store.list_edges()
@@ -154,6 +122,8 @@ class QueryEngine:
             "total_nodes": len(all_nodes),
             "total_edges": len(edges),
             "nodes_by_type": by_type,
+            "open_bottlenecks": open_bottlenecks,
+            "method_cards": by_type.get(NodeType.METHOD_CARD.value, 0),
             "total_gates": len(gates),
             "total_blocked_regressions": sum(g.blocked_count for g in gates),
             "total_experiments": len(exps),

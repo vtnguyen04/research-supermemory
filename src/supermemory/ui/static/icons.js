@@ -64,9 +64,9 @@
     root.querySelectorAll("[data-icon]").forEach((el) => { const n = el.getAttribute("data-icon"); if (n) el.innerHTML = svg(n, 15); });
   }
 
-  const OK_SET = new Set(["ACTIVE", "KEEP", "VICTORY_CONFIRMED", "APPROVE", "AUDITED", "VERIFIED", "ENABLED"]);
-  const WARN_SET = new Set(["PROPOSED", "DESIGNED", "IMPLEMENTING", "CHALLENGED", "SEED", "PENDING"]);
-  const ERR_SET = new Set(["REVERT", "FAILED", "REJECTED", "REQUEST_CHANGES", "DISABLED", "BLOCKED", "FAILURE_INSIGHT"]);
+  const OK_SET = new Set(["ACTIVE", "KEEP", "VICTORY_CONFIRMED", "APPROVE", "AUDITED", "VERIFIED", "ENABLED", "RESOLVED", "ANSWERED", "DONE"]);
+  const WARN_SET = new Set(["PROPOSED", "DESIGNED", "IMPLEMENTING", "CHALLENGED", "SEED", "PENDING", "OPEN", "QUEUED", "RUNNING", "READY"]);
+  const ERR_SET = new Set(["REVERT", "FAILED", "REJECTED", "REQUEST_CHANGES", "DISABLED", "BLOCKED", "FAILURE_INSIGHT", "EARLY_KILLED", "CANCELLED_BY_KILL_GATE"]);
 
   function statusTag(rawStatus, labelOverride = "") {
     const code = String(rawStatus || "ACTIVE").toUpperCase(), label = labelOverride || code;

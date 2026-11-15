@@ -78,7 +78,7 @@ def test_stdio_mcp_server_end_to_end(tmp_path: Path) -> None:
 
     assert by_id[1]["result"]["serverInfo"]["name"] == "supermemory"
     tools = by_id[2]["result"]["tools"]
-    assert len(tools) == 14
+    assert len(tools) == 17
     assert {t["name"] for t in tools} >= {
         "supermemory_init",
         "supermemory_recall",
@@ -87,6 +87,9 @@ def test_stdio_mcp_server_end_to_end(tmp_path: Path) -> None:
         "supermemory_manage_proposal",
         "supermemory_checkpoint",
         "supermemory_consolidate",
+        "supermemory_diagnose_bottleneck",
+        "supermemory_scout_sota",
+        "supermemory_orchestrate",
     }
 
     lesson_res = json.loads(by_id[4]["result"]["content"][0]["text"])

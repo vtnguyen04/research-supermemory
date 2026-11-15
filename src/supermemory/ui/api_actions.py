@@ -17,6 +17,7 @@ from supermemory.storage.sqlite_store import GraphStore
 from supermemory.sync.agent_adapters import generate_agent_files, generate_handoff_briefing
 from supermemory.sync.markdown_compiler import MarkdownCompiler
 from supermemory.sync.zaloai_importer import import_zaloai_workspace
+from supermemory.ui.api_research import dispatch_research_mutation
 
 
 def _next_custom_id(store: GraphStore, prefix: str, node_type: str) -> str:
@@ -232,6 +233,11 @@ def dispatch_store_mutation(route: str, store: GraphStore, body: Dict[str, Any])
             what_changes=str(body.get("what_changes") or body["why"]).strip(),
             design_notes=str(body.get("design_notes") or "").strip(),
             tasks=tasks or None,
+            bottleneck_id=str(body.get("bottleneck_id") or "").strip(),
+            kill_criterion=str(body.get("kill_criterion") or "").strip(),
+            est_loc=int(body.get("est_loc") or 80),
+            coupled_vars=int(body.get("coupled_vars") or 1),
+            strict_occam=bool(body.get("strict_occam", False)),
         )
         MarkdownCompiler(store).compile_all()
         return out
@@ -264,4 +270,4 @@ def dispatch_store_mutation(route: str, store: GraphStore, body: Dict[str, Any])
         hpath = generate_handoff_briefing(store)
         return {"handoff_path": str(hpath), "markdown": hpath.read_text(encoding="utf-8")}
 
-    return None
+    return dispatch_research_mutation(route, store, body)
