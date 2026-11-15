@@ -1,6 +1,6 @@
 // Paginated High-Legibility Views (Constitution, Experiments, Proposals/Ideas, Events)
 (function () {
-  const { esc, statusTag, paginate, bindPagers, tr } = window.SuperMemoryIcons;
+  const { esc, statusTag, paginate, bindPagers, tr, cleanText } = window.SuperMemoryIcons;
   let activePropStage = "ALL";
 
   function renderSkeletons() {
@@ -16,8 +16,8 @@
     return `<div role="listitem" class="ledger-listitem">
       <button type="button" class="ledger-row" data-nid="${esc(n.id)}">
         <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, tagLabel || n.status)}</span>
-        <span class="row-title">${esc(n.title)}</span>
-        <span class="row-desc">${esc(n.summary).slice(0, 175)}</span>
+        <span class="row-title">${esc(cleanText(n.title, 110))}</span>
+        <span class="row-desc">${esc(cleanText(n.summary, 175))}</span>
       </button></div>`;
   }
 
@@ -113,7 +113,7 @@
       return `<tr>
         <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="mono-id">${esc(eid)}</span></button></td>
         <td class="mono-id">${esc(e.track)}</td>
-        <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="row-title">${esc(e.title)}</span><span class="row-desc">${esc(e.single_var_diff || e.hypothesis).slice(0, 100)}</span></button></td>
+        <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="row-title">${esc(cleanText(e.title, 96))}</span><span class="row-desc">${esc(cleanText(e.single_var_diff || e.hypothesis, 115))}</span></button></td>
         <td class="metric-cell">${esc(e.cv_summary || (e.cv_score ?? "—"))}</td>
         <td class="metric-cell">${esc(e.test_summary || (e.test_score ?? "—"))}</td>
         <td class="num-col">${delta}</td><td>${statusTag(e.verdict)}</td></tr>`;
@@ -145,7 +145,7 @@
       return `<div class="ledger-panel"><div class="ledger-item-static">
         <button type="button" class="row-trigger" data-nid="${esc(p.id)}">
           <span class="row-top"><span class="mono-id">${esc(p.id)}</span>${statusTag(p.status)}</span>
-          <span class="row-title">${esc(p.title)}</span><span class="row-desc">${esc(p.summary).slice(0, 140)}</span>
+          <span class="row-title">${esc(cleanText(p.title, 96))}</span><span class="row-desc">${esc(cleanText(p.summary, 145))}</span>
         </button>${acts ? `<div class="row-actions">${acts}</div>` : ""}</div></div>`;
     }).join("") : `<div class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No proposals in this stage", "Không có Proposal nào ở giai đoạn này")}</p></div></div>`;
     propPager.innerHTML = pgProps.html;
@@ -159,7 +159,7 @@
     if (ideas.length) {
       ideasGrid.innerHTML = pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel"><button type="button" class="ledger-row" data-nid="${esc(n.id)}">
         <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, `${n.node_type} / ${n.status}`)}</span>
-        <span class="row-title">${esc(n.title)}</span><span class="row-desc">${esc(n.summary).slice(0, 145)}</span></button></div>`).join("");
+        <span class="row-title">${esc(cleanText(n.title, 96))}</span><span class="row-desc">${esc(cleanText(n.summary, 145))}</span></button></div>`).join("");
       ideasPager.innerHTML = pgIdeas.html;
       bindInspectTriggers(ideasGrid, h.onInspect);
     } else {
@@ -177,7 +177,7 @@
     box.innerHTML = pg.slice.length ? pg.slice.map((ev) => `<div role="listitem" class="ledger-item-static">
       <div class="row-top"><span class="mono-id">${esc(ev.event_type)}${ev.entity_id ? ` &middot; ${esc(ev.entity_id)}` : ""}</span>
         <span class="mono-id">${esc((ev.created_at || "").slice(0, 19))}</span></div>
-      <div class="row-desc">${esc(ev.summary || "")}</div>
+      <div class="row-desc">${esc(cleanText(ev.summary || "", 200))}</div>
       ${ev.entity_id && nodeSet.has(ev.entity_id) ? `<div><button type="button" class="btn btn-secondary btn-xs" data-nid="${esc(ev.entity_id)}">${tr("Open", "Mở")} ${esc(ev.entity_id)}</button></div>` : ""}
     </div>`).join("") + pg.html : `<div role="listitem" class="empty-state"><p class="empty-desc">${tr("No system telemetry events yet.", "Chưa có sự kiện hệ thống nào.")}</p></div>`;
     bindInspectTriggers(box, h.onInspect);

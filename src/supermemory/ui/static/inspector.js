@@ -1,6 +1,21 @@
-// Contextual Floating Slide-Over Inspector Sheet with Inline 2-Step Confirmation
+// Contextual Floating Slide-Over Inspector Sheet with Rendered Markdown & Structured Metadata
 (function () {
-  const { esc, statusTag, tr } = window.SuperMemoryIcons;
+  const { esc, statusTag, tr, cleanText, renderMarkdown } = window.SuperMemoryIcons;
+
+  function formatMetaSection(meta) {
+    const entries = Object.entries(meta || {}).filter(([, v]) => v !== null && v !== "" && !(Array.isArray(v) && !v.length));
+    if (!entries.length) return "";
+    const rows = entries.map(([k, v]) => {
+      const label = k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bId\b/g, "ID").replace(/\bSha\b/g, "SHA");
+      const valHtml = Array.isArray(v)
+        ? v.map((x) => `<code class="md-code">${esc(typeof x === "object" ? JSON.stringify(x) : x)}</code>`).join(" ")
+        : typeof v === "object"
+          ? Object.entries(v).map(([ sk, sv ]) => `<code class="md-code">${esc(sk)}: ${esc(sv)}</code>`).join(" ")
+          : `<span class="prop-val">${esc(v)}</span>`;
+      return `<span class="prop-key">${esc(label)}</span><span>${valHtml}</span>`;
+    }).join("");
+    return `<div class="inspector-section"><h3 class="inspector-subhead">${tr("Attributes & Metadata", "Thuộc tính mở rộng")}</h3><div class="prop-grid meta-grid">${rows}</div></div>`;
+  }
 
   class InspectorController {
     constructor(getState, getScope, postJson, onRefresh, onOpenEditModal, notify, onClearSelection) {
@@ -39,7 +54,7 @@
       this.drawer.setAttribute("aria-hidden", "false");
       this.backdrop.classList.remove("hidden");
       document.getElementById("insp-badge").textContent = `${node.memory_tier || "SEMANTIC"} / ${node.node_type}`;
-      document.getElementById("insp-id").textContent = `${node.id} — ${node.title}`;
+      document.getElementById("insp-id").textContent = `${node.id} — ${cleanText(node.title, 96)}`;
 
       const promoteBtn = !state.is_global
         ? `<button type="button" id="btn-promote-global" class="btn btn-secondary btn-sm">${tr("Promote to Global", "Đưa lên Global")}</button>`
@@ -48,36 +63,25 @@
         ? `<span class="prop-key">${tr("Source File", "Tệp nguồn")}</span><span class="prop-val"><a class="file-anchor" href="file://${esc(node.file_path)}" target="_blank" rel="noreferrer">${esc(node.file_path)}</a></span>`
         : "";
 
-      const edgeRows = edges
-        .map((e) => {
-          const outbound = e.source_id === node.id;
-          const jump = outbound ? e.target_id : e.source_id;
-          const relLabel = outbound ? `${e.relation} -> ${jump}` : `${jump} -> ${e.relation}`;
-          return `<button type="button" class="edge-btn" data-jump="${esc(jump)}"><span>${esc(relLabel)}</span><span class="muted">${tr("Open", "Mở")}</span></button>`;
-        })
-        .join("");
+      const edgeRows = edges.map((e) => {
+        const outbound = e.source_id === node.id, jump = outbound ? e.target_id : e.source_id;
+        const relLabel = outbound ? `${e.relation} → ${jump}` : `${jump} → ${e.relation}`;
+        return `<button type="button" class="edge-btn" data-jump="${esc(jump)}"><span>${esc(relLabel)}</span><span class="muted">${tr("Open", "Mở")}</span></button>`;
+      }).join("");
 
-      const targetOpts = (state.nodes || [])
-        .filter((x) => x.id !== node.id)
-        .slice(0, 120)
-        .map((x) => `<option value="${esc(x.id)}">${esc(x.id)} — ${esc(x.title.slice(0, 34))}</option>`)
-        .join("");
-
+      const targetOpts = (state.nodes || []).filter((x) => x.id !== node.id).slice(0, 120)
+        .map((x) => `<option value="${esc(x.id)}">${esc(x.id)} — ${esc(cleanText(x.title, 36))}</option>`).join("");
       const relOpts = ["REFERENCES", "GOVERNED_BY", "DERIVED_FROM", "CONSOLIDATED_INTO", "VERIFIED_BY", "INSPIRED"]
-        .map((r) => `<option value="${r}">${r}</option>`)
-        .join("");
+        .map((r) => `<option value="${r}">${r}</option>`).join("");
 
-      const metaJson = node.metadata && Object.keys(node.metadata).length
-        ? `<div class="inspector-section"><h3 class="inspector-subhead">${tr("Extended Metadata", "Thuộc tính mở rộng (Metadata)")}</h3><pre class="code-block">${esc(JSON.stringify(node.metadata, null, 2))}</pre></div>`
-        : "";
+      const rawContent = String(node.content || "").trim(), rawSum = String(node.summary || "").trim();
+      const proseHtml = renderMarkdown(rawContent || rawSum, true);
 
       document.getElementById("insp-body").innerHTML = `
         <div class="row-actions">
           <button type="button" id="btn-edit-node" class="btn btn-primary btn-sm">${tr("Edit", "Chỉnh sửa")}</button>
           ${promoteBtn}
-          <span id="insp-del-zone">
-            <button type="button" id="btn-arm-del-node" class="btn btn-danger btn-sm">${tr("Delete", "Xóa")}</button>
-          </span>
+          <span id="insp-del-zone"><button type="button" id="btn-arm-del-node" class="btn btn-danger btn-sm">${tr("Delete", "Xóa")}</button></span>
         </div>
 
         <div class="prop-grid">
@@ -90,9 +94,8 @@
         </div>
 
         <div class="inspector-section">
-          <h3 class="inspector-subhead">${tr("Summary & Full Content", "Tóm tắt & Nội dung chi tiết")}</h3>
-          <p class="row-desc">${esc(node.summary)}</p>
-          <pre class="code-block">${esc(node.content || node.summary)}</pre>
+          <h3 class="inspector-subhead">${tr("Content & Details", "Nội dung chi tiết")}</h3>
+          <article class="md-prose">${proseHtml}</article>
         </div>
 
         <div class="inspector-section">
@@ -110,7 +113,7 @@
           <h3 class="inspector-subhead">${tr("Graph Edges", "Liên kết đồ thị")} (${edges.length})</h3>
           <div class="edge-list">${edgeRows || `<p class="empty-desc">${tr("No direct graph edges yet.", "Chưa có cạnh liên kết trực tiếp.")}</p>`}</div>
         </div>
-        ${metaJson}
+        ${formatMetaSection(node.metadata)}
       `;
 
       this._bindInspectorActions(node);

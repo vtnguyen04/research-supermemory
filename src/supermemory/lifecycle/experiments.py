@@ -27,6 +27,15 @@ def _next_obs_id(store: GraphStore) -> str:
     return f"OBS-{(max(nums) + 1) if nums else 1:03d}"
 
 
+def _clip(text: str, limit: int) -> str:
+    clean = " ".join(text.split())
+    if len(clean) <= limit:
+        return clean
+    cut = clean[: max(1, limit - 1)]
+    sp = cut.rfind(" ")
+    return (cut[:sp] if sp > limit // 2 else cut).rstrip(" ,;:-(") + "…"
+
+
 def record_scientific_experiment(
     store: GraphStore,
     track: str,
@@ -169,9 +178,9 @@ def record_scientific_experiment(
             MemoryNode(
                 id=obs_id,
                 node_type=NodeType.OBSERVATION.value,
-                title=f"[{obs_kind}] {ins_text[:72]}",
+                title=f"[{obs_kind}] {_clip(ins_text, 84)}",
                 status=obs_kind,
-                summary=f"(From {exp_id}) {ins_text[:200]}",
+                summary=f"(From {exp_id}) {_clip(ins_text, 220)}",
                 content=obs_md,
                 file_path=obs_rel,
                 tags=["observation", clean_track, obs_kind.lower()],

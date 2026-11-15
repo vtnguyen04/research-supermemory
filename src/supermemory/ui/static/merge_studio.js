@@ -1,6 +1,6 @@
 // 4-Tier Cognitive Hierarchy & Paginated Memory Consolidation Workbench Controller
 (function () {
-  const { esc, statusTag, paginate, bindPagers, tr } = window.SuperMemoryIcons;
+  const { esc, statusTag, paginate, bindPagers, tr, cleanText } = window.SuperMemoryIcons;
 
   class MergeStudioController {
     constructor(getState, postJson, onRefresh, onInspect, notify) {
@@ -41,8 +41,8 @@
                 <input type="checkbox" class="merge-chk" data-id="${esc(n.id)}" aria-label="${tr("Select", "Chọn")} ${esc(n.id)}" ${checked} />
                 <button type="button" class="row-trigger" data-inspect="${esc(n.id)}">
                   <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, `${n.node_type} / ${n.status}`)}</span>
-                  <span class="row-title">${esc(n.title)}</span>
-                  <span class="row-desc">${esc(n.summary).slice(0, 125)}</span>
+                  <span class="row-title">${esc(cleanText(n.title, 92))}</span>
+                  <span class="row-desc">${esc(cleanText(n.summary, 135))}</span>
                 </button></div>`;
             })
             .join("");

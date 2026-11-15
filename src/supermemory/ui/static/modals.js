@@ -1,6 +1,6 @@
 // Accessible Native <dialog> Form & Workflow Controller (WCAG 2.1 AA Focus Management)
 (function () {
-  const { esc, statusTag, tr } = window.SuperMemoryIcons;
+  const { esc, statusTag, tr, renderMarkdown } = window.SuperMemoryIcons;
   const fld = (name, label, ctrl) => `<div class="field-group"><label for="f-${name}" class="field-label">${label}</label>${ctrl}</div>`;
   const inp = (name, val = "", ph = "") => `<input id="f-${name}" name="${name}" class="control-input" value="${esc(val)}" placeholder="${esc(ph)}" />`;
   const area = (name, val = "", rows = 3) => `<textarea id="f-${name}" name="${name}" class="control-textarea" rows="${rows}">${esc(val)}</textarea>`;
@@ -170,7 +170,7 @@
       });
       document.getElementById("btn-handoff").addEventListener("click", async () => {
         const res = await this.postJson("/api/handoff", {});
-        this.open(tr("Zero-Loss Handoff Briefing (HANDOFF_BRIEFING.md)", "Bản bàn giao Không mất Ngữ cảnh (HANDOFF_BRIEFING.md)"), `<p class="mono-id">${esc(res.handoff_path)}</p><pre class="code-block">${esc(res.markdown)}</pre>`, null);
+        this.open(tr("Zero-Loss Handoff Briefing (HANDOFF_BRIEFING.md)", "Bản bàn giao Không mất Ngữ cảnh (HANDOFF_BRIEFING.md)"), `<p class="mono-id">${esc(res.handoff_path)}</p><article class="md-prose md-modal-scroll">${renderMarkdown(res.markdown, false)}</article>`, null);
       });
     }
   }
