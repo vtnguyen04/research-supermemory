@@ -11,6 +11,7 @@ from pathlib import Path
 if sys.version_info < (3, 10):
     _home = Path.home()
     for _py in (
+        str(_home / ".local/share/uv/tools/research-supermemory/bin/python"),
         str(_home / ".local/share/uv/tools/supermemory-harness/bin/python"),
         str(_home / ".local/share/supermemory-venv/bin/python"),
         str(_home / ".local/bin/python3.13"),

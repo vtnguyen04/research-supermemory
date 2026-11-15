@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_REPO_URL="https://github.com/vtnguyen04/supermemory.git"
+DEFAULT_REPO_URL="https://github.com/vtnguyen04/research-supermemory.git"
 REPO_URL="${SUPERMEMORY_REPO:-${1:-${DEFAULT_REPO_URL}}}"
 BIN_DIR="${HOME}/.local/bin"
 mkdir -p "${BIN_DIR}"
@@ -14,7 +14,7 @@ if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
   fi
 fi
 
-echo "==> Installing SuperMemory Harness (${INSTALL_SPEC})..."
+echo "==> Installing Research SuperMemory (${INSTALL_SPEC})..."
 
 if command -v uv >/dev/null 2>&1; then
   uv tool install --force "${INSTALL_SPEC}"

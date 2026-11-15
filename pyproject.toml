@@ -3,15 +3,17 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "supermemory-harness"
+name = "research-supermemory"
 version = "2.5.0"
-description = "Anti-Amnesia Knowledge Graph, Self-Learning Constitutional Harness, Scientific Experiment Registry, and Lifecycle Extension for Antigravity & Multi-Agent Engineering."
+description = "Research SuperMemory: Zero-Amnesia 4-Tier Cognitive Graph, Self-Learning Constitutional CodeGates, Single-Variable Scientific Experiment Registry, and Daylight Architectural Studio for Antigravity & Multi-Agent R&D."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-authors = [{ name = "SuperMemory Engineering" }]
+authors = [{ name = "Vo Thanh Nguyen" }]
 keywords = [
     "antigravity",
+    "research-agent",
+    "supermemory",
     "agent-harness",
     "knowledge-graph",
     "self-learning",
@@ -20,6 +22,10 @@ keywords = [
     "anti-regression",
 ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/vtnguyen04/research-supermemory"
+Repository = "https://github.com/vtnguyen04/research-supermemory"
 
 [project.optional-dependencies]
 dev = [
@@ -30,6 +36,7 @@ dev = [
 
 [project.scripts]
 supermemory = "supermemory.cli:main"
+research-supermemory = "supermemory.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,4 +1,4 @@
-# SuperMemory Harness (`v2.5`)
+# Research SuperMemory (`v2.5`)
 
 **Hệ thống Bộ nhớ Đồ thị Nhận thức 4 Tầng (Zero-Amnesia 4-Tier Cognitive Graph), Chốt chặn Hiến pháp Thời gian thực (`PreToolUse CodeGates`), Cơ chế Tự học Bài học & Khóa Lỗi Lặp lại, Sổ cái Thực nghiệm Khoa học Đơn biến, Quản lý Vòng đời OpenSpec, và Giao diện Quản trị Daylight Architectural Studio — Tích hợp sâu làm Plugin gốc cho Antigravity CLI kiêm CLI/SDK độc lập không phụ thuộc thư viện ngoài.**
 
@@ -103,11 +103,11 @@ Giao diện Web quản trị chạy cục bộ không cần Internet/CDN (`http:
 ### Cài đặt mới hoặc Cập nhật lên bản mới nhất (1 dòng duy nhất, đứng ở bất kỳ đâu)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vtnguyen04/supermemory/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vtnguyen04/research-supermemory/main/install.sh | bash
 ```
 
 Lệnh duy nhất trên tự động thực hiện trọn gói:
-1. Tải và cài đặt CLI `supermemory` vào `~/.local/bin/supermemory` (ưu tiên `uv tool` -> `pipx` -> hoặc tự tạo môi trường cô lập `~/.local/share/supermemory-venv` nếu máy chỉ có `python3` thuần).
+1. Tải và cài đặt CLI `supermemory` (cùng alias `research-supermemory`) vào `~/.local/bin/` (ưu tiên `uv tool` -> `pipx` -> hoặc tự tạo môi trường cô lập `~/.local/share/supermemory-venv` nếu máy chỉ có `python3` thuần).
 2. Tự chạy `supermemory install-plugin` để kiểm định nghiêm ngặt (`agy plugin validate --strict`) và kích hoạt bộ **7 Skills · 4 Subagents · 1 Rule · 1 Lifecycle Hook · 1 MCP Server** vào Antigravity CLI.
 
 > **Lưu ý biến môi trường `PATH`:** Nếu lần đầu máy bạn chưa thêm `~/.local/bin` vào `PATH`, hãy thêm dòng sau vào `~/.bashrc` hoặc `~/.zshrc`:
@@ -119,11 +119,11 @@ Lệnh duy nhất trên tự động thực hiện trọn gói:
 
 ```bash
 # Cài trực tiếp 1 dòng qua uv:
-uv tool install git+https://github.com/vtnguyen04/supermemory.git && ~/.local/bin/supermemory install-plugin
+uv tool install git+https://github.com/vtnguyen04/research-supermemory.git && ~/.local/bin/supermemory install-plugin
 
 # Hoặc cài ở chế độ phát triển (Editable mode) khi muốn chỉnh sửa mã nguồn:
-git clone https://github.com/vtnguyen04/supermemory.git
-cd supermemory
+git clone https://github.com/vtnguyen04/research-supermemory.git
+cd research-supermemory
 uv tool install --editable . --force && supermemory install-plugin
 ```
 
@@ -131,7 +131,7 @@ uv tool install --editable . --force && supermemory install-plugin
 
 ```bash
 agy plugin uninstall supermemory
-uv tool uninstall supermemory-harness   # hoặc: rm -rf ~/.local/share/supermemory-venv ~/.local/bin/supermemory
+uv tool uninstall research-supermemory   # hoặc: rm -rf ~/.local/share/supermemory-venv ~/.local/bin/supermemory
 ```
 
 ---
@@ -357,7 +357,7 @@ which supermemory
 gh auth login -h github.com
 
 # Tạo repo công khai và đẩy toàn bộ mã nguồn lên:
-gh repo create supermemory --public --source=. --remote=origin --push
+gh repo create research-supermemory --public --source=. --remote=origin --push
 ```
 
 ### Chạy bộ kiểm thử & tự kiểm định Hiến pháp của dự án
