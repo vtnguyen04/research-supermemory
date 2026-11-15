@@ -177,7 +177,7 @@ def create_http_server(workspace_root: Path, host: str = "127.0.0.1", port: int 
 def run_ui_server(workspace_root: Path, host: str = "127.0.0.1", port: int = 8765) -> int:
     """Start blocking SuperMemory Constitutional Graph Workbench server."""
     srv, actual_port = create_http_server(workspace_root, host=host, port=port)
-    print(f"[SuperMemory v3.0.0] Daylight Architectural Research Studio live at: http://{host}:{actual_port}")
+    print(f"[SuperMemory v3.0.3] Daylight Architectural Research Studio live at: http://{host}:{actual_port}")
     print(f"   Default Workspace: {workspace_root.resolve()}")
     print("   Press Ctrl+C to stop.")
     try:

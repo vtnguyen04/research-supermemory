@@ -66,7 +66,7 @@ class MarkdownCompiler:
             "",
             "```mermaid",
             "flowchart TD",
-            '    ROOT["AGENTS.md / GEMINI.md / CLAUDE.md<br/>(Always-On Harness Rules)"] --> MG["memory/00_MEMORY_GRAPH.md<br/>(Central Graph Index)"]',
+            '    ROOT["AGENTS.md<br/>(Canonical Always-On Rule + @AGENTS.md Pointer)"] --> MG["memory/00_MEMORY_GRAPH.md<br/>(Central Graph Index)"]',
             '    HOOKS["hooks.json + MCP Server<br/>(SessionStart / PreInvocation / PreToolUse / Stop)"] --> DB[(".supermemory/supermemory.db<br/>SQLite FTS5 + Gates")]',
             '    DB <--> MG',
             '    MG --> STATE["memory/01_ACTIVE_STATE.md<br/>(Live Goals & Next Steps < 150L)"]',

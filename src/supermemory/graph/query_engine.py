@@ -15,8 +15,8 @@ class QueryEngine:
     def __init__(self, store: GraphStore) -> None:
         self.store = store
 
-    def recall(self, query: str, limit: int = 10, hops: int = 1) -> Dict[str, Any]:
-        """Search graph with Hybrid BM25 + N-gram TF-IDF + Utility PageRank & surface warnings."""
+    def recall(self, query: str, limit: int = 8, hops: int = 1, compact: bool = True) -> Dict[str, Any]:
+        """Search graph with Hybrid BM25 + N-gram TF-IDF + Utility PageRank & progressive disclosure."""
         seed_hits = self.store.search_fts(query, limit=max(limit, 12))
         ranked, connected_edges = rank_hybrid_graph(
             self.store,
@@ -26,12 +26,56 @@ class QueryEngine:
             hops=hops,
         )
         warnings = self._extract_anti_repeat_warnings(ranked)
+        if not compact:
+            return {
+                "query": query,
+                "match_count": len(ranked),
+                "anti_repeat_warnings": warnings,
+                "results": ranked[: limit + 8],
+                "edges": connected_edges[:30],
+            }
+
+        slim_results: List[Dict[str, Any]] = []
+        for r in ranked[:limit]:
+            card: Dict[str, Any] = {
+                "id": r["id"],
+                "type": r["type"],
+                "status": r["status"],
+                "score": r["score"],
+                "title": str(r["title"])[:72],
+                "summary": str(r["summary"])[:96],
+            }
+            if r.get("hop"):
+                card["hop"] = r["hop"]
+            if r.get("file_path"):
+                card["file_path"] = r["file_path"]
+            if r.get("via_relation"):
+                card["via_relation"] = r["via_relation"]
+            slim_results.append(card)
+
+        slim_edges = [
+            f"{e['source_id']} -[{e['relation']}]-> {e['target_id']}"
+            for e in connected_edges[:8]
+        ]
         return {
             "query": query,
             "match_count": len(ranked),
-            "anti_repeat_warnings": warnings,
-            "results": ranked[: limit + 8],
-            "edges": connected_edges[:30],
+            "anti_repeat_warnings": warnings[:5],
+            "results": slim_results,
+            "edges": slim_edges,
+        }
+
+    def inspect_node(self, node_id: str) -> Dict[str, Any] | None:
+        """Stage-2 progressive expansion: fetch full content, metadata, and edges for one node."""
+        nd = self.store.get_node(node_id)
+        if nd is None:
+            return None
+        return {
+            "node": nd.to_dict(),
+            "edges": [
+                f"{e.source_id} -[{e.relation}]-> {e.target_id}"
+                for e in self.store.list_edges(node_id)[:20]
+            ],
         }
 
     def build_session_capsule(self, user_input: str = "") -> str:

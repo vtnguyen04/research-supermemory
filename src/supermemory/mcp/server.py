@@ -86,6 +86,8 @@ def handle_rpc_request(msg: Dict[str, Any], default_ws: Optional[Path] = None) -
                 t_args["workspace"] = str(eff_ws)
             out = execute_mcp_tool(t_name, t_args)
             txt = json.dumps(out, ensure_ascii=False, indent=2)
+            if len(txt) > 3200:
+                txt = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,

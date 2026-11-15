@@ -11,8 +11,31 @@ from supermemory.models import NodeType, utc_now_iso
 from supermemory.storage.sqlite_store import GraphStore
 
 
+def _purge_duplicate_rule_files(root: Path) -> List[str]:
+    """Remove legacy SuperMemory-generated duplicate rule files that cause 3x-4x prompt injection."""
+    removed: List[str] = []
+    agy_dup = root / ".agents" / "rules" / "00_supermemory_constitution.md"
+    if agy_dup.is_file():
+        agy_dup.unlink()
+        removed.append(".agents/rules/00_supermemory_constitution.md")
+        rules_dir = agy_dup.parent
+        if rules_dir.is_dir() and not any(rules_dir.iterdir()):
+            rules_dir.rmdir()
+
+    gemini_dup = root / "GEMINI.md"
+    if gemini_dup.is_file():
+        try:
+            txt = gemini_dup.read_text(encoding="utf-8")
+            if "SUPERMEMORY CONSTITUTION" in txt:
+                gemini_dup.unlink()
+                removed.append("GEMINI.md")
+        except OSError:
+            pass
+    return removed
+
+
 def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True) -> Dict[str, str]:
-    """Generate concise (< 6 KB) Always-On rules for Antigravity, Claude Code, Cursor, and Codex."""
+    """Generate single canonical AGENTS.md (< 400 tokens) + @AGENTS.md pointer for Claude Code."""
     root = store.workspace_root
     meta = store.get_all_meta()
     proj = meta.get("project_name") or root.name
@@ -20,51 +43,46 @@ def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True
     laws = sorted(store.list_nodes(node_types=[NodeType.LAW.value], limit=20), key=lambda x: x.id)
 
     law_bullets = "\n".join(
-        f"{idx}. **`{lw.id}` — {lw.title}:** {lw.summary}"
-        for idx, lw in enumerate(laws, 1)
+        f"- **`{lw.id}`** {lw.title[:72]}"
+        + (f": {(lw.summary or '')[:60]}" if len(lw.title) < 44 and lw.summary else "")
+        for lw in laws
     )
 
     core_rule_body = (
-        f"# 🧠 {proj.upper()} — SUPERMEMORY CONSTITUTION & ZERO-OVERHEAD HARNESS\n\n"
-        f"> **⚡ FAST ZERO-OVERHEAD PROTOCOL (NO TURN-SPAM):**\n"
-        f"> - `SessionStart` already injects your active capsule. On normal Q&A, chat clarifications, or read-only turns, **do NOT** re-read memory files or call `supermemory_graph` MCP tools — reply directly!\n"
-        f"> - **Before non-trivial code edits or new proposals**, read [01_ACTIVE_STATE.md](memory/01_ACTIVE_STATE.md), [02_CONSTITUTION_AND_LESSONS.md](memory/02_CONSTITUTION_AND_LESSONS.md), and query MCP `recall`.\n\n"
-        f"---\n\n"
-        f"## ⚖️ 1. Non-Negotiable Constitutional Laws (Enforced by PreToolUse & Audit Gates)\n\n"
+        f"# {proj.upper()} — SUPERMEMORY CONSTITUTION\n\n"
+        f"> **Zero-Overhead:** `SessionStart` injects capsule (`<850` tok). Reply directly on Q&A (`0` MCP calls). "
+        f"Before non-trivial edits/proposals, read `memory/01_ACTIVE_STATE.md`, `memory/02_CONSTITUTION_AND_LESSONS.md`, & `recall`.\n\n"
+        f"## 1. Laws (PreToolUse Enforced)\n"
         f"{law_bullets}\n\n"
-        f"---\n\n"
-        f"## 🔄 2. Selective High-Signal Memory Loop & Deterministic Research Vault Routing\n\n"
-        f"1. **Progressive Recall (`L1 PROCEDURAL` + `L2 SEMANTIC`):** Query MCP `recall` (`include_siblings=True` for R&D) before proposing/coding non-trivial features so prior wins are reused and falsified dead-ends are never repeated.\n"
-        f"2. **Zero-Amnesia Research Vault Routing (Enforced at `PreInvocation` & `Stop`):** Whenever researching bottlenecks, papers, or SOTA methods, ALWAYS persist distilled findings to their canonical vault before ending the turn:\n"
-        f"   - **Error Slices & RQs:** `diagnose_bottleneck` -> `memory/08_BOTTLENECKS/BNK-XXX.md` + `RQ-XXX`\n"
-        f"   - **Papers & SOTA Mechanisms:** `scout_sota` (`save_top_k>=1` or `register_card`) -> `memory/07_METHOD_VAULT/METH-XXX.md`\n"
-        f"   - **Candidate Ideas / Dead-Ends / Specs:** `propose_idea` / `manage_proposal` -> `memory/05_IDEAS_AND_ALGORITHMS/` & `memory/04_PROPOSALS/`\n"
-        f"3. **Selective Self-Learning (Never Spam on Casual Chat):** Call MCP `record_lesson` (+ `CodeGate`) **ONLY** for explicit user rules/preferences (`scope='local'` or `'global'`) or genuine technical bug post-mortems — NEVER on casual clarifications. Log real benchmarks via MCP `log_experiment` ([03_EXPERIMENTS_REGISTRY.md](memory/03_EXPERIMENTS_REGISTRY.md)).\n"
-        f"4. **Clean Code (`< {max_lines}` lines/file) & Full-Tab UI Visual Audit:** Keep [00_MEMORY_GRAPH.md](memory/00_MEMORY_GRAPH.md) & `01_ACTIVE_STATE.md` synced on milestone completions, and visually inspect ALL UI tabs/viewports after any frontend change.\n"
+        f"## 2. Vault Routing & Persistence (`<{max_lines}`L)\n"
+        f"- **Recall:** `recall(query, include_siblings=True)` -> Stage-2 `recall(node_id=...)` on demand.\n"
+        f"- **Research Vaults:** Slices -> `diagnose_bottleneck` (`08_BOTTLENECKS/`); Papers -> `scout_sota` (`07_METHOD_VAULT/`); Specs -> `propose_idea`/`manage_proposal`.\n"
+        f"- **Lessons & Benchmarks:** `record_lesson` (+ `CodeGate`) ONLY for durable rules/post-mortems; `log_experiment` for runs; inspect all UI tabs/viewports after UI edits.\n"
     )
 
+    _purge_duplicate_rule_files(root)
     written: Dict[str, str] = {}
-    for fname in ("AGENTS.md", "GEMINI.md", "CLAUDE.md"):
-        fpath = root / fname
-        fpath.write_text(core_rule_body, encoding="utf-8")
-        written[fname] = str(fpath)
+    agents_path = root / "AGENTS.md"
+    agents_path.write_text(core_rule_body, encoding="utf-8")
+    written["AGENTS.md"] = str(agents_path)
 
-    # Antigravity .agents/rules/ always_on rule
-    agy_rules_dir = root / ".agents" / "rules"
-    agy_rules_dir.mkdir(parents=True, exist_ok=True)
-    agy_rule_path = agy_rules_dir / "00_supermemory_constitution.md"
-    agy_rule_path.write_text(
-        "---\n"
-        "trigger: always_on\n"
-        "description: Mandatory SuperMemory knowledge graph recall, anti-regression laws, and self-learning gate loop.\n"
-        "---\n\n"
-        + core_rule_body,
-        encoding="utf-8",
-    )
-    written[".agents/rules/00_supermemory_constitution.md"] = str(agy_rule_path)
+    # Lightweight @AGENTS.md import pointer for Claude Code (0 duplicate tokens in Antigravity/Codex)
+    claude_path = root / "CLAUDE.md"
+    write_claude_ptr = not claude_path.is_file()
+    if claude_path.is_file():
+        try:
+            existing_claude = claude_path.read_text(encoding="utf-8")
+            if "SUPERMEMORY CONSTITUTION" in existing_claude or existing_claude.strip().startswith("@AGENTS.md"):
+                write_claude_ptr = True
+        except OSError:
+            write_claude_ptr = False
+    if write_claude_ptr:
+        claude_path.write_text("@AGENTS.md\n", encoding="utf-8")
+        written["CLAUDE.md"] = str(claude_path)
 
     if install_workspace_hooks:
         hooks_path = root / ".agents" / "hooks.json"
+        hooks_path.parent.mkdir(parents=True, exist_ok=True)
         if not hooks_path.exists():
             hooks_cfg = {
                 "supermemory-workspace-guard": {

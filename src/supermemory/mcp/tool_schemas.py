@@ -36,17 +36,19 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "recall",
-        "description": "Federated (Local + Global) BM25 + 2-hop Knowledge Graph progressive-disclosure search & Anti-Repeat check.",
+        "description": "2-Stage Progressive Recall: Stage-1 compact index search (`query`) or Stage-2 full node expansion (`node_id`).",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string"},
+                "query": {"type": "string", "default": ""},
+                "node_id": {"type": "string", "description": "Optional Stage-2 ID (e.g. METH-001, OBS-001) to fetch full content."},
+                "limit": {"type": "integer", "default": 6},
                 "hops": {"type": "integer", "default": 1},
+                "compact": {"type": "boolean", "default": True},
                 "include_global": {"type": "boolean", "default": True},
                 "include_siblings": {"type": "boolean", "default": False},
                 "workspace": {"type": "string"},
             },
-            "required": ["query"],
         },
     },
     {

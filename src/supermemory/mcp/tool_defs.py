@@ -55,11 +55,14 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
     if canon == "recall":
         local_ok = (raw_ws / ".supermemory").is_dir() or (raw_ws / "memory" / "graph_snapshot.json").is_file()
         return federated_recall(
-            str(args["query"]),
+            str(args.get("query") or ""),
             local_ws=raw_ws if local_ok else None,
             include_global=bool(args.get("include_global", True)),
             include_siblings=bool(args.get("include_siblings", False)),
+            limit=int(args.get("limit") or 6),
             hops=int(args.get("hops") or 1),
+            compact=bool(args.get("compact", True)),
+            node_id=str(args.get("node_id") or ""),
         )
 
     target_root = _resolve_target_root(args)

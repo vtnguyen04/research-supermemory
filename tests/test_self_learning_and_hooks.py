@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from supermemory.bootstrap import init_workspace
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.hooks.runner import dispatch_hook
@@ -255,12 +257,13 @@ def test_hook_compaction_recovery_and_stop_lesson_lock(tmp_path: Path) -> None:
     assert stop_3["decision"] == "allow"
 
 
-def test_research_campaign_routing_and_zero_amnesia_persistence(tmp_path: Path, monkeypatch: object) -> None:
+def test_research_campaign_routing_and_zero_amnesia_persistence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from supermemory.cognitive.tiers import build_tiered_capsule
     from supermemory.mcp.tool_defs import execute_mcp_tool
 
-    mp = monkeypatch  # type: ignore[assignment]
-    mp.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_mem"))
+    monkeypatch.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_mem"))
     proj_dir = tmp_path / "proj_research"
     fake_plugin_cwd = tmp_path / "config" / "plugins" / "supermemory"
     fake_plugin_cwd.mkdir(parents=True, exist_ok=True)
@@ -275,7 +278,7 @@ def test_research_campaign_routing_and_zero_amnesia_persistence(tmp_path: Path, 
     assert stop_hold["decision"] == "continue" and "RESEARCH VAULT COMMIT REQUIRED" in stop_hold["reason"]
 
     # Even if MCP server cwd is plugins/supermemory and `workspace` is omitted, auto-routes to proj_dir!
-    mp.chdir(fake_plugin_cwd)
+    monkeypatch.chdir(fake_plugin_cwd)
     execute_mcp_tool("diagnose_bottleneck", {"title": "Thermal Overshoot", "evidence_slice": "Night slice", "error_share_pct": 55, "ceiling_gain": 0.12, "falsifiable_rq": "Does MPC bound overshoot?"})
     execute_mcp_tool("scout_sota", {"action": "register_card", "title": "Tube MPC Bound", "core_mechanism": "Tightened invariant tube", "bottleneck_id": "BNK-001", "venue": "ICML", "year": 2025})
     with GraphStore(proj_dir) as store:

@@ -161,41 +161,72 @@ _SIBLING_REUSABLE_TYPES = {
 }
 
 
+def _inspect_federated_node(node_id: str, local_ws: Optional[Path], include_global: bool, include_siblings: bool) -> Dict[str, Any]:
+    """Stage-2 Progressive Recall: resolve full markdown content & edges for a single node ID."""
+    nid = node_id.strip()
+    candidates: List[tuple[str, Path]] = []
+    if local_ws is not None and ((local_ws / ".supermemory").is_dir() or (local_ws / "memory" / "graph_snapshot.json").is_file()):
+        candidates.append(("LOCAL", local_ws.resolve()))
+    if include_global:
+        candidates.append(("GLOBAL", ensure_global_memory()))
+    if include_siblings:
+        for item in list_registered_workspaces():
+            if item.get("scope") == "LOCAL":
+                p = Path(str(item.get("path") or "")).resolve()
+                if all(p != existing_p for _, existing_p in candidates):
+                    candidates.append((f"SIBLING:{item.get('name') or p.name}", p))
+    for scope_lbl, root_p in candidates:
+        with GraphStore(root_p) as st:
+            detail = QueryEngine(st).inspect_node(nid)
+            if detail is not None:
+                detail["node"]["memory_tier"] = classify_tier(detail["node"])
+                return {"stage": "NODE_DETAIL", "scope": scope_lbl, "workspace": str(root_p), **detail}
+    return {"stage": "NODE_DETAIL", "error": f"Node `{nid}` not found across federated vaults."}
+
+
 def federated_recall(
-    query: str,
+    query: str = "",
     local_ws: Optional[Path] = None,
     include_global: bool = True,
     include_siblings: bool = False,
-    limit: int = 8,
+    limit: int = 6,
     hops: int = 1,
+    compact: bool = True,
+    node_id: str = "",
 ) -> Dict[str, Any]:
-    """Query Local project SuperMemory + Global + optional Sibling Research Vaults."""
-    merged_results: List[Dict[str, Any]] = []
+    """2-Stage Progressive Recall across Local, Global, and optional Sibling Research Vaults."""
+    if node_id.strip():
+        return _inspect_federated_node(node_id, local_ws, include_global, include_siblings)
+
+    merged: List[Dict[str, Any]] = []
     warnings: List[str] = []
+    seen_keys: set[tuple[str, str]] = set()
     local_resolved = local_ws.resolve() if local_ws is not None else None
 
-    if local_ws is not None and (
-        (local_ws / ".supermemory").is_dir() or (local_ws / "memory" / "graph_snapshot.json").is_file()
+    def _collect(items: List[Dict[str, Any]], scope_tag: str) -> None:
+        for r in items:
+            if r.get("status") == "CONSOLIDATED":
+                continue
+            key = (scope_tag, str(r["id"]))
+            if key not in seen_keys:
+                seen_keys.add(key)
+                merged.append({**r, "scope": scope_tag, "tier": classify_tier({"node_type": r["type"], "metadata": {}})})
+
+    if local_resolved is not None and (
+        (local_resolved / ".supermemory").is_dir() or (local_resolved / "memory" / "graph_snapshot.json").is_file()
     ):
-        with GraphStore(local_ws) as l_store:
-            l_rec = QueryEngine(l_store).recall(query, limit=limit, hops=hops)
+        with GraphStore(local_resolved) as l_store:
+            l_rec = QueryEngine(l_store).recall(query, limit=limit, hops=hops, compact=compact)
             warnings.extend(l_rec["anti_repeat_warnings"])
-            for r in l_rec["results"]:
-                if r.get("status") != "CONSOLIDATED":
-                    merged_results.append({**r, "scope": "LOCAL", "tier": classify_tier({"node_type": r["type"], "metadata": {}})})
+            _collect(l_rec["results"], "LOCAL")
 
     if include_global:
         g_root = ensure_global_memory()
         if local_resolved is None or local_resolved != g_root:
             with GraphStore(g_root) as g_store:
-                g_rec = QueryEngine(g_store).recall(query, limit=max(4, limit // 2), hops=1)
-                for w in g_rec["anti_repeat_warnings"]:
-                    warnings.append(f"[GLOBAL] {w}")
-                for r in g_rec["results"]:
-                    if r.get("status") != "CONSOLIDATED":
-                        merged_results.append(
-                            {**r, "scope": "GLOBAL", "tier": classify_tier({"node_type": r["type"], "metadata": {}})}
-                        )
+                g_rec = QueryEngine(g_store).recall(query, limit=max(3, limit // 2), hops=1, compact=compact)
+                warnings.extend(f"[GLOBAL] {w}" for w in g_rec["anti_repeat_warnings"][:2])
+                _collect(g_rec["results"], "GLOBAL")
 
     if include_siblings:
         for ws_item in list_registered_workspaces():
@@ -206,24 +237,21 @@ def federated_recall(
                 continue
             sib_name = str(ws_item.get("name") or sib_path.name)
             with GraphStore(sib_path) as sib_store:
-                s_rec = QueryEngine(sib_store).recall(query, limit=4, hops=1)
-                for w in s_rec["anti_repeat_warnings"][:2]:
-                    warnings.append(f"[SIBLING:{sib_name}] {w}")
-                for r in s_rec["results"]:
-                    if r.get("status") != "CONSOLIDATED" and r.get("type") in _SIBLING_REUSABLE_TYPES:
-                        merged_results.append(
-                            {
-                                **r,
-                                "scope": f"SIBLING:{sib_name}",
-                                "tier": classify_tier({"node_type": r["type"], "metadata": {}}),
-                            }
-                        )
+                s_rec = QueryEngine(sib_store).recall(query, limit=3, hops=1, compact=compact)
+                warnings.extend(f"[SIBLING:{sib_name}] {w}" for w in s_rec["anti_repeat_warnings"][:1])
+                _collect([r for r in s_rec["results"] if r.get("type") in _SIBLING_REUSABLE_TYPES], f"SIBLING:{sib_name}")
 
+    merged.sort(key=lambda x: (x.get("hop", 0) == 0, x["scope"] == "LOCAL", float(x.get("score") or 0.0)), reverse=True)
+    dedup_warn = [w[:120] for w in dict.fromkeys(warnings)]
+    cap = limit if compact else (limit + 8)
     return {
+        "stage": "INDEX_COMPACT" if compact else "FULL",
+        "workspace": str(local_resolved) if local_resolved else "global",
         "query": query,
         "local_initialized": local_ws is not None,
-        "anti_repeat_warnings": warnings[:10],
-        "results": merged_results[: limit + 10],
+        "total_candidates": len(merged),
+        "anti_repeat_warnings": dedup_warn[: (4 if compact else 10)],
+        "results": merged[:cap],
     }
 
 

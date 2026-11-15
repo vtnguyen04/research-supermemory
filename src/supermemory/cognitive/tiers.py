@@ -75,14 +75,36 @@ def compute_tier_telemetry(store: GraphStore) -> Dict[str, Any]:
     }
 
 
-def build_tiered_capsule(store: GraphStore, query: str = "", global_rules: List[str] | None = None) -> str:
+_BASE_LAW_IDS = {f"LAW-0{i}" for i in range(1, 9)}
+
+
+def _trim_capsule_blocks(blocks: List[tuple[int, str]], max_tokens: int) -> str:
+    """Drop lowest-priority blocks (4 -> 1) until capsule strictly fits `max_tokens`."""
+    kept = list(blocks)
+    while len(kept) > 1 and _est_tokens("\n".join(txt for _, txt in kept)) > max_tokens:
+        droppable = [idx for idx, (prio, _) in enumerate(kept) if prio > 0]
+        if not droppable:
+            break
+        worst_idx = max(droppable, key=lambda idx: (kept[idx][0], idx))
+        kept.pop(worst_idx)
+    out = "\n".join(txt for _, txt in kept)
+    char_cap = max(120, max_tokens * 4)
+    return out[: char_cap - 1] + "…" if len(out) > char_cap else out
+
+
+def build_tiered_capsule(
+    store: GraphStore,
+    query: str = "",
+    global_rules: List[str] | None = None,
+    max_tokens: int = 800,
+) -> str:
     """Compile strictly token-budgeted L0 Working + L1 Procedural + L2 Semantic capsule (<850 tokens)."""
     meta = store.get_all_meta()
     proj = meta.get("project_name") or store.workspace_root.name
     goal = (meta.get("active_goal") or "Maintain 100% constitutional compliance.")[:180]
     next_act = (meta.get("next_actions") or "Check recall before editing; commit memory before stopping.")[:180]
 
-    laws = sorted(store.list_nodes(node_types=[NodeType.LAW.value], limit=12), key=lambda x: x.id)
+    laws = sorted(store.list_nodes(node_types=[NodeType.LAW.value], limit=16), key=lambda x: x.id)
     procs = store.list_nodes(node_types=[NodeType.PROCEDURE.value], limit=6)
     gates = store.list_gates(enabled_only=True)
     proposals = [
@@ -104,14 +126,12 @@ def build_tiered_capsule(store: GraphStore, query: str = "", global_rules: List[
         if e.verdict not in ("REVERT", "FAILED", "REJECTED") and (e.test_score is not None or e.cv_score is not None)
     ]
     sota = max(scored_exps, key=lambda x: float(x.test_score if x.test_score is not None else (x.cv_score or 0.0))) if scored_exps else None
-    dead_end_count = sum(
-        1 for n in store.list_nodes(limit=2000) if n.status in ("REJECTED", "REVERT", "FAILED")
-    )
+    dead_end_count = sum(1 for n in store.list_nodes(limit=2000) if n.status in ("REJECTED", "REVERT", "FAILED"))
 
-    lines: List[str] = [
-        f"🧠 SUPERMEMORY CONSTITUTIONAL HARNESS ACTIVE — Project: `{proj}`",
-        f"• [L0 WORKING] Goal: {goal}",
-        f"• [L0 WORKING] Next: {next_act}",
+    blocks: List[tuple[int, str]] = [
+        (0, f"🧠 SUPERMEMORY CONSTITUTIONAL HARNESS ACTIVE — Project: `{proj}`"),
+        (0, f"• [L0 WORKING] Goal: {goal}"),
+        (0, f"• [L0 WORKING] Next: {next_act}"),
     ]
     if sota or dead_end_count:
         sota_txt = (
@@ -119,53 +139,54 @@ def build_tiered_capsule(store: GraphStore, query: str = "", global_rules: List[
             if sota
             else "🏆 Best SOTA: None yet"
         )
-        lines.append(f"• [L0 SCOREBOARD] {sota_txt} | Falsified Dead-Ends (Never Repeat): {dead_end_count}")
-    if proposals:
-        lines.append("• [L0 WORKING] Active Proposals: " + " | ".join(f"`{p.id}`[{p.status}] {p.title[:45]}" for p in proposals[:3]))
+        blocks.append((0, f"• [L0 SCOREBOARD] {sota_txt} | Falsified Dead-Ends (Never Repeat): {dead_end_count}"))
     if bottlenecks:
         bnk_txt = " | ".join(
             f"`{b.id}`({b.metadata.get('error_share_pct', 0)}% err, +{b.metadata.get('ceiling_gain', 0)} ceil) {b.title[:40]}"
             for b in bottlenecks[:3]
         )
-        lines.append(f"• [L0 BOTTLENECKS — Fix Highest Pareto First]: {bnk_txt}")
+        blocks.append((1, f"• [L0 BOTTLENECKS — Fix Highest Pareto First]: {bnk_txt}"))
+    if proposals:
+        blocks.append((2, "• [L0 WORKING] Active Proposals: " + " | ".join(f"`{p.id}`[{p.status}] {p.title[:45]}" for p in proposals[:3])))
     mcards = [
         m for m in store.list_nodes(node_types=[NodeType.METHOD_CARD.value], limit=6)
         if m.status not in ("REJECTED", "ARCHIVED", "CONSOLIDATED")
     ]
     if mcards:
-        mc_txt = " | ".join(
-            f"`{m.id}`({m.metadata.get('venue', 'SOTA')} {m.metadata.get('year', '')}) {m.title[:38]}"
-            for m in mcards[:3]
-        )
-        lines.append(f"• [L2 METHOD VAULT — Saved SOTA Cards]: {mc_txt}")
+        mc_txt = " | ".join(f"`{m.id}`({m.metadata.get('venue', 'SOTA')} {m.metadata.get('year', '')}) {m.title[:38]}" for m in mcards[:3])
+        blocks.append((2, f"• [L2 METHOD VAULT — Saved SOTA Cards]: {mc_txt}"))
 
-    lines.append(f"• [L1 PROCEDURAL] {len(laws)} Laws | {len(procs)} Procedures | {len(gates)} PreToolUse Gates:")
-    for lw in laws[:10]:
-        lines.append(f"  - `{lw.id}`: {lw.title[:78]}")
+    has_agents_md = (store.workspace_root / "AGENTS.md").is_file()
+    law_note = " (active in AGENTS.md)" if has_agents_md else ":"
+    blocks.append((1, f"• [L1 PROCEDURAL] {len(laws)} Laws{law_note} | {len(procs)} Procedures | {len(gates)} PreToolUse Gates"))
+    shown_laws = [lw for lw in laws if lw.id not in _BASE_LAW_IDS][:6] if has_agents_md else laws[:8]
+    for lw in shown_laws:
+        blocks.append((2, f"  - `{lw.id}`: {lw.title[:78]}"))
     for pr in procs[:4]:
-        lines.append(f"  - `{pr.id}` (Procedure): {pr.title[:78]}")
+        blocks.append((2, f"  - `{pr.id}` (Procedure): {pr.title[:78]}"))
     for gr in (global_rules or [])[:4]:
-        lines.append(f"  - [GLOBAL] {gr[:85]}")
+        blocks.append((2, f"  - [GLOBAL] {gr[:85]}"))
 
     if query.strip():
         hits = store.search_fts(query, limit=6)
-        sem_lines = []
-        for nd, _ in hits:
-            if nd.status == "CONSOLIDATED":
-                continue
-            tier = classify_tier(nd)
-            if tier == MemoryTier.SEMANTIC.value or nd.status in ("REJECTED", "REVERT", "FAILED", "FAILURE_INSIGHT"):
-                sem_lines.append(f"  - [{tier}/{nd.node_type}] `{nd.id}`: {nd.title[:55]} — {nd.summary[:95]}")
+        sem_lines = [
+            f"  - [{classify_tier(nd)}/{nd.node_type}] `{nd.id}`: {nd.title[:55]} — {nd.summary[:95]}"
+            for nd, _ in hits
+            if nd.status != "CONSOLIDATED"
+            and (classify_tier(nd) == MemoryTier.SEMANTIC.value or nd.status in ("REJECTED", "REVERT", "FAILED", "FAILURE_INSIGHT"))
+        ]
         if sem_lines:
-            lines.append("• [L2 SEMANTIC RECALL — Progressive Disclosure]:")
-            lines.extend(sem_lines[:4])
+            blocks.append((3, "• [L2 SEMANTIC RECALL — Progressive Disclosure]:"))
+            for sl in sem_lines[:4]:
+                blocks.append((3, sl))
 
     if exps:
-        lines.append(
+        blocks.append((
+            4,
             "• [L3 EPISODIC POINTERS — Paged on Disk]: "
-            + " | ".join(f"`{x.exp_id}`({x.verdict}: {x.test_summary[:28] or x.cv_summary[:28]})" for x in exps)
-        )
-    return "\n".join(lines)
+            + " | ".join(f"`{x.exp_id}`({x.verdict}: {x.test_summary[:28] or x.cv_summary[:28]})" for x in exps),
+        ))
+    return _trim_capsule_blocks(blocks, max_tokens=max_tokens)
 
 
 def _next_tier_id(store: GraphStore, prefix: str, ntype: str) -> str:

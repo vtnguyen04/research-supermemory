@@ -20,6 +20,8 @@ from supermemory.storage.ledger_ops import (
 )
 from supermemory.storage.schema import apply_schema
 
+MAX_EVENT_LOG_ROWS = 2000
+
 
 def _safe_fts_query(raw: str) -> str:
     """Sanitize arbitrary natural language input into a safe FTS5 OR query."""
@@ -247,11 +249,25 @@ class GraphStore:
         rows = self.conn.execute("SELECT * FROM events ORDER BY seq DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
 
+    def prune_events(self, max_events: int = MAX_EVENT_LOG_ROWS) -> int:
+        """Ring-buffer prune: retain only the most recent `max_events` telemetry rows."""
+        cur = self.conn.execute(
+            "DELETE FROM events WHERE seq <= (SELECT COALESCE(MAX(seq), 0) - ? FROM events)",
+            (max(1, max_events),),
+        )
+        self.conn.commit()
+        return int(cur.rowcount or 0)
+
     def _append_event(self, event_type: str, entity_id: str, summary: str, payload: Optional[Dict[str, Any]] = None) -> None:
-        self.conn.execute(
+        cur = self.conn.execute(
             "INSERT INTO events(event_type, actor, entity_id, summary, payload_json, created_at) VALUES (?, 'supermemory', ?, ?, ?, ?)",
             (event_type, entity_id, summary, json.dumps(payload or {}, ensure_ascii=False), utc_now_iso()),
         )
+        if cur.lastrowid and cur.lastrowid % 100 == 0:
+            self.conn.execute(
+                "DELETE FROM events WHERE seq <= (SELECT COALESCE(MAX(seq), 0) - ? FROM events)",
+                (MAX_EVENT_LOG_ROWS,),
+            )
 
     @staticmethod
     def _row_to_node(row: sqlite3.Row) -> MemoryNode:
