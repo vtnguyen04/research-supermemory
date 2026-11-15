@@ -96,8 +96,15 @@ def test_full_ui_management_console_crud_and_lifecycle(tmp_path: Path, monkeypat
             {"scope": sc, "source_id": "PROC-001", "target_id": "LAW-03", "relation": "GOVERNED_BY"},
         )
         assert edge_res["linked"] is True
+        del_edge = _post_json(
+            base,
+            "/api/edge/delete",
+            {"scope": sc, "source_id": "PROC-001", "target_id": "LAW-03", "relation": "GOVERNED_BY"},
+        )
+        assert del_edge["deleted"] is True
+        assert _get_json(base, f"/api/node/PROC-001?scope={sc}")["edges"] == []
 
-        # 4. Create Lesson + Rule + Gate, Toggle Gate, Audit, Delete Gate
+        # 4. Create Lesson + Rule + Gate, Edit Gate, Toggle Gate, Audit, Delete Gate
         ls_res = _post_json(
             base,
             "/api/lessons",
@@ -114,6 +121,22 @@ def test_full_ui_management_console_crud_and_lifecycle(tmp_path: Path, monkeypat
         assert "No Hardcoded Ports" in (new_proj / "AGENTS.md").read_text(encoding="utf-8")
         gid = ls_res["gate_id"]
         assert gid
+
+        edited_gate = _post_json(
+            base,
+            "/api/gates",
+            {
+                "scope": sc,
+                "id": gid,
+                "name": "Forbid static port 9998 or 9999",
+                "law_id": ls_res["law_id"],
+                "gate_type": "REGEX_FORBID",
+                "target_glob": "src/**/*.py",
+                "pattern": r"port\s*=\s*999[89]",
+            },
+        )["gate"]
+        assert edited_gate["id"] == gid
+        assert edited_gate["pattern"] == r"port\s*=\s*999[89]"
 
         assert _post_json(base, "/api/gates", {"scope": sc, "action": "toggle", "gate_id": gid, "enabled": False})["toggled"] is True
         assert _post_json(base, "/api/audit", {"scope": sc})["passed"] is True
@@ -179,10 +202,12 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         "/",
         "/styles.css",
         "/icons.js",
+        "/graph_layouts.js",
         "/graph_canvas.js",
         "/inspector.js",
         "/merge_studio.js",
         "/modals.js",
+        "/palette.js",
         "/views.js",
         "/app.js",
     ]
@@ -206,7 +231,10 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         assert "skip-link" in html
         assert "inspector-backdrop" in html
         assert "canvas-viewport" in html
-        for gmode in ("FORCE", "RADIAL", "LANES"):
+        assert "search-popover" in html
+        assert "l0-context-strip" in html
+        assert "btn-dock-inspector" in html
+        for gmode in ("FORCE", "RADIAL", "HIERARCHY", "LANES"):
             assert f'data-gmode="{gmode}"' in html
         assert "paginate(" in fetched["/views.js"] and "paginate(" in fetched["/merge_studio.js"]
         assert ".pager-bar" in css
@@ -218,7 +246,7 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         assert not micro_font_rx.search(css), "Microscopic font-size (<13px) detected in styles.css"
 
         js_files = sorted(STATIC_DIR.glob("*.js"))
-        assert len(js_files) == 7
+        assert len(js_files) == 9
         for js_path in js_files:
             lines = js_path.read_text(encoding="utf-8").splitlines()
             assert len(lines) < 200, f"{js_path.name} exceeds 200 lines ({len(lines)})"

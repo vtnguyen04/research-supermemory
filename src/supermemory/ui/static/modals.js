@@ -1,6 +1,6 @@
 // Accessible Native <dialog> Form & Workflow Controller (WCAG 2.1 AA Focus Management)
 (function () {
-  const { esc, statusTag, tr, renderMarkdown } = window.SuperMemoryIcons;
+  const { esc, statusTag, tr, renderMarkdown, svg } = window.SuperMemoryIcons;
   const fld = (name, label, ctrl) => `<div class="field-group"><label for="f-${name}" class="field-label">${label}</label>${ctrl}</div>`;
   const inp = (name, val = "", ph = "") => `<input id="f-${name}" name="${name}" class="control-input" value="${esc(val)}" placeholder="${esc(ph)}" />`;
   const area = (name, val = "", rows = 3) => `<textarea id="f-${name}" name="${name}" class="control-textarea" rows="${rows}">${esc(val)}</textarea>`;
@@ -24,7 +24,7 @@
 
     close() { if (this.dialog.open) this.dialog.close(); }
 
-    open(title, html, onSubmit) {
+    open(title, html, onSubmit, extraFooterHtml = "") {
       this.lastTrigger = document.activeElement;
       document.getElementById("dialog-title").textContent = title;
       this.errBox.classList.add("hidden");
@@ -34,13 +34,12 @@
           <button type="submit" class="btn btn-primary">${tr("Save", "Lưu thực thi")}</button></div></form>`;
         document.getElementById("btn-dlg-cancel").addEventListener("click", () => this.close());
         document.getElementById("dlg-form").addEventListener("submit", async (ev) => {
-          ev.preventDefault();
-          this.errBox.classList.add("hidden");
+          ev.preventDefault(); this.errBox.classList.add("hidden");
           try { await onSubmit(Object.fromEntries(new FormData(ev.target).entries())); this.close(); }
           catch (err) { this.errBox.textContent = err.message; this.errBox.classList.remove("hidden"); }
         });
       } else {
-        this.bodyBox.innerHTML = `${html}<div class="dialog-footer"><button type="button" id="btn-dlg-ok" class="btn btn-secondary">${tr("Close", "Đóng")}</button></div>`;
+        this.bodyBox.innerHTML = `${html}<div class="dialog-footer">${extraFooterHtml}<button type="button" id="btn-dlg-ok" class="btn btn-secondary">${tr("Close", "Đóng")}</button></div>`;
         document.getElementById("btn-dlg-ok").addEventListener("click", () => this.close());
       }
       if (!this.dialog.open) this.dialog.showModal();
@@ -102,15 +101,16 @@
         });
     }
 
-    openAddGate() {
-      this.open(tr("Add PreToolUse CodeGate / SHA-256 Freeze", "Thêm Chốt chặn PreToolUse CodeGate / Khóa SHA-256"),
-        fld("freeze_path", tr("Freeze File Integrity via SHA-256 (optional)", "Khóa toàn vẹn tệp bằng SHA-256 (tùy chọn)"), inp("freeze_path", "", "eval/evaluate.py")) +
-        row2(fld("name", tr("Gate Name", "Tên Gate"), inp("name", "", "Block Print Debug")), fld("law_id", tr("Bound LAW", "Thuộc LAW"), inp("law_id", "LAW-08"))) +
-        row2(fld("gate_type", tr("Gate Type", "Loại Gate"), sel("gate_type", ["FORBIDDEN_REGEX", "FORBIDDEN_CMD_PATTERN", "MAX_LINES", "FROZEN_SHA256"])), fld("target_glob", "Target Glob", inp("target_glob", "**/*.py"))) +
-        fld("pattern", tr("Forbidden Regex Pattern", "Biểu thức Regex chặn"), inp("pattern")),
+    openAddGate(ex = null) {
+      this.open(ex ? tr(`Edit CodeGate ${ex.id}`, `Chỉnh sửa CodeGate ${ex.id}`) : tr("Add PreToolUse CodeGate / SHA-256 Freeze", "Thêm Chốt chặn PreToolUse CodeGate / Khóa SHA-256"),
+        (ex ? "" : fld("freeze_path", tr("Freeze File Integrity via SHA-256 (optional)", "Khóa toàn vẹn tệp bằng SHA-256 (tùy chọn)"), inp("freeze_path", "", "eval/evaluate.py"))) +
+        row2(fld("name", tr("Gate Name", "Tên Gate"), inp("name", ex?.name || "", "Block Print Debug")), fld("law_id", tr("Bound LAW", "Thuộc LAW"), inp("law_id", ex?.law_id || "LAW-08"))) +
+        row2(fld("gate_type", tr("Gate Type", "Loại Gate"), sel("gate_type", ["FORBIDDEN_REGEX", "FORBIDDEN_CMD_PATTERN", "MAX_LINES", "FROZEN_SHA256"], ex?.gate_type || "FORBIDDEN_REGEX")),
+             fld("target_glob", "Target Glob", inp("target_glob", ex?.target_glob || "**/*.py"))) +
+        fld("pattern", tr("Rule Pattern / Max Lines / SHA-256", "Biểu thức Regex / Số dòng / SHA-256"), area("pattern", ex?.pattern || "", 2)),
         async (v) => {
-          const out = await this.postJson("/api/gates", { ...v, action: v.freeze_path.trim() ? "freeze" : "create", name: v.name.trim() || "Custom Gate" });
-          this.notify(tr(`Activated ${out.gate.id}`, `Đã kích hoạt ${out.gate.id}`)); await this.onRefresh();
+          const out = await this.postJson("/api/gates", { ...v, id: ex?.id || "", action: v.freeze_path?.trim() ? "freeze" : "create", name: v.name.trim() || "Custom Gate" });
+          this.notify(tr(`Saved ${out.gate.id}`, `Đã lưu ${out.gate.id}`)); await this.onRefresh();
         });
     }
 
@@ -152,26 +152,35 @@
         });
     }
 
+    async runAuditDialog() {
+      const res = await this.postJson("/api/audit", {});
+      const vList = (res.violations || []).map((v) => `<li><code>${esc(v.gate_id)}</code>: ${esc(v.message)}</li>`).join("");
+      this.open(tr("Full Workspace CodeGate Audit Results", "Kết quả Kiểm định Toàn bộ Workspace"),
+        `<div>${statusTag(res.passed ? "ACTIVE" : "FAILED", res.passed ? tr("100% PASSED", "ĐẠT CHUẨN 100%") : tr("VIOLATIONS FOUND", "PHÁT HIỆN VI PHẠM"))}</div>` +
+        `<p class="row-desc">${tr(`Scanned ${res.checked_files || 0} files across ${res.active_gates || res.gates_evaluated || 0} active CodeGates.`, `Đã quét ${res.checked_files || 0} tệp qua ${res.active_gates || res.gates_evaluated || 0} chốt chặn CodeGate.`)}</p>` +
+        (vList ? `<ul class="code-block">${vList}</ul>` : `<p class="row-desc">${tr("Zero source or SHA-256 integrity violations detected.", "Không có vi phạm nào trong mã nguồn và SHA-256.")}</p>`), null);
+    }
+
+    async openHandoffDialog() {
+      const res = await this.postJson("/api/handoff", {});
+      this.open(tr("Zero-Loss Handoff Briefing (HANDOFF_BRIEFING.md)", "Bản bàn giao Không mất Ngữ cảnh (HANDOFF_BRIEFING.md)"),
+        `<p class="mono-id">${esc(res.handoff_path)}</p><article class="md-prose md-modal-scroll">${renderMarkdown(res.markdown, false)}</article>`, null,
+        `<button type="button" id="btn-copy-handoff" class="btn btn-primary">${svg("copy", 14)} ${tr("Copy Markdown", "Sao chép Markdown")}</button>`);
+      document.getElementById("btn-copy-handoff")?.addEventListener("click", async () => {
+        await navigator.clipboard?.writeText(res.markdown || "");
+        this.notify(tr("Copied HANDOFF_BRIEFING.md", "Đã sao chép HANDOFF_BRIEFING.md"));
+      });
+    }
+
     _bindButtons() {
       const map = {
         "btn-open-init": () => this.openInitWorkspace(), "btn-open-state": () => this.openEditState(),
         "btn-open-quick-node": () => this.openUpsertNode(), "btn-add-lesson": () => this.openAddLesson(),
         "btn-add-gate": () => this.openAddGate(), "btn-add-exp": () => this.openAddExperiment(),
         "btn-add-proposal": () => this.openAddProposal(), "btn-add-idea": () => this.openAddIdea(),
+        "btn-run-audit": () => this.runAuditDialog(), "btn-handoff": () => this.openHandoffDialog(),
       };
-      Object.entries(map).forEach(([id, fn]) => document.getElementById(id).addEventListener("click", fn));
-      document.getElementById("btn-run-audit").addEventListener("click", async () => {
-        const res = await this.postJson("/api/audit", {});
-        const vList = (res.violations || []).map((v) => `<li><code>${esc(v.gate_id)}</code>: ${esc(v.message)}</li>`).join("");
-        this.open(tr("Full Workspace CodeGate Audit Results", "Kết quả Kiểm định Toàn bộ Workspace"),
-          `<div>${statusTag(res.passed ? "ACTIVE" : "FAILED", res.passed ? tr("100% PASSED", "ĐẠT CHUẨN 100%") : tr("VIOLATIONS FOUND", "PHÁT HIỆN VI PHẠM"))}</div>` +
-          `<p class="row-desc">${tr(`Scanned ${res.checked_files || 0} files across ${res.gates_evaluated || 0} active CodeGates.`, `Đã quét ${res.checked_files || 0} tệp qua ${res.gates_evaluated || 0} chốt chặn CodeGate.`)}</p>` +
-          (vList ? `<ul class="code-block">${vList}</ul>` : `<p class="row-desc">${tr("Zero source or SHA-256 integrity violations detected.", "Không có vi phạm nào trong mã nguồn và SHA-256.")}</p>`), null);
-      });
-      document.getElementById("btn-handoff").addEventListener("click", async () => {
-        const res = await this.postJson("/api/handoff", {});
-        this.open(tr("Zero-Loss Handoff Briefing (HANDOFF_BRIEFING.md)", "Bản bàn giao Không mất Ngữ cảnh (HANDOFF_BRIEFING.md)"), `<p class="mono-id">${esc(res.handoff_path)}</p><article class="md-prose md-modal-scroll">${renderMarkdown(res.markdown, false)}</article>`, null);
-      });
+      Object.entries(map).forEach(([id, fn]) => document.getElementById(id)?.addEventListener("click", fn));
     }
   }
   window.SuperMemoryModals = { ModalController };

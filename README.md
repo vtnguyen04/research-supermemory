@@ -1,4 +1,4 @@
-# Research SuperMemory (`v2.5`)
+# Research SuperMemory (`v2.6`)
 
 > Language: **English (Default)** | **[Tiếng Việt](README.vi.md)**
 
@@ -79,14 +79,16 @@ flowchart TB
 
 ---
 
-## 3. Daylight Architectural Studio (`Web UI`)
+## 3. Daylight Architectural Studio (`Web UI v2.6`)
 
-A zero-CDN local management workbench (`http://127.0.0.1:8765`) built with **Daylight Utilitarian Minimalism**, **English by default** with a 1-click **`VI` / `EN` language toggle**, strict `>= 13px` typography, full pagination across every view, and zero horizontal overflow on Desktop (`1440x900`) and Mobile (`375x812`):
+A zero-CDN local management studio (`http://127.0.0.1:8765`) built with **Daylight Utilitarian Minimalism**, **English by default** with a 1-click **`VI` / `EN` language toggle**, **Docked Split-Pane vs Floating Inspector** (`←` Back history, Wide mode, 1-click `Focus in Graph`, `Copy MD`, Edge Unlink `×`, and full untruncated CodeGate regex inspection), **`/` & `Ctrl+K` Federated Command Popover**, collapsible sidebar rail, live L0 Working Memory strip, and zero horizontal overflow on Desktop (`1440x900`) and Mobile (`375x812`):
 
-### 3-Mode Interactive Knowledge Graph (`Force` · `Radial` · `Lanes`)
+### 4-Mode Directed Knowledge Graph (`Force` · `Radial` · `Hierarchy` · `Lanes`) & Split-Pane Studio
 ![Force Network Mode](docs/screenshots/graph_force.png)
 
-![3-Lane Architectural Cards Mode](docs/screenshots/graph_lanes.png)
+![Hierarchy DAG + Docked Split-Pane Inspector](docs/screenshots/hierarchy_split.png)
+
+![Collapsed Rail + 3-Lane Cards + Wide Inspector](docs/screenshots/graph_lanes.png)
 
 ### Paginated OpenSpec Proposals & Single-Variable Experiment Ledger
 ![Paginated Proposals & Ideas Vault](docs/screenshots/proposals_paginated.png)

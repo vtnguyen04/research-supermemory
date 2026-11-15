@@ -4,18 +4,17 @@
 
   class MergeStudioController {
     constructor(getState, postJson, onRefresh, onInspect, notify) {
-      Object.assign(this, { getState, postJson, onRefresh, onInspect, notify, selectedIds: new Set() });
+      Object.assign(this, { getState, postJson, onRefresh, onInspect, notify, selectedIds: new Set(), filterQuery: "" });
       this._bindControls();
     }
 
     render() {
       const state = this.getState();
       const tiers = state.cognitive_tiers || {};
-      const activeTok = tiers.active_prompt_tokens || 0;
-      const totalTok = tiers.total_vault_tokens || 0;
-      const savedPct = tiers.context_compression_pct || 0;
-      const consCount = tiers.consolidated_episodes || 0;
+      const activeTok = tiers.active_prompt_tokens || 0, totalTok = tiers.total_vault_tokens || 0;
+      const savedPct = tiers.context_compression_pct || 0, consCount = tiers.consolidated_episodes || 0;
       const hideCons = document.getElementById("chk-hide-consolidated")?.checked;
+      const q = this.filterQuery.toLowerCase();
 
       document.getElementById("tier-budget-summary").textContent = tr(
         `Active Agent Capsule: ~${activeTok} tok / Total Vault: ~${totalTok} tok (${savedPct}% context saved, ${consCount} L3 episodes consolidated).`,
@@ -30,9 +29,10 @@
       const box = document.getElementById("tier-columns");
       box.innerHTML = cols
         .map((c) => {
-          const items = (state.nodes || []).filter(
-            (n) => n.memory_tier === c.key && (!hideCons || n.status !== "CONSOLIDATED")
-          );
+          const items = (state.nodes || []).filter((n) => {
+            if (n.memory_tier !== c.key || (hideCons && n.status === "CONSOLIDATED")) return false;
+            return !q || `${n.id} ${n.title} ${n.summary} ${n.node_type}`.toLowerCase().includes(q);
+          });
           const pg = paginate(items, `tier-${c.key}`, 5);
           const rows = pg.slice
             .map((n) => {
@@ -76,6 +76,10 @@
     _bindControls() {
       const fb = document.getElementById("merge-feedback");
       document.getElementById("chk-hide-consolidated").addEventListener("change", () => this.render());
+      document.getElementById("tier-filter-input")?.addEventListener("input", (ev) => {
+        this.filterQuery = ev.target.value.trim();
+        this.render();
+      });
       document.getElementById("btn-select-episodic").addEventListener("click", () => {
         (this.getState().nodes || [])
           .filter((n) => n.memory_tier === "EPISODIC" && n.status !== "CONSOLIDATED")
@@ -93,10 +97,7 @@
         const summary = document.getElementById("merge-summary").value.trim();
         const tier = document.getElementById("merge-tier").value;
         if (!ids.length || !title || !summary) {
-          fb.textContent = tr(
-            "Please select at least 1 source item and provide both Title and Synthesized Principle.",
-            "Vui lòng chọn ít nhất 1 mục nguồn và điền đủ Tiêu đề cùng Nguyên lý tổng hợp."
-          );
+          fb.textContent = tr("Select at least 1 source item and provide Title + Synthesized Principle.", "Chọn ít nhất 1 mục nguồn và điền đủ Tiêu đề + Nguyên lý tổng hợp.");
           return;
         }
         try {

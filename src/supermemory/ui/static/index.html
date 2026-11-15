@@ -11,7 +11,7 @@
   <a href="#main-content" class="skip-link" data-vi="Chuyển tới nội dung chính">Skip to main content</a>
 
   <div class="app-shell">
-    <!-- ARCHITECTURAL LEFT SIDEBAR -->
+    <!-- COLLAPSIBLE ARCHITECTURAL LEFT SIDEBAR -->
     <aside class="nav-rail" aria-label="Workspace and module navigation">
       <div class="rail-brand">
         <span class="brand-badge" aria-hidden="true">
@@ -24,9 +24,12 @@
         </span>
         <div class="brand-text">
           <span class="brand-name">SuperMemory</span>
-          <span class="version-tag">Studio 2.5</span>
+          <span class="version-tag">Studio 2.6</span>
         </div>
-        <button type="button" id="btn-lang-toggle" class="btn btn-secondary btn-xs lang-pill" aria-label="Switch language EN / VI">VI</button>
+        <div class="rail-head-btns">
+          <button type="button" id="btn-lang-toggle" class="btn btn-secondary btn-xs lang-pill" aria-label="Switch language EN / VI">VI</button>
+          <button type="button" id="btn-collapse-rail" class="icon-btn" title="Collapse / expand sidebar" data-vi-title="Thu gọn / mở rộng thanh bên" aria-label="Collapse / expand sidebar"><span data-icon="sidebarLeft"></span></button>
+        </div>
       </div>
 
       <div class="workspace-bezel">
@@ -40,32 +43,32 @@
       </div>
 
       <nav class="rail-nav" role="tablist" aria-label="Studio modules">
-        <button type="button" role="tab" id="tabbtn-graph" class="nav-item active" aria-selected="true" aria-controls="tab-graph" data-tab="tab-graph">
+        <button type="button" role="tab" id="tabbtn-graph" class="nav-item active" aria-selected="true" aria-controls="tab-graph" data-tab="tab-graph" title="Knowledge Graph" data-vi-title="Bản đồ Tri thức">
           <span class="nav-icon" data-icon="topology" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Bản đồ Tri thức">Knowledge Graph</span>
           <span id="nav-count-nodes" class="nav-count">0</span>
         </button>
-        <button type="button" role="tab" id="tabbtn-constitution" class="nav-item" aria-selected="false" aria-controls="tab-constitution" tabindex="-1" data-tab="tab-constitution">
+        <button type="button" role="tab" id="tabbtn-constitution" class="nav-item" aria-selected="false" aria-controls="tab-constitution" tabindex="-1" data-tab="tab-constitution" title="Constitution & Gates" data-vi-title="Hiến pháp & Gates">
           <span class="nav-icon" data-icon="shield" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Hiến pháp &amp; Gates">Constitution &amp; Gates</span>
           <span id="nav-count-gates" class="nav-count">0</span>
         </button>
-        <button type="button" role="tab" id="tabbtn-tiers" class="nav-item" aria-selected="false" aria-controls="tab-tiers" tabindex="-1" data-tab="tab-tiers">
+        <button type="button" role="tab" id="tabbtn-tiers" class="nav-item" aria-selected="false" aria-controls="tab-tiers" tabindex="-1" data-tab="tab-tiers" title="Tiers & Consolidation" data-vi-title="Phân tầng & Gộp">
           <span class="nav-icon" data-icon="layers" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Phân tầng &amp; Gộp">Tiers &amp; Consolidation</span>
           <span id="nav-count-episodic" class="nav-count">0</span>
         </button>
-        <button type="button" role="tab" id="tabbtn-experiments" class="nav-item" aria-selected="false" aria-controls="tab-experiments" tabindex="-1" data-tab="tab-experiments">
+        <button type="button" role="tab" id="tabbtn-experiments" class="nav-item" aria-selected="false" aria-controls="tab-experiments" tabindex="-1" data-tab="tab-experiments" title="Experiment Ledger" data-vi-title="Sổ cái Thực nghiệm">
           <span class="nav-icon" data-icon="activity" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Sổ cái Thực nghiệm">Experiment Ledger</span>
           <span id="nav-count-exps" class="nav-count">0</span>
         </button>
-        <button type="button" role="tab" id="tabbtn-lifecycle" class="nav-item" aria-selected="false" aria-controls="tab-lifecycle" tabindex="-1" data-tab="tab-lifecycle">
+        <button type="button" role="tab" id="tabbtn-lifecycle" class="nav-item" aria-selected="false" aria-controls="tab-lifecycle" tabindex="-1" data-tab="tab-lifecycle" title="Proposals & Ideas" data-vi-title="Proposals & Kho Idea">
           <span class="nav-icon" data-icon="gitBranch" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Proposals &amp; Kho Idea">Proposals &amp; Ideas</span>
           <span id="nav-count-props" class="nav-count">0</span>
         </button>
-        <button type="button" role="tab" id="tabbtn-events" class="nav-item" aria-selected="false" aria-controls="tab-events" tabindex="-1" data-tab="tab-events">
+        <button type="button" role="tab" id="tabbtn-events" class="nav-item" aria-selected="false" aria-controls="tab-events" tabindex="-1" data-tab="tab-events" title="System Events" data-vi-title="Nhật ký Hệ thống">
           <span class="nav-icon" data-icon="terminal" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Nhật ký Hệ thống">System Events</span>
         </button>
@@ -111,23 +114,40 @@
         </div>
 
         <div class="command-actions">
-          <div class="search-field">
-            <span class="search-icon" data-icon="search" aria-hidden="true"></span>
-            <label for="global-search" class="sr-only">Federated BM25 and 2-hop graph search</label>
-            <input id="global-search" type="search" placeholder="Search laws, lessons, experiments..." data-vi-ph="Tìm luật, bài học, thực nghiệm..." autocomplete="off" />
-            <kbd class="kbd-hint" id="search-kbd" aria-hidden="true">/</kbd>
-            <button type="button" id="btn-clear-search" class="icon-btn hidden" aria-label="Clear search query">&times;</button>
+          <div class="search-wrap">
+            <div class="search-field">
+              <span class="search-icon" data-icon="search" aria-hidden="true"></span>
+              <label for="global-search" class="sr-only">Federated BM25 search and command palette</label>
+              <input id="global-search" type="search" placeholder="Search Local + Global or run command..." data-vi-ph="Tìm trên Local + Global hoặc chạy lệnh..." autocomplete="off" />
+              <kbd class="kbd-hint" id="search-kbd" aria-hidden="true">/ &middot; ^K</kbd>
+              <button type="button" id="btn-clear-search" class="icon-btn hidden" aria-label="Clear search query">&times;</button>
+            </div>
+            <div id="search-popover" class="search-popover hidden" role="listbox" aria-label="Search results and quick commands"></div>
           </div>
           <button type="button" id="btn-refresh" class="btn btn-secondary" data-vi="Đồng bộ">Sync</button>
           <button type="button" id="btn-open-quick-node" class="btn btn-primary" data-vi="+ Tạo thực thể">+ New Entity</button>
         </div>
       </header>
 
+      <!-- L0 WORKING MEMORY & QUICK NAVIGATION STRIP -->
+      <div id="l0-context-strip" class="l0-strip" aria-label="Working memory context">
+        <div class="l0-left">
+          <span class="l0-tag" data-vi="TRẠNG THÁI L0">L0 STATE</span>
+          <strong id="l0-phase" class="l0-phase">Active Studio</strong>
+          <span class="l0-sep" aria-hidden="true">&middot;</span>
+          <span id="l0-next" class="l0-next" data-vi="Đang tải hành động tiếp theo...">Loading next actions...</span>
+        </div>
+        <div class="l0-right">
+          <div id="l0-kpis" class="l0-kpis"></div>
+          <button type="button" id="btn-toggle-l0" class="btn btn-ghost btn-xs" data-vi="Thu gọn">Compact</button>
+        </div>
+      </div>
+
       <div id="anti-repeat-banner" class="alert-strip hidden" role="status" aria-live="polite"></div>
       <div id="error-banner" class="alert-strip alert-danger hidden" role="alert"></div>
 
       <main id="main-content" class="stage-container">
-        <!-- TAB 1: MULTI-MODE INTERACTIVE KNOWLEDGE GRAPH -->
+        <!-- TAB 1: 4-MODE DIRECTED KNOWLEDGE GRAPH -->
         <section id="tab-graph" role="tabpanel" aria-labelledby="tabbtn-graph" class="tab-panel active">
           <div class="canvas-stage">
             <div class="floating-toolbar">
@@ -135,14 +155,16 @@
                 <div class="segmented-tray" role="group" aria-label="Graph layout mode" id="graph-mode-bar">
                   <button type="button" class="seg-btn" aria-pressed="true" data-gmode="FORCE" data-vi="Mạng tự do">Force</button>
                   <button type="button" class="seg-btn" aria-pressed="false" data-gmode="RADIAL" data-vi="Đồng tâm">Radial</button>
-                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="LANES" data-vi="Phân tầng">Lanes</button>
+                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="HIERARCHY" data-vi="Phân cấp">Hierarchy</button>
+                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="LANES" data-vi="Phân cột">Lanes</button>
                 </div>
                 <div class="segmented-tray" role="group" aria-label="Filter by cognitive tier" id="tier-filters"></div>
+                <span id="graph-stats-pill" class="stats-pill">0/0 nodes</span>
               </div>
               <div class="toolbar-cluster">
                 <label class="checkbox-label toolbar-chk">
                   <input type="checkbox" id="chk-hide-aux" checked />
-                  <span data-vi="Ẩn Audit phụ">Hide Aux Runs</span>
+                  <span data-vi="Ẩn Audit phụ">Hide Aux</span>
                 </label>
                 <label for="type-filter-select" class="sr-only">Filter by entity type</label>
                 <select id="type-filter-select" class="control-select select-compact">
@@ -154,11 +176,12 @@
                   <button type="button" id="btn-zoom-in" class="zoom-btn" aria-label="Zoom in">+</button>
                 </div>
                 <button type="button" id="btn-relayout" class="btn btn-secondary btn-sm" data-vi="Xếp lại">Relayout</button>
+                <button type="button" id="btn-export-png" class="btn btn-secondary btn-sm" title="Export Graph as PNG" data-vi-title="Xuất ảnh PNG đồ thị"><span data-icon="download"></span> PNG</button>
               </div>
             </div>
 
             <div class="canvas-viewport">
-              <canvas id="graph-canvas" tabindex="0" aria-label="Interactive 3-tier knowledge graph. Drag nodes to move, scroll to zoom, click any node to inspect."></canvas>
+              <canvas id="graph-canvas" tabindex="0" aria-label="Interactive 4-mode directed knowledge graph. Drag nodes to move, double-click to unpin, scroll to zoom, click any node to inspect."></canvas>
               <div id="graph-tooltip" class="graph-tooltip hidden" role="tooltip"></div>
 
               <div class="canvas-legend">
@@ -166,7 +189,7 @@
                 <span class="legend-item"><span class="legend-swatch" data-tone="SEMANTIC"></span><span data-vi="L2 Tri thức &amp; Insight">L2 Semantic Insights</span></span>
                 <span class="legend-item"><span class="legend-swatch" data-tone="EXPERIMENT"></span><span data-vi="L3 Thực nghiệm &amp; Proposal">L3 Experiments &amp; Proposals</span></span>
                 <span class="legend-item"><span class="legend-swatch" data-tone="LESSON"></span><span data-vi="Bài học sai lầm">Mistake Lessons</span></span>
-                <span class="legend-hint" data-vi="Kéo thả nút để sắp xếp &middot; Nhấp vào nút để xem chi tiết">Drag nodes to rearrange &middot; Click a node to inspect</span>
+                <span class="legend-hint" data-vi="Kéo để di chuyển &middot; Nhấp đúp bỏ ghim &middot; Nhấp để xem chi tiết">Drag to move &middot; Double-click to unpin &middot; Click to inspect</span>
               </div>
             </div>
           </div>
@@ -178,11 +201,13 @@
             <div class="panel-header">
               <div>
                 <h2 data-vi="Hiến pháp, Chốt chặn CodeGate &amp; Bài học">Constitution, CodeGates &amp; Lessons</h2>
-                <p class="section-subtitle" data-vi="Mọi quy tắc được kiểm tra tức thời tại PreToolUse và đồng bộ trực tiếp vào AGENTS.md của dự án.">Every rule is enforced in real time at PreToolUse and synced directly into AGENTS.md.</p>
+                <p class="section-subtitle" data-vi="Mọi quy tắc được kiểm tra tức thời tại PreToolUse và đồng bộ trực tiếp vào AGENTS.md.">Every rule is enforced in real time at PreToolUse and synced directly into AGENTS.md.</p>
               </div>
               <div class="toolbar-right">
-                <button type="button" id="btn-add-gate" class="btn btn-secondary" data-vi="Thêm Gate / Khóa SHA-256">Add Gate / Freeze SHA-256</button>
-                <button type="button" id="btn-add-lesson" class="btn btn-primary" data-vi="+ Ghi bài học / Thêm Rule">+ Record Lesson / Rule</button>
+                <label for="const-filter-input" class="sr-only">Filter laws, gates, and lessons</label>
+                <input id="const-filter-input" type="search" class="control-input filter-inline" placeholder="Filter laws, gates, regex..." data-vi-ph="Lọc luật, gate, biểu thức regex..." />
+                <button type="button" id="btn-add-gate" class="btn btn-secondary" data-vi="Thêm Gate / SHA-256">Add Gate / Freeze</button>
+                <button type="button" id="btn-add-lesson" class="btn btn-primary" data-vi="+ Ghi bài học / Rule">+ Record Lesson / Rule</button>
               </div>
             </div>
 
@@ -222,13 +247,15 @@
                 <p id="tier-budget-summary" class="section-subtitle">Computing token budget...</p>
               </div>
               <div class="toolbar-right">
+                <label for="tier-filter-input" class="sr-only">Filter cognitive tier items</label>
+                <input id="tier-filter-input" type="search" class="control-input filter-inline" placeholder="Filter L1 / L2 / L3..." data-vi-ph="Tìm thực thể L1 / L2 / L3..." />
                 <label class="checkbox-label">
                   <input type="checkbox" id="chk-hide-consolidated" checked />
                   <span data-vi="Ẩn mục đã gộp">Hide Consolidated</span>
                 </label>
                 <button type="button" id="btn-select-episodic" class="btn btn-secondary" data-vi="Chọn L3 chưa gộp">Select Unmerged L3</button>
                 <button type="button" id="btn-clear-merge-sel" class="btn btn-ghost" data-vi="Bỏ chọn">Clear</button>
-                <button type="button" id="btn-auto-consolidate" class="btn btn-primary" data-vi="Tự động nén theo cụm">Auto-Consolidate Clusters</button>
+                <button type="button" id="btn-auto-consolidate" class="btn btn-primary" data-vi="Tự động nén cụm">Auto-Consolidate</button>
               </div>
             </div>
 
@@ -273,6 +300,18 @@
                 <select id="exp-track-filter" class="control-select select-compact">
                   <option value="ALL">All Tracks</option>
                 </select>
+                <label for="exp-verdict-filter" class="sr-only">Filter by verdict</label>
+                <select id="exp-verdict-filter" class="control-select select-compact">
+                  <option value="ALL" data-vi="Tất cả kết quả">All Verdicts</option>
+                  <option value="WINNERS" data-vi="Đạt / Giữ lại">Winners (KEEP / VICTORY)</option>
+                  <option value="FALSIFIED" data-vi="Thất bại / Hoàn tác">Falsified (REVERT / FAILED)</option>
+                </select>
+                <label for="exp-sort-select" class="sr-only">Sort experiments</label>
+                <select id="exp-sort-select" class="control-select select-compact">
+                  <option value="NEWEST" data-vi="Xếp: Mới nhất">Sort: Newest</option>
+                  <option value="SCORE" data-vi="Xếp: Điểm cao nhất">Sort: Best Score</option>
+                  <option value="DELTA" data-vi="Xếp: Delta cao nhất">Sort: Best Delta</option>
+                </select>
                 <button type="button" id="btn-add-exp" class="btn btn-primary" data-vi="+ Ghi thực nghiệm">+ Log Experiment</button>
               </div>
             </div>
@@ -308,6 +347,8 @@
                 <p class="section-subtitle" data-vi="Kiểm tra chống lặp hướng thất bại trước khi triển khai và lưu vết phê duyệt kiến trúc.">Guard against repeating falsified dead-ends and track architectural audit sign-offs.</p>
               </div>
               <div class="toolbar-right">
+                <label for="lifecycle-filter-input" class="sr-only">Filter proposals and ideas</label>
+                <input id="lifecycle-filter-input" type="search" class="control-input filter-inline" placeholder="Filter proposals & ideas..." data-vi-ph="Lọc proposal, ý tưởng, insight..." />
                 <button type="button" id="btn-add-idea" class="btn btn-secondary" data-vi="Lưu Idea / Dead-End">Log Idea / Dead-End</button>
                 <button type="button" id="btn-add-proposal" class="btn btn-primary" data-vi="+ Tạo Proposal">+ New Proposal</button>
               </div>
@@ -318,7 +359,10 @@
             <div id="proposal-pager" class="standalone-pager"></div>
 
             <div class="subsection-block">
-              <h3 data-vi="Kho Ý tưởng, Thuật toán &amp; Nhận xét Đúc kết">Ideas, Algorithms &amp; Distilled Observations</h3>
+              <div class="subhead-bar">
+                <h3 data-vi="Kho Ý tưởng, Thuật toán &amp; Nhận xét Đúc kết">Ideas, Algorithms &amp; Distilled Observations</h3>
+                <div id="vault-type-bar" class="segmented-tray stage-filter-bar" role="group" aria-label="Filter idea vault types"></div>
+              </div>
               <div id="ideas-grid" class="vault-grid" role="list"></div>
               <div id="ideas-pager" class="standalone-pager"></div>
             </div>
@@ -333,6 +377,11 @@
                 <h2 data-vi="Nhật ký Sự kiện Bất biến">Immutable Audit &amp; System Events</h2>
                 <p class="section-subtitle" data-vi="Lịch sử thời gian thực của các chốt chặn Hook, Kiểm định, Gộp tầng và Cập nhật đồ thị.">Real-time ledger of PreToolUse blocks, audits, consolidations, and graph mutations.</p>
               </div>
+              <div class="toolbar-right">
+                <div id="events-cat-bar" class="segmented-tray stage-filter-bar" role="group" aria-label="Filter event categories"></div>
+                <label for="events-filter-input" class="sr-only">Search events</label>
+                <input id="events-filter-input" type="search" class="control-input filter-inline" placeholder="Filter events..." data-vi-ph="Lọc sự kiện..." />
+              </div>
             </div>
             <div class="surface-card">
               <div id="events-list" class="ledger-list" role="list"></div>
@@ -341,20 +390,26 @@
         </section>
       </main>
     </div>
+
+    <!-- FLEXIBLE DOCKED SPLIT-PANE / FLOATING INSPECTOR -->
+    <aside id="inspector-drawer" class="inspector-sheet" aria-label="Entity inspector and editor" aria-hidden="true">
+      <div class="inspector-top">
+        <div class="inspector-title-group">
+          <span id="insp-badge" class="status-tag" data-vi="CHI TIẾT THỰC THỂ">ENTITY INSPECTOR</span>
+          <h2 id="insp-id" class="inspector-heading" data-vi="Thanh tra thực thể">Entity Details</h2>
+        </div>
+        <div class="inspector-controls">
+          <button type="button" id="btn-insp-back" class="icon-btn" title="Back to previous entity" data-vi-title="Quay lại thực thể trước" aria-label="Back to previous entity" disabled><span data-icon="arrowLeft"></span></button>
+          <button type="button" id="btn-dock-inspector" class="icon-btn" aria-pressed="true" title="Toggle Docked Split-Pane / Floating Overlay" data-vi-title="Chuyển chế độ Ghim chia đôi / Cửa sổ nổi" aria-label="Toggle Docked Split-Pane / Floating Overlay"><span data-icon="dockRight"></span></button>
+          <button type="button" id="btn-wide-inspector" class="icon-btn" aria-pressed="false" title="Toggle Wide Reading Mode" data-vi-title="Mở rộng / Thu hẹp chiều ngang đọc" aria-label="Toggle Wide Reading Mode"><span data-icon="expand"></span></button>
+          <button type="button" id="btn-close-inspector" class="icon-btn" title="Close inspector (Esc)" data-vi-title="Đóng bảng chi tiết (Esc)" aria-label="Close inspector">&times;</button>
+        </div>
+      </div>
+      <div id="insp-body" class="inspector-content"></div>
+    </aside>
   </div>
 
-  <!-- CONTEXTUAL SLIDE-OVER INSPECTOR SHEET -->
   <div id="inspector-backdrop" class="sheet-backdrop hidden" aria-hidden="true"></div>
-  <aside id="inspector-drawer" class="inspector-sheet" aria-label="Entity inspector and editor" aria-hidden="true">
-    <div class="inspector-top">
-      <div class="inspector-title-group">
-        <span id="insp-badge" class="status-tag" data-vi="CHI TIẾT THỰC THỂ">ENTITY INSPECTOR</span>
-        <h2 id="insp-id" class="inspector-heading" data-vi="Thanh tra thực thể">Entity Details</h2>
-      </div>
-      <button type="button" id="btn-close-inspector" class="icon-btn" aria-label="Close inspector">&times;</button>
-    </div>
-    <div id="insp-body" class="inspector-content"></div>
-  </aside>
 
   <!-- NATIVE ACCESSIBLE DIALOG -->
   <dialog id="workbench-dialog" class="workbench-dialog" aria-labelledby="dialog-title">
@@ -371,10 +426,12 @@
   <div id="toast-region" class="toast-region hidden" role="status" aria-live="polite"></div>
 
   <script src="/icons.js"></script>
+  <script src="/graph_layouts.js"></script>
   <script src="/graph_canvas.js"></script>
   <script src="/inspector.js"></script>
   <script src="/merge_studio.js"></script>
   <script src="/modals.js"></script>
+  <script src="/palette.js"></script>
   <script src="/views.js"></script>
   <script src="/app.js"></script>
 </body>

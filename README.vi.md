@@ -1,4 +1,4 @@
-# Research SuperMemory (`v2.5`)
+# Research SuperMemory (`v2.6`)
 
 > Language: **[English (Default)](README.md)** | **Tiếng Việt**
 
@@ -79,14 +79,16 @@ flowchart TB
 
 ---
 
-## 3. Hình ảnh Giao diện Thực tế (`Daylight Architectural Studio`)
+## 3. Hình ảnh Giao diện Thực tế (`Daylight Architectural Studio v2.6`)
 
-Giao diện Web quản trị chạy cục bộ không cần Internet/CDN (`http://127.0.0.1:8765`), thiết kế theo phong cách **Daylight Utilitarian Minimalism**, mặc định **Tiếng Anh (`EN`)** kèm nút chuyển đổi **1-click `VI` / `EN`** ở góc trên thanh bên trái, chữ tối thiểu `>= 13px` dễ đọc, phân trang toàn diện và không tràn viền trên cả Desktop lẫn Mobile:
+Giao diện Web quản trị chạy cục bộ không cần Internet/CDN (`http://127.0.0.1:8765`), thiết kế theo phong cách **Daylight Utilitarian Minimalism**, mặc định **Tiếng Anh (`EN`)** kèm nút **1-click `VI` / `EN`**, hỗ trợ linh hoạt **Ghim chia đôi màn hình (`Docked Split-Pane`) hoặc Cửa sổ nổi (`Floating`)**, mở rộng chiều ngang đọc (`Wide`), nút lùi lịch sử (`←`), **`/` & `Ctrl+K` Command Popover**, thu gọn thanh bên trái, dải trạng thái L0 trực tiếp, và xem/sửa đầy đủ biểu thức Regex của từng `CodeGate`:
 
-### Bản đồ Tri thức Chuyển đổi 3 Chế độ (`Force` · `Radial` · `Lanes`)
+### Bản đồ Tri thức Có hướng 4 Chế độ (`Force` · `Radial` · `Hierarchy` · `Lanes`) & Split-Pane Studio
 ![Chế độ Force Network](docs/screenshots/graph_force.png)
 
-![Chế độ 3-Lane Architectural Cards](docs/screenshots/graph_lanes.png)
+![Chế độ Hierarchy Phân cấp + Docked Split-Pane Inspector](docs/screenshots/hierarchy_split.png)
+
+![Thu gọn Sidebar + 3-Lane Cards + Wide Inspector](docs/screenshots/graph_lanes.png)
 
 ### Quản lý Vòng đời Proposals Phân trang & Sổ cái Thực nghiệm Đơn biến
 ![Proposals & Kho Idea có bộ lọc giai đoạn và phân trang](docs/screenshots/proposals_paginated.png)

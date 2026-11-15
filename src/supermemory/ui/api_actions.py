@@ -134,6 +134,16 @@ def dispatch_store_mutation(route: str, store: GraphStore, body: Dict[str, Any])
         MarkdownCompiler(store).compile_all()
         return {"linked": True, "source_id": src, "target_id": dst, "relation": rel}
 
+    if route == "/api/edge/delete":
+        src = str(body.get("source_id") or "").strip()
+        dst = str(body.get("target_id") or "").strip()
+        rel = str(body.get("relation") or "").strip().upper()
+        if not src or not dst:
+            raise ValueError("Both source_id and target_id are required.")
+        ok = store.delete_edge(src, dst, rel)
+        MarkdownCompiler(store).compile_all()
+        return {"deleted": ok, "source_id": src, "target_id": dst, "relation": rel}
+
     if route == "/api/lessons":
         res = LessonConsolidator(store).record_lesson(
             title=str(body["title"]).strip(),
@@ -164,7 +174,7 @@ def dispatch_store_mutation(route: str, store: GraphStore, body: Dict[str, Any])
         if action == "freeze" or body.get("freeze_path"):
             gate = enf.freeze_file(str(body["freeze_path"]).strip(), law_id=str(body.get("law_id") or "LAW-05"))
         else:
-            gid = LessonConsolidator(store).next_gate_id()
+            gid = str(body.get("id") or "").strip() or LessonConsolidator(store).next_gate_id()
             gtype = str(body.get("gate_type") or "FORBIDDEN_REGEX").upper()
             cfg = {"max_lines": int(body.get("max_lines") or 300)} if gtype == "MAX_LINES" else {"ignore_comments": True}
             gate = store.upsert_gate(

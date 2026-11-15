@@ -160,6 +160,19 @@ class GraphStore:
         )
         self.conn.commit()
 
+    def delete_edge(self, source_id: str, target_id: str, relation: str = "") -> bool:
+        if relation:
+            cur = self.conn.execute(
+                "DELETE FROM edges WHERE source_id = ? AND target_id = ? AND relation = ?",
+                (source_id, target_id, relation),
+            )
+        else:
+            cur = self.conn.execute("DELETE FROM edges WHERE source_id = ? AND target_id = ?", (source_id, target_id))
+        self.conn.commit()
+        if cur.rowcount > 0:
+            self.log_event("EDGE_DELETED", source_id, f"Unlinked {source_id} -[{relation or '*'}]-> {target_id}")
+        return cur.rowcount > 0
+
     def list_edges(self, node_id: Optional[str] = None) -> List[MemoryEdge]:
         if node_id:
             rows = self.conn.execute(

@@ -24,6 +24,11 @@
       if (el.dataset.enPh === undefined) el.dataset.enPh = el.getAttribute("placeholder") || "";
       el.setAttribute("placeholder", curLang === "vi" ? el.dataset.viPh : el.dataset.enPh);
     });
+    document.querySelectorAll("[data-vi-title]").forEach((el) => {
+      if (el.dataset.enTitle === undefined) el.dataset.enTitle = el.getAttribute("title") || "";
+      const val = curLang === "vi" ? el.dataset.viTitle : el.dataset.enTitle;
+      el.setAttribute("title", val); el.setAttribute("aria-label", val);
+    });
     const btn = document.getElementById("btn-lang-toggle");
     if (btn) btn.textContent = curLang === "vi" ? "EN" : "VI";
   }
@@ -111,9 +116,13 @@
     warn: '<path d="M8 2.5l5.75 10.5H2.25L8 2.5z"/><path d="M8 6.5v3M8 11.25h.01"/>',
     x: '<path d="M4.25 4.25l7.5 7.5M11.75 4.25l-7.5 7.5"/>',
     dot: '<circle cx="8" cy="8" r="3"/>',
-    arrowRight: '<path d="M3 8h10M9.5 4.5L13 8l-3.5 3.5"/>',
-    plus: '<path d="M8 3.25v9.5M3.25 8h9.5"/>',
-    lock: '<rect x="3.25" y="7.25" width="9.5" height="6.5" rx="1.5"/><path d="M5.25 7.25V5.2a2.75 2.75 0 015.5 0v2.05"/>',
+    arrowLeft: '<path d="M13 8H3M6.5 4.5L3 8l3.5 3.5"/>',
+    sidebarLeft: '<rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M6.25 2.5v11"/>',
+    dockRight: '<rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M10 2.5v11"/>',
+    expand: '<path d="M2.5 8h11M5.25 5.25L2.5 8l2.75 2.75M10.75 5.25L13.5 8l-2.75 2.75"/>',
+    crosshair: '<circle cx="8" cy="8" r="4.25"/><path d="M8 1.75v2.25M8 12v2.25M1.75 8H4M12 8h2.25"/>',
+    copy: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3 10.5V3.5A1.5 1.5 0 014.5 2h7"/>',
+    download: '<path d="M8 2.25v7.5M5.25 7L8 9.75 10.75 7M3 13.25h10"/>',
   };
 
   function svg(name, size = 16) {
