@@ -6,9 +6,13 @@ import json
 import sys
 from pathlib import Path
 from typing import Any, BinaryIO, Dict, Optional
+from urllib.parse import unquote, urlparse
 
 from supermemory import __version__
+from supermemory.cognitive.federation import resolve_default_workspace, set_active_workspace
 from supermemory.mcp.tool_defs import MCP_TOOLS, execute_mcp_tool
+
+_CLIENT_ROOT: Optional[Path] = None
 
 
 def _read_rpc_message(stream: BinaryIO) -> Optional[Dict[str, Any]]:
@@ -49,6 +53,14 @@ def handle_rpc_request(msg: Dict[str, Any], default_ws: Optional[Path] = None) -
 
     try:
         if method == "initialize":
+            global _CLIENT_ROOT
+            folders = params.get("workspaceFolders") or []
+            raw_uri = str((folders[0].get("uri") if folders and isinstance(folders[0], dict) else "") or params.get("rootUri") or "")
+            if raw_uri.startswith("file://"):
+                cand = Path(unquote(urlparse(raw_uri).path)).resolve()
+                if cand.is_dir():
+                    _CLIENT_ROOT = cand
+                    set_active_workspace(cand)
             client_proto = str(params.get("protocolVersion") or "2024-11-05")
             return {
                 "jsonrpc": "2.0",
@@ -69,8 +81,9 @@ def handle_rpc_request(msg: Dict[str, Any], default_ws: Optional[Path] = None) -
         if method == "tools/call":
             t_name = str(params.get("name") or "")
             t_args = dict(params.get("arguments") or {})
-            if default_ws and not t_args.get("workspace"):
-                t_args["workspace"] = str(default_ws)
+            eff_ws = default_ws or _CLIENT_ROOT
+            if eff_ws and not t_args.get("workspace"):
+                t_args["workspace"] = str(eff_ws)
             out = execute_mcp_tool(t_name, t_args)
             txt = json.dumps(out, ensure_ascii=False, indent=2)
             return {
@@ -93,7 +106,7 @@ def handle_rpc_request(msg: Dict[str, Any], default_ws: Optional[Path] = None) -
 
         if method == "resources/read":
             uri = str(params.get("uri") or "")
-            ws = default_ws or Path.cwd()
+            ws = default_ws or _CLIENT_ROOT or resolve_default_workspace()
             mapping = {
                 "supermemory://active_state": ws / "memory" / "01_ACTIVE_STATE.md",
                 "supermemory://constitution": ws / "memory" / "02_CONSTITUTION_AND_LESSONS.md",

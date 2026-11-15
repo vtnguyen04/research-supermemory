@@ -225,3 +225,38 @@ def federated_recall(
         "anti_repeat_warnings": warnings[:10],
         "results": merged_results[: limit + 10],
     }
+
+
+def set_active_workspace(workspace_root: Path) -> None:
+    """Persist the most recently active project workspace so MCP calls without `workspace` never misroute."""
+    ws = workspace_root.resolve()
+    g_root = get_global_root()
+    if ws == g_root or "plugins/supermemory" in ws.as_posix():
+        return
+    if "pytest-of-" in str(ws) and not os.environ.get("SUPERMEMORY_GLOBAL_DIR", "").strip():
+        return
+    g_root.mkdir(parents=True, exist_ok=True)
+    (g_root / "active_workspace.json").write_text(
+        json.dumps({"path": str(ws), "updated_at": utc_now_iso()}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def resolve_default_workspace(explicit_ws: str = "") -> Path:
+    """Resolve target workspace cleanly, avoiding plugin install directories when `workspace` is omitted."""
+    if explicit_ws and explicit_ws.strip():
+        return Path(explicit_ws.strip()).expanduser().resolve()
+    cwd = Path.cwd().resolve()
+    if "plugins/supermemory" not in cwd.as_posix() and (
+        (cwd / ".supermemory").is_dir() or (cwd / "memory" / "graph_snapshot.json").is_file()
+    ):
+        return cwd
+    act_file = get_global_root() / "active_workspace.json"
+    if act_file.is_file():
+        try:
+            cand = Path(str(json.loads(act_file.read_text(encoding="utf-8")).get("path") or "")).resolve()
+            if cand.is_dir() and "plugins/supermemory" not in cand.as_posix():
+                return cand
+        except (ValueError, OSError):
+            pass
+    return ensure_global_memory() if "plugins/supermemory" in cwd.as_posix() else cwd

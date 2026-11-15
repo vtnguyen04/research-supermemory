@@ -13,6 +13,7 @@ from supermemory.research.bottleneck_engine import (
 )
 from supermemory.research.orchestrator import (
     claim_next_task,
+    clear_completed_tasks,
     complete_task,
     dag_telemetry,
     enqueue_task,
@@ -96,7 +97,7 @@ RESEARCH_MCP_TOOLS: List[Dict[str, Any]] = [
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["plan_sprint", "enqueue", "claim", "complete", "status"],
+                    "enum": ["plan_sprint", "enqueue", "claim", "complete", "clear_done", "status"],
                     "default": "status",
                 },
                 "goal": {"type": "string"},
@@ -247,8 +248,11 @@ def execute_research_mcp_tool(name: str, store: GraphStore, args: Dict[str, Any]
                 store,
                 agent_name=str(args.get("agent_name") or "worker"),
                 role=str(args.get("role") or ""),
+                task_id=str(args.get("task_id") or ""),
             )
             return {"claimed": claimed}
+        if act == "clear_done":
+            return {"cleared": clear_completed_tasks(store)}
         if act == "complete":
             res = complete_task(
                 store,

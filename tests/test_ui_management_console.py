@@ -260,6 +260,18 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
             assert not confirm_rx.search(content), f"Browser confirm/alert detected in {route}"
             if route != "/styles.css":
                 assert 'style="' not in content, f"Inline HTML style attribute detected in {route}"
+
+        defined_classes = set(re.findall(r"\.([a-zA-Z0-9_-]+)", css))
+        for asset_path in sorted([STATIC_DIR / "index.html", *js_files]):
+            src_txt = asset_path.read_text(encoding="utf-8")
+            used_classes = set()
+            for raw_cls in re.findall(r'class="([^"]+)"', src_txt):
+                stripped = re.sub(r"\$\{[^}]*\}", " ", raw_cls)
+                for tok in stripped.split():
+                    if re.match(r"^[a-zA-Z0-9_-]+$", tok) and not tok.endswith("-"):
+                        used_classes.add(tok)
+            missing = sorted(used_classes - defined_classes)
+            assert missing == [], f"{asset_path.name} uses undefined CSS classes: {missing}"
     finally:
         srv.shutdown()
         srv.server_close()

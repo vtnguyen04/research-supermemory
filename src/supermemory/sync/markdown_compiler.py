@@ -74,6 +74,8 @@ class MarkdownCompiler:
             '    MG --> EXPS["memory/03_EXPERIMENTS_REGISTRY.md<br/>(Scientific Ablation Ledger)"]',
             '    MG --> PROPS["memory/04_PROPOSALS/<br/>(OpenSpec Lifecycle Artifacts)"]',
             '    MG --> IDEAS["memory/05_IDEAS_AND_ALGORITHMS/<br/>(Idea Vault & Dead-End Memory)"]',
+            '    MG --> MVAULT["memory/07_METHOD_VAULT/<br/>(Harvested SOTA Method Cards)"]',
+            '    MG --> BNKS["memory/08_BOTTLENECKS/<br/>(Pareto Error Slices & RQs)"]',
             "```",
             "",
             "## 📑 2. Core Memory Nodes",
@@ -161,6 +163,16 @@ class MarkdownCompiler:
             lines.extend(["", "## 🎯 3B. Open Pareto Bottlenecks", ""])
             for b in open_bnks[:4]:
                 lines.append(f"- **`{b.id}`** (`{b.metadata.get('error_share_pct', 0)}%` err | `+{b.metadata.get('ceiling_gain', 0)}` ceil): {b.title}")
+
+        mcards = [
+            m for m in self.store.list_nodes(node_types=[NodeType.METHOD_CARD.value], limit=6)
+            if m.status not in ("REJECTED", "ARCHIVED", "CONSOLIDATED")
+        ]
+        if mcards:
+            lines.extend(["", "## 📚 3C. Harvested SOTA Method Vault (`07_METHOD_VAULT`)", ""])
+            for mc in mcards[:4]:
+                tgt = mc.metadata.get("bottleneck_id") or "General"
+                lines.append(f"- **`{mc.id}`** (`{mc.metadata.get('venue', 'SOTA')} {mc.metadata.get('year', '')}` -> `{tgt}`): {mc.title}")
 
         if proposals:
             lines.extend(["", "## 📋 4. Active Proposals", ""])

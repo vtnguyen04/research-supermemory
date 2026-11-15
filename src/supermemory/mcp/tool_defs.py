@@ -12,6 +12,7 @@ from supermemory.cognitive.federation import (
     federated_recall,
     list_registered_workspaces,
     promote_node_to_global,
+    resolve_default_workspace,
 )
 from supermemory.cognitive.tiers import (
     auto_consolidate_episodic,
@@ -37,16 +38,13 @@ __all__ = ["MCP_TOOLS", "execute_mcp_tool"]
 def _resolve_target_root(args: Dict[str, Any]) -> Path:
     if str(args.get("scope") or "local").lower() == "global":
         return ensure_global_memory()
-    ws = Path(str(args.get("workspace") or Path.cwd())).resolve()
-    if (ws / ".supermemory").is_dir() or (ws / "memory" / "graph_snapshot.json").is_file():
-        return ws
-    return ws
+    return resolve_default_workspace(str(args.get("workspace") or ""))
 
 
 def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
     """Dispatch an MCP tool call against Local or Global SuperMemory (supports short & legacy names)."""
     canon = name[12:] if name.startswith("supermemory_") else name
-    raw_ws = Path(str(args.get("workspace") or Path.cwd())).resolve()
+    raw_ws = resolve_default_workspace(str(args.get("workspace") or ""))
     if canon == "init":
         return init_workspace(
             raw_ws,

@@ -161,7 +161,7 @@ def list_tasks(store: GraphStore, status: str = "", wave: int = 0) -> List[Agent
     return tasks
 
 
-def claim_next_task(store: GraphStore, agent_name: str, role: str = "") -> Optional[Dict[str, Any]]:
+def claim_next_task(store: GraphStore, agent_name: str, role: str = "", task_id: str = "") -> Optional[Dict[str, Any]]:
     """Atomically claim the next dependency-ready, glob-conflict-free task in SQLite WAL."""
     cur = store.conn.cursor()
     cur.execute("BEGIN IMMEDIATE")
@@ -170,7 +170,7 @@ def claim_next_task(store: GraphStore, agent_name: str, role: str = "") -> Optio
         by_id = {t.task_id: t for t in all_tasks}
         running_globs = [g for t in all_tasks if t.status == "RUNNING" for g in t.locked_globs]
         for cand in all_tasks:
-            if cand.status != "QUEUED" or (role and cand.role != role):
+            if cand.status != "QUEUED" or (role and cand.role != role) or (task_id and cand.task_id != task_id):
                 continue
             if not all((by_id.get(d) is not None and by_id[d].status == "DONE") for d in cand.depends_on):
                 continue
@@ -242,3 +242,12 @@ def dag_telemetry(store: GraphStore) -> Dict[str, Any]:
         and not _globs_conflict(t.locked_globs, running_globs)
     ]
     return {"total_tasks": len(tasks), "counts_by_status": by_status, "ready_parallel_task_ids": ready, "active_glob_leases": active_leases}
+
+
+def clear_completed_tasks(store: GraphStore) -> int:
+    """Remove finished/cancelled DAG tasks so new sprints remain uncluttered."""
+    cur = store.conn.execute(
+        "DELETE FROM agent_tasks WHERE status IN ('DONE', 'FAILED', 'EARLY_KILLED', 'CANCELLED_BY_KILL_GATE', 'SKIPPED')"
+    )
+    store.conn.commit()
+    return int(cur.rowcount or 0)

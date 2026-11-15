@@ -253,3 +253,34 @@ def test_hook_compaction_recovery_and_stop_lesson_lock(tmp_path: Path) -> None:
         },
     )
     assert stop_3["decision"] == "allow"
+
+
+def test_research_campaign_routing_and_zero_amnesia_persistence(tmp_path: Path, monkeypatch: object) -> None:
+    from supermemory.cognitive.tiers import build_tiered_capsule
+    from supermemory.mcp.tool_defs import execute_mcp_tool
+
+    mp = monkeypatch  # type: ignore[assignment]
+    mp.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_mem"))
+    proj_dir = tmp_path / "proj_research"
+    fake_plugin_cwd = tmp_path / "config" / "plugins" / "supermemory"
+    fake_plugin_cwd.mkdir(parents=True, exist_ok=True)
+    init_workspace(proj_dir, project_name="ResearchPersistence")
+    conv = "conv-research-001"
+    pre = dispatch_hook("PreInvocation", {"conversationId": conv, "workspacePaths": [str(proj_dir)], "invocationNum": 1, "initialNumSteps": 2, "lastUserInput": "Hãy nghiên cứu tìm paper SOTA trên arXiv để xử lý điểm nghẽn của mô hình này"})
+    msg = pre["injectSteps"][0]["systemMessage"]["systemMessage"]
+    assert "RESEARCH AUTO-ROUTING ACTIVE" in msg and "08_BOTTLENECKS" in msg and "07_METHOD_VAULT" in msg
+
+    dispatch_hook("PostToolUse", {"conversationId": conv, "workspacePaths": [str(proj_dir)], "toolCall": {"name": "search_web", "args": {"query": "arxiv mpc"}}})
+    stop_hold = dispatch_hook("Stop", {"conversationId": conv, "workspacePaths": [str(proj_dir)], "continuationActive": False, "terminationReason": "NO_TOOL_CALL"})
+    assert stop_hold["decision"] == "continue" and "RESEARCH VAULT COMMIT REQUIRED" in stop_hold["reason"]
+
+    # Even if MCP server cwd is plugins/supermemory and `workspace` is omitted, auto-routes to proj_dir!
+    mp.chdir(fake_plugin_cwd)
+    execute_mcp_tool("diagnose_bottleneck", {"title": "Thermal Overshoot", "evidence_slice": "Night slice", "error_share_pct": 55, "ceiling_gain": 0.12, "falsifiable_rq": "Does MPC bound overshoot?"})
+    execute_mcp_tool("scout_sota", {"action": "register_card", "title": "Tube MPC Bound", "core_mechanism": "Tightened invariant tube", "bottleneck_id": "BNK-001", "venue": "ICML", "year": 2025})
+    with GraphStore(proj_dir) as store:
+        capsule = build_tiered_capsule(store)
+    assert not (fake_plugin_cwd / "memory").exists()
+    assert any((proj_dir / "memory" / "08_BOTTLENECKS").glob("BNK-001*.md"))
+    assert any((proj_dir / "memory" / "07_METHOD_VAULT").glob("METH-001*.md"))
+    assert "BNK-001" in capsule and "METH-001" in capsule

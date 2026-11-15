@@ -66,6 +66,17 @@ _DIRECTIVE_PATTERNS: List[Tuple[str, str]] = [
     ("ARCHITECTURE_SPEC", r"(?:thiết kế hệ thống theo kiến trúc|vòng đời proposal rõ ràng)"),
 ]
 
+_EXPLAIN_ONLY_GUARD = re.compile(
+    r"^(?:tại sao lại dùng|vì sao lại dùng|giải thích giúp|explain how|why does this use)\b",
+    flags=re.IGNORECASE | re.UNICODE,
+)
+
+_RESEARCH_INTENT_RE = re.compile(
+    r"(?:\b(?:research|literature\s+review|paper\s+search|arxiv|semantic\s*scholar|openalex|sota\s+(?:method|paper|approach|idea)s?|scout\s+sota|diagnose\s+bottleneck|find\s+bottleneck|error\s+slice)\b"
+    r"|(?:nghiên\s+cứu|tìm\s+paper|săn\s+paper|bài\s+báo\s+(?:sota|mới|khoa\s+học)|điểm\s+nghẽn|chẩn\s+đoán\s+lỗi|tìm\s+bottleneck|đề\s+xuất\s+(?:phương\s+pháp|hướng|ý\s+tưởng|thuật\s+toán)|tìm\s+hướng\s+cải\s+tiến))",
+    flags=re.IGNORECASE | re.UNICODE,
+)
+
 _CATEGORY_TO_DEFAULT_LAW: Dict[str, str] = {
     "NEW_USER_RULE": "LAW-08",
     "HARDCODING_LEAKAGE": "LAW-01",
@@ -137,5 +148,16 @@ class SelfLearningDetector:
                     f"Persist updated project targets/architecture via MCP `update_state` if scope changed."
                 )
                 return UserSignal(False, True, d_cat, "LAW-07", 75, excerpt, guidance)
+
+        if len(text) >= 18 and not _EXPLAIN_ONLY_GUARD.search(text) and _RESEARCH_INTENT_RE.search(text):
+            guidance = (
+                "🔬 SUPERMEMORY RESEARCH AUTO-ROUTING ACTIVE (ZERO-AMNESIA VAULT PROTOCOL):\n"
+                "1. Recall First: Query MCP `recall` (`include_siblings=True`) so prior wins & dead-ends are never repeated.\n"
+                "2. Persist Every Finding to Its Canonical Vault Before Ending Turn:\n"
+                "   • Error Slices & Falsifiable RQs -> `diagnose_bottleneck` (`memory/08_BOTTLENECKS/BNK-XXX.md` + `RQ-XXX`)\n"
+                "   • Papers & SOTA Mechanisms -> `scout_sota` (`memory/07_METHOD_VAULT/METH-XXX.md`, `save_top_k>=1` or `action='register_card'`)\n"
+                "   • Candidate Ideas / Dead-Ends / Specs -> `propose_idea` or `manage_proposal` (`memory/05_IDEAS_AND_ALGORITHMS/` & `memory/04_PROPOSALS/`)"
+            )
+            return UserSignal(False, True, "RESEARCH_CAMPAIGN", "LAW-06", 84, excerpt, guidance)
 
         return UserSignal(False, False, "NONE", "", 0, excerpt, "")

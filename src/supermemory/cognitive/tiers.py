@@ -128,6 +128,16 @@ def build_tiered_capsule(store: GraphStore, query: str = "", global_rules: List[
             for b in bottlenecks[:3]
         )
         lines.append(f"• [L0 BOTTLENECKS — Fix Highest Pareto First]: {bnk_txt}")
+    mcards = [
+        m for m in store.list_nodes(node_types=[NodeType.METHOD_CARD.value], limit=6)
+        if m.status not in ("REJECTED", "ARCHIVED", "CONSOLIDATED")
+    ]
+    if mcards:
+        mc_txt = " | ".join(
+            f"`{m.id}`({m.metadata.get('venue', 'SOTA')} {m.metadata.get('year', '')}) {m.title[:38]}"
+            for m in mcards[:3]
+        )
+        lines.append(f"• [L2 METHOD VAULT — Saved SOTA Cards]: {mc_txt}")
 
     lines.append(f"• [L1 PROCEDURAL] {len(laws)} Laws | {len(procs)} Procedures | {len(gates)} PreToolUse Gates:")
     for lw in laws[:10]:

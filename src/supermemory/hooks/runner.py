@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from supermemory.cognitive.federation import ensure_global_memory, federated_recall
+from supermemory.cognitive.federation import ensure_global_memory, federated_recall, set_active_workspace
 from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.models import NodeType
@@ -18,6 +18,10 @@ from supermemory.storage.sqlite_store import GraphStore
 
 _BENCHMARK_CMD_RE = re.compile(
     r"\b(?:python3?|uv\s+run|bash|sh)\b.*\b(?:train|eval|evaluate|benchmark|ablation|run_submission|run_exp)\w*",
+    flags=re.IGNORECASE,
+)
+_RESEARCH_CMD_RE = re.compile(
+    r"\b(?:export\.arxiv\.org|arxiv\.org|semanticscholar\.org|api\.openalex\.org|huggingface\.co/papers)\b",
     flags=re.IGNORECASE,
 )
 
@@ -71,6 +75,7 @@ def dispatch_hook(event_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         return {}
 
     with GraphStore(ws) as store:
+        set_active_workspace(ws)
         if ev == "SessionStart":
             return _on_session_start(store, conv_id)
         if ev == "PreInvocation":
@@ -110,6 +115,7 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
     if user_input and user_input != st.get("last_seen_user_input"):
         st["last_seen_user_input"] = user_input
         st["turn_memory_handled"] = False
+        st["research_campaign_active"] = False
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
 
@@ -119,10 +125,20 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
             st["pending_lesson_quote"] = user_input
             st["pending_lesson_category"] = sig.category
             injected_msgs.append(sig.guidance)
+        elif sig.category == "RESEARCH_CAMPAIGN":
+            st["research_campaign_active"] = True
+            injected_msgs.append(sig.guidance)
 
         # Only inject anti-repeat recall if query is substantial and hits a concrete high-BM25 warning
         if len(user_input.strip()) >= 28:
-            rec = federated_recall(user_input, local_ws=store.workspace_root, include_global=True, limit=3, hops=1)
+            rec = federated_recall(
+                user_input,
+                local_ws=store.workspace_root,
+                include_global=True,
+                include_siblings=bool(st.get("research_campaign_active")),
+                limit=3,
+                hops=1,
+            )
             high_hit = any(float(r.get("score") or 0) >= 8.5 for r in rec.get("results") or [])
             if high_hit and rec["anti_repeat_warnings"]:
                 warn_block = "⚠️ SUPERMEMORY ANTI-REPEAT RECALL:\n" + "\n".join(
@@ -187,14 +203,27 @@ def _on_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) 
         st["turn_memory_handled"] = True
 
     sm_cli = ("supermemory sync", "supermemory exp", "supermemory learn", "supermemory idea", "supermemory proposal", "supermemory gate", "supermemory checkpoint", "supermemory consolidate", "supermemory promote", "supermemory bottleneck", "supermemory scout", "supermemory orchestrate")
-    sm_mcp = ("update_state", "log_experiment", "record_lesson", "link_knowledge", "manage_proposal", "propose_idea", "add_gate", "checkpoint", "consolidate", "diagnose_bottleneck", "scout_sota", "orchestrate")
+    sm_mcp = ("update_state", "log_experiment", "record_lesson", "link_knowledge", "manage_proposal", "propose_idea", "add_gate", "checkpoint", "consolidate", "diagnose_bottleneck")
+    raw_inner = t_args.get("Arguments")
+    inner_args: Dict[str, Any] = raw_inner if isinstance(raw_inner, dict) else t_args
+    scout_persisted = is_sm_mcp and (norm_mcp == "scout_sota" or "scout_sota" in t_name) and (
+        str(inner_args.get("action") or "search").lower() == "register_card" or int(inner_args.get("save_top_k") or 0) > 0
+    )
+    scout_readonly = is_sm_mcp and (norm_mcp == "scout_sota" or "scout_sota" in t_name) and not scout_persisted
 
-    if (any(m in cmd for m in sm_cli) or (is_sm_mcp and (norm_mcp in sm_mcp or any(m in t_name for m in sm_mcp)))) and not err:
+    if (any(m in cmd for m in sm_cli) or scout_persisted or (is_sm_mcp and (norm_mcp in sm_mcp or any(m in t_name for m in sm_mcp)))) and not err:
         st["turn_memory_handled"] = True
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
     elif t_name in ("run_command", "bash") and _BENCHMARK_CMD_RE.search(cmd):
         st["pending_sync_reason"] = f"Benchmark/experiment executed (`{cmd[:60]}`)"
+        st["turn_memory_handled"] = False
+    elif not err and not st.get("turn_memory_handled") and (
+        scout_readonly
+        or (t_name in ("search_web", "read_url_content") and st.get("research_campaign_active"))
+        or (t_name in ("run_command", "bash") and _RESEARCH_CMD_RE.search(cmd))
+    ):
+        st["pending_sync_reason"] = "Research/literature lookup executed without saving distilled findings to SuperMemory Vault"
         st["turn_memory_handled"] = False
 
     if t_name in ("write_file", "edit_file", "replace_file_content", "multi_replace_file_content") and not err:
@@ -236,6 +265,15 @@ def _on_stop(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[s
         st["turn_memory_handled"] = True
         st["pending_sync_reason"] = ""
         save_session_state(store, st)
+        if "Research/literature" in reason_txt:
+            return {
+                "decision": "continue",
+                "reason": (
+                    f"🔬 SUPERMEMORY RESEARCH VAULT COMMIT REQUIRED (LAW-06 / LAW-07): {reason_txt}. "
+                    "Persist distilled findings to `08_BOTTLENECKS` (`diagnose_bottleneck`), `07_METHOD_VAULT` "
+                    "(`scout_sota` with `save_top_k>=1` or `register_card`), or `05_IDEAS_AND_ALGORITHMS` (`propose_idea`) before stopping."
+                ),
+            }
         return {
             "decision": "continue",
             "reason": (

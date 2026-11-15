@@ -174,6 +174,8 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
             "dirty_files": [],
             "unlogged_exp_cmds": [],
             "turn_memory_handled": False,
+            "research_campaign_active": False,
+            "last_heartbeat_bucket": 0,
             "last_seen_user_input": "",
             "pending_sync_reason": "",
             "compaction_count": 0,
@@ -190,6 +192,8 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
         "dirty_files": json.loads(row["dirty_files_json"] or "[]"),
         "unlogged_exp_cmds": list(extra_obj.get("cmds") or []),
         "turn_memory_handled": bool(extra_obj.get("turn_memory_handled", False)),
+        "research_campaign_active": bool(extra_obj.get("research_campaign_active", False)),
+        "last_heartbeat_bucket": int(extra_obj.get("last_heartbeat_bucket", 0)),
         "last_seen_user_input": str(extra_obj.get("last_seen_user_input") or ""),
         "pending_sync_reason": str(extra_obj.get("pending_sync_reason") or ""),
         "compaction_count": int(row["compaction_count"]),
@@ -201,6 +205,8 @@ def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
     extra_envelope = {
         "cmds": list(state.get("unlogged_exp_cmds") or []),
         "turn_memory_handled": bool(state.get("turn_memory_handled", False)),
+        "research_campaign_active": bool(state.get("research_campaign_active", False)),
+        "last_heartbeat_bucket": int(state.get("last_heartbeat_bucket", 0)),
         "last_seen_user_input": str(state.get("last_seen_user_input") or ""),
         "pending_sync_reason": str(state.get("pending_sync_reason") or ""),
     }

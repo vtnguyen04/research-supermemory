@@ -33,10 +33,14 @@ def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True
         f"## ⚖️ 1. Non-Negotiable Constitutional Laws (Enforced by PreToolUse & Audit Gates)\n\n"
         f"{law_bullets}\n\n"
         f"---\n\n"
-        f"## 🔄 2. Selective High-Signal Memory Loop (Anti-Spam)\n\n"
-        f"1. **Progressive Recall (`L1 PROCEDURAL` + `L2 SEMANTIC`):** Query MCP `recall` before proposing/coding non-trivial features so falsified dead-ends are never repeated.\n"
-        f"2. **Selective Self-Learning (Never Spam on Casual Chat):** Call MCP `record_lesson` (+ `CodeGate`) **ONLY** for explicit user rules/preferences (`scope='local'` or `'global'`) or genuine technical bug post-mortems — NEVER on casual clarifications. Log real benchmarks via MCP `log_experiment` ([03_EXPERIMENTS_REGISTRY.md](memory/03_EXPERIMENTS_REGISTRY.md)).\n"
-        f"3. **Clean Code (`< {max_lines}` lines/file) & Full-Tab UI Visual Audit:** Keep [00_MEMORY_GRAPH.md](memory/00_MEMORY_GRAPH.md) & `01_ACTIVE_STATE.md` synced on milestone completions, and visually inspect ALL UI tabs/viewports after any frontend change.\n"
+        f"## 🔄 2. Selective High-Signal Memory Loop & Deterministic Research Vault Routing\n\n"
+        f"1. **Progressive Recall (`L1 PROCEDURAL` + `L2 SEMANTIC`):** Query MCP `recall` (`include_siblings=True` for R&D) before proposing/coding non-trivial features so prior wins are reused and falsified dead-ends are never repeated.\n"
+        f"2. **Zero-Amnesia Research Vault Routing (Enforced at `PreInvocation` & `Stop`):** Whenever researching bottlenecks, papers, or SOTA methods, ALWAYS persist distilled findings to their canonical vault before ending the turn:\n"
+        f"   - **Error Slices & RQs:** `diagnose_bottleneck` -> `memory/08_BOTTLENECKS/BNK-XXX.md` + `RQ-XXX`\n"
+        f"   - **Papers & SOTA Mechanisms:** `scout_sota` (`save_top_k>=1` or `register_card`) -> `memory/07_METHOD_VAULT/METH-XXX.md`\n"
+        f"   - **Candidate Ideas / Dead-Ends / Specs:** `propose_idea` / `manage_proposal` -> `memory/05_IDEAS_AND_ALGORITHMS/` & `memory/04_PROPOSALS/`\n"
+        f"3. **Selective Self-Learning (Never Spam on Casual Chat):** Call MCP `record_lesson` (+ `CodeGate`) **ONLY** for explicit user rules/preferences (`scope='local'` or `'global'`) or genuine technical bug post-mortems — NEVER on casual clarifications. Log real benchmarks via MCP `log_experiment` ([03_EXPERIMENTS_REGISTRY.md](memory/03_EXPERIMENTS_REGISTRY.md)).\n"
+        f"4. **Clean Code (`< {max_lines}` lines/file) & Full-Tab UI Visual Audit:** Keep [00_MEMORY_GRAPH.md](memory/00_MEMORY_GRAPH.md) & `01_ACTIVE_STATE.md` synced on milestone completions, and visually inspect ALL UI tabs/viewports after any frontend change.\n"
     )
 
     written: Dict[str, str] = {}

@@ -13,6 +13,7 @@ from supermemory.research.bottleneck_engine import (
 )
 from supermemory.research.orchestrator import (
     claim_next_task,
+    clear_completed_tasks,
     complete_task,
     dag_telemetry,
     enqueue_task,
@@ -137,7 +138,16 @@ def dispatch_research_mutation(route: str, store: GraphStore, body: Dict[str, An
             MarkdownCompiler(store).compile_all()
             return {"task": task.to_dict()}
         if act == "claim":
-            return {"claimed": claim_next_task(store, agent_name=str(body.get("agent_name") or "ui-worker"), role=str(body.get("role") or ""))}
+            return {
+                "claimed": claim_next_task(
+                    store,
+                    agent_name=str(body.get("agent_name") or "ui-worker"),
+                    role=str(body.get("role") or ""),
+                    task_id=str(body.get("task_id") or "").strip(),
+                )
+            }
+        if act == "clear_done":
+            return {"cleared": clear_completed_tasks(store)}
         if act == "complete":
             receipt = body.get("receipt") if isinstance(body.get("receipt"), dict) else {"note": str(body.get("note") or "")}
             res = complete_task(store, task_id=str(body["task_id"]).strip(), status=str(body.get("status") or "DONE"), receipt=receipt)
