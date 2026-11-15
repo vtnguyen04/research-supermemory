@@ -1,6 +1,6 @@
 // Interactive 4-Column Drag-and-Drop Kanban Board & Granular Task Execution List
 (function () {
-  const { esc, statusTag, inlineMd, tr } = window.SuperMemoryIcons;
+  const { esc, statusTag, inlineMd, tr, paginate, bindPagers } = window.SuperMemoryIcons;
   const { buildKanbanItems, openTaskModal, inspectTaskInDrawer } = window.SuperMemoryKanbanModals;
 
   class KanbanBoardController {
@@ -106,9 +106,9 @@
         mount.innerHTML = `<div class="kanban-board">${cols.map(([cKey, cTitle]) => {
           const cItems = items.filter((x) => x.col === cKey);
           const cards = cItems.length ? cItems.map((it) => {
-            const stepsHtml = it.steps.slice(0, 3).map((s, idx) => `<label class="subtask-row ${s.done ? "is-done" : ""}" title="${esc(s.text)}">
+            const stepsHtml = it.steps.slice(0, 2).map((s, idx) => `<label class="subtask-row ${s.done ? "is-done" : ""}" title="${esc(s.text)}">
               <input type="checkbox" data-step-chk="${idx}" data-step-id="${esc(it.id)}" data-step-kind="${it.kind}" ${s.done ? "checked" : ""} /><span>${esc(s.text)}</span></label>`).join("");
-            const more = it.steps.length > 3 ? `<span class="subtask-more">+${it.steps.length - 3} ${tr("more", "bước nữa")}</span>` : "";
+            const more = it.steps.length > 2 ? `<span class="subtask-more">+${it.steps.length - 2} ${tr("more", "bước nữa")}</span>` : "";
             const chipTxt = it.wave ? `W${it.wave} · ${it.badge}` : it.badge;
             const actBtn = cKey === "IN_PROGRESS"
               ? `<button type="button" class="btn btn-primary btn-xs" data-kmove="DONE" data-kid="${esc(it.id)}" data-kkind="${it.kind}">${tr("Done", "Hoàn tất")}</button>`
@@ -116,8 +116,8 @@
                 ? `<button type="button" class="btn btn-ghost btn-xs" data-kmove="READY" data-kid="${esc(it.id)}" data-kkind="${it.kind}">${tr("Requeue", "Chạy lại")}</button>`
                 : `<button type="button" class="btn btn-secondary btn-xs" data-kmove="IN_PROGRESS" data-kid="${esc(it.id)}" data-kkind="${it.kind}">${tr("Start", "Bắt đầu")}</button>`;
             return `<article class="kanban-card" draggable="true" data-drag-id="${esc(it.id)}" data-drag-kind="${it.kind}" data-task-id="${esc(it.id)}">
-              <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(it.id)}</span>${statusTag(it.status)}</span><span class="role-chip" title="${esc(chipTxt)}">${esc(chipTxt)}</span></div>
-              <h4 class="kanban-card-title" data-open-id="${esc(it.id)}" data-open-kind="${it.kind}">${esc(it.title)}</h4>
+              <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(it.id)}</span>${statusTag(it.status)}</span>${chipTxt ? `<span class="role-chip" title="${esc(chipTxt)}">${esc(chipTxt)}</span>` : ""}</div>
+              <h4 class="kanban-card-title" title="${esc(it.title)}" data-open-id="${esc(it.id)}" data-open-kind="${it.kind}">${esc(it.title)}</h4>
               <div class="pareto-row"><span>${it.stepsDone}/${it.stepsTotal} ${tr("steps", "bước")}</span><strong>${it.pct}%</strong></div>
               <progress class="pareto-meter kanban-meter" max="100" value="${it.pct}"></progress>
               ${stepsHtml ? `<div class="subtask-list subtask-compact">${stepsHtml}${more}</div>` : ""}
@@ -128,12 +128,14 @@
           return `<section class="kanban-col" data-kcol="${cKey}" aria-label="${esc(cTitle)}"><header class="kanban-col-head"><h3>${esc(cTitle)}</h3><span class="nav-count">${cItems.length}</span></header><div class="kanban-col-body">${cards}</div></section>`;
         }).join("")}</div>`;
       } else {
-        mount.innerHTML = items.length ? `<div class="task-list-stack">${items.map((it) => {
+        const pg = paginate(items, `klist-${this.sourceFilter}`, 6);
+        mount.innerHTML = items.length ? `<div class="task-list-stack">${pg.slice.map((it) => {
+          const chipLbl = it.wave ? `Wave ${it.wave} · ${it.badge}` : (it.badge || it.kind);
           const allSteps = it.steps.map((s, idx) => `<label class="subtask-row ${s.done ? "is-done" : ""}">
             <input type="checkbox" data-step-chk="${idx}" data-step-id="${esc(it.id)}" data-step-kind="${it.kind}" ${s.done ? "checked" : ""} /><span>${esc(s.text)}</span></label>`).join("");
           return `<article class="surface-card task-list-card" data-task-id="${esc(it.id)}">
             <div class="row-top">
-              <span class="badge-cluster"><span class="mono-id">${esc(it.id)}</span>${statusTag(it.status)}<span class="role-chip">${esc(it.wave ? `Wave ${it.wave} · ${it.badge}` : it.badge)}</span>${it.worker ? `<span class="mono-tag">Worker: ${esc(it.worker)}</span>` : ""}${it.globs.length ? `<span class="mono-tag">Lease: ${esc(it.globs.join(", "))}</span>` : ""}</span>
+              <span class="badge-cluster"><span class="mono-id">${esc(it.id)}</span>${statusTag(it.status)}<span class="role-chip">${esc(chipLbl)}</span>${it.worker ? `<span class="mono-tag">Worker: ${esc(it.worker)}</span>` : ""}${it.globs.length ? `<span class="mono-tag">Lease: ${esc(it.globs.join(", "))}</span>` : ""}</span>
               <div class="row-actions">
                 <strong class="mono-tag">${it.stepsDone}/${it.stepsTotal} &middot; ${it.pct}%</strong>
                 ${it.col !== "IN_PROGRESS" ? `<button type="button" class="btn btn-secondary btn-xs" data-kmove="IN_PROGRESS" data-kid="${esc(it.id)}" data-kkind="${it.kind}">${tr("Start", "Bắt đầu")}</button>` : ""}
@@ -142,7 +144,7 @@
               </div>
             </div>
             <h3 class="row-title">${esc(it.title)}</h3>
-            <p class="row-desc">${inlineMd(it.summary)}</p>
+            <p class="row-desc line-clamp-3">${inlineMd(it.summary)}</p>
             <progress class="pareto-meter kanban-meter" max="100" value="${it.pct}"></progress>
             <div class="subtask-list task-list-grid">${allSteps}</div>
             <form class="step-add-row" data-list-step-form="${esc(it.id)}" data-list-step-kind="${it.kind}" novalidate>
@@ -150,8 +152,9 @@
               <button type="submit" class="btn btn-secondary btn-xs">+ ${tr("Add Step", "Thêm bước")}</button>
             </form>
           </article>`;
-        }).join("")}</div>` : `<div class="surface-card empty-state"><p class="empty-desc">${tr("No matching tasks or proposals. Create a new task or plan a 3-Wave Sprint.", "Không tìm thấy tác vụ phù hợp. Hãy tạo Task mới hoặc lập Sprint 3-Wave.")}</p></div>`;
+        }).join("")}${pg.html ? `<div class="standalone-pager">${pg.html}</div>` : ""}</div>` : `<div class="surface-card empty-state"><p class="empty-desc">${tr("No matching tasks or proposals. Create a new task or plan a 3-Wave Sprint.", "Không tìm thấy tác vụ phù hợp. Hãy tạo Task mới hoặc lập Sprint 3-Wave.")}</p></div>`;
       }
+      bindPagers(mount, () => this.render(this.ctx.getState()));
       this._bindStageEvents(mount);
     }
 

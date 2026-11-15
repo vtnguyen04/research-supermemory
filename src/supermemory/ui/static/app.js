@@ -5,8 +5,9 @@
   const { MergeStudioController } = window.SuperMemoryMergeStudio, { ModalController } = window.SuperMemoryModals;
   const { SearchPaletteController } = window.SuperMemoryPalette, Views = window.SuperMemoryViews;
   const { ResearchHubController } = window.SuperMemoryResearchHub, { KanbanBoardController } = window.SuperMemoryKanbanBoard;
+  const UI_VER = document.querySelector('meta[name="sm-version"]')?.content || "";
   let state = { nodes: [], edges: [], gates: [], experiments: [], events: [], meta: {}, analytics: {}, cognitive_tiers: {}, workspaces: [] };
-  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, liveTimer = null;
+  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, liveTimer = null, lastFetch = 0;
   let graphView = null, inspector = null, mergeStudio = null, modals = null, researchHub = null, kanbanBoard = null, activateTabFn = null;
 
   function toast(msg, isError = false) {
@@ -53,7 +54,9 @@
     try {
       const res = await fetch(`/api/graph?scope=${encodeURIComponent(currentScope)}`);
       if (!res.ok) throw new Error(tr(`Failed to load graph (HTTP ${res.status})`, `Không thể tải dữ liệu đồ thị (HTTP ${res.status})`));
-      state = await res.json(); graphView.setData(state.nodes, state.edges); rerenderAll();
+      state = await res.json(); lastFetch = Date.now();
+      if (state.ui_version && UI_VER && state.ui_version !== UI_VER) { location.reload(); return; }
+      graphView.setData(state.nodes, state.edges); rerenderAll();
       const qs = new URLSearchParams(window.location.search), qMode = qs.get("mode"), qInspect = qs.get("inspect");
       if (qMode && ["FORCE", "RADIAL", "HIERARCHY", "LANES"].includes(qMode.toUpperCase())) setGraphMode(qMode.toUpperCase());
       if (qInspect && !inspector.currentNodeId) { graphView.selectedId = qInspect; inspector.inspect(qInspect); }
@@ -65,21 +68,18 @@
   }
 
   function renderWorkspaceSwitcher() {
-    const sel = document.getElementById("workspace-switcher"); sel.innerHTML = "";
-    let matched = false;
+    const sel = document.getElementById("workspace-switcher"); sel.innerHTML = ""; let matched = false;
     (state.workspaces || []).forEach((w) => {
-      const opt = document.createElement("option");
-      opt.value = w.id === "global" ? "global" : w.path;
-      opt.textContent = w.id === "global" ? tr("Global: All Workspaces", "Global: Tất cả dự án") : `Local: ${w.name}`;
+      const opt = Object.assign(document.createElement("option"), { value: w.id === "global" ? "global" : w.path, textContent: w.id === "global" ? tr("Global: All Workspaces", "Global: Tất cả dự án") : `Local: ${w.name}` });
       if ((currentScope === "global" && w.id === "global") || w.path === state.workspace_path) { opt.selected = true; matched = true; }
       sel.appendChild(opt);
     });
-    if (!matched) { const opt = document.createElement("option"); opt.value = "local"; opt.textContent = `Local: ${state.project}`; opt.selected = true; sel.prepend(opt); }
+    if (!matched) sel.prepend(Object.assign(document.createElement("option"), { value: "local", textContent: `Local: ${state.project}`, selected: true }));
   }
 
   function renderCommandAndTelemetry() {
     const meta = state.meta || {}, nodes = state.nodes || [], gates = state.gates || [], exps = state.experiments || [], ov = state.execution_overview || {};
-    const flat = (s) => String(s || "").replace(/\\n|\s+/g, " ").trim();
+    const flat = (s) => String(s || "").replace(/^\s*\[['"]?|['"]?\]\s*$/g, "").replace(/['"],\s*['"]/g, " · ").replace(/\\n|\s+/g, " ").trim();
     const setTxt = (id, v, tip = false) => { const el = document.getElementById(id); if (el) { el.textContent = v; if (tip) el.title = String(v); } };
     setTxt("scope-indicator", state.is_global ? "GLOBAL" : "LOCAL"); setTxt("project-title", state.project || "SuperMemory", true);
     setTxt("active-goal-line", flat(meta.active_goal) || "4-Tier Cognitive Graph & Constitutional Harness", true);
@@ -131,15 +131,15 @@
       if (moveFocus) tab.focus();
     };
     tabs.forEach((tab, idx) => {
-      tab.addEventListener("click", () => activateTabFn(tab));
+      tab.addEventListener("click", () => { activateTabFn(tab); if (Date.now() - lastFetch > 8000) loadGraph(); });
       tab.addEventListener("keydown", (ev) => {
         const map = { ArrowDown: (idx + 1) % tabs.length, ArrowRight: (idx + 1) % tabs.length, ArrowUp: (idx - 1 + tabs.length) % tabs.length, ArrowLeft: (idx - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 };
         if (ev.key in map) { ev.preventDefault(); activateTabFn(tabs[map[ev.key]], true); }
       });
     });
     const rawTab = (location.hash.slice(1) || new URLSearchParams(location.search).get("tab") || "").replace(/^tab-/, "").replace(/^proposals$/, "lifecycle");
-    const hashTab = tabs.find((t) => t.dataset.tab === `tab-${rawTab}`);
-    if (hashTab) activateTabFn(hashTab);
+    const hashTab = tabs.find((t) => t.dataset.tab === `tab-${rawTab}`); if (hashTab) activateTabFn(hashTab);
+    window.addEventListener("focus", () => { if (Date.now() - lastFetch > 5000 && !document.getElementById("workbench-dialog").open) loadGraph(); });
     window.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !document.getElementById("workbench-dialog").open) inspector.close(); });
   }
 

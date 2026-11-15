@@ -115,7 +115,7 @@
         <h4 class="row-title">${esc(b.title)}</h4>
         <div class="pareto-row"><span>${esc(b.error_share_pct)}% ${tr("error share", "tỷ trọng lỗi")} &middot; +${esc(b.ceiling_gain)} ${esc(b.metric_name)}</span><span>${esc((b.candidate_ids || []).length)} ${tr("candidates", "ứng viên")}</span></div>
         <progress class="pareto-meter" max="100" value="${esc(Math.min(100, Number(b.error_share_pct) || 0))}"></progress>
-        <p class="row-desc">${inlineMd(b.kill_criterion || b.summary)}</p>
+        <p class="row-desc line-clamp-3">${inlineMd(b.kill_criterion || b.summary)}</p>
         <div class="row-actions"><button type="button" class="btn btn-secondary btn-xs" data-inspect-btn="${esc(b.id)}">${tr("Inspect", "Chi tiết")}</button>
         ${b.rq_id ? `<button type="button" class="btn btn-ghost btn-xs" data-inspect-btn="${esc(b.rq_id)}">${esc(b.rq_id)}</button>` : ""}
         ${b.status !== "RESOLVED" ? `<button type="button" class="btn btn-ghost btn-xs" data-resolve-bnk="${esc(b.id)}">${tr("Mark Resolved", "Đánh dấu Xong")}</button>` : ""}</div>
@@ -127,7 +127,7 @@
         return `<article class="ledger-item-static ledger-item-clickable" data-inspect-rh="${esc(m.id)}">
           <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(m.id)}</span><span class="role-chip" title="${esc(venueLbl)}">${esc(venueLbl)}</span></span><span class="mono-tag" title="${esc(md.complexity_cost || "O(N)")}">${esc(md.complexity_cost || "O(N)")}</span></div>
           <h4 class="row-title">${esc(m.title)}</h4>
-          <p class="row-desc">${inlineMd(md.core_mechanism || m.summary)}</p>
+          <p class="row-desc line-clamp-3">${inlineMd(md.core_mechanism || m.summary)}</p>
           <div class="dag-meta-row">${md.bottleneck_id ? `<span class="mono-tag">${tr("Targets", "Đích")}: ${esc(md.bottleneck_id)}</span>` : "<span></span>"}<button type="button" class="btn btn-secondary btn-xs" data-inspect-btn="${esc(m.id)}">${tr("Read Card", "Đọc thẻ")}</button></div>
         </article>`;
       }).join("") : `<div class="empty-state"><p class="empty-desc">${tr("Method Vault is empty. Harvest papers from arXiv / Semantic Scholar / OpenAlex or add a curated Method Card.", "Kho phương pháp trống. Hãy săn bài báo từ arXiv / Semantic Scholar / OpenAlex hoặc thêm thẻ mới.")}</p></div>`) + mp.html;

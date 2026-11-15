@@ -57,6 +57,7 @@
     _applyLayout(reset) {
       const vis = this._visibleNodes();
       computeLayout(this, vis, reset);
+      if (reset && this.mode === "FORCE" && vis.length > 1) { for (let k = 0; k < 44; k++) stepForce(this, vis); }
       this._emitStats(vis);
       if (reset) this.fitView();
     }
@@ -64,11 +65,11 @@
     fitView() {
       const rect = this.canvas.parentElement.getBoundingClientRect(), vis = this._visibleNodes();
       if (!vis.length || !rect.width || !rect.height) return;
-      const isCard = this.mode === "LANES", padX = isCard ? 28 : 74, padY = isCard ? 24 : 52;
+      const isCard = this.mode === "LANES", padX = isCard ? 28 : 78, padY = isCard ? 28 : 60;
       const minX = Math.min(...vis.map((n) => n.x)) - padX, maxX = Math.max(...vis.map((n) => n.x + (isCard ? n.w : 0))) + padX;
-      const minY = Math.min(...vis.map((n) => n.y)) - padY, maxY = Math.max(...vis.map((n) => n.y + (isCard ? n.h : 28))) + padY;
-      const topIn = 18, botIn = rect.width <= 768 ? 16 : 52, availH = Math.max(200, rect.height - topIn - botIn);
-      this.scale = Math.min(1.12, Math.max(0.48, Math.min((rect.width - 36) / (maxX - minX || 1), availH / (maxY - minY || 1))));
+      const minY = Math.min(...vis.map((n) => n.y)) - padY, maxY = Math.max(...vis.map((n) => n.y + (isCard ? n.h : 34))) + padY;
+      const topIn = 18, botIn = rect.width <= 768 ? 18 : 66, availH = Math.max(200, rect.height - topIn - botIn);
+      this.scale = Math.min(1.12, Math.max(0.28, Math.min((rect.width - 36) / (maxX - minX || 1), availH / (maxY - minY || 1))));
       this.panX = rect.width / 2 - ((minX + maxX) / 2) * this.scale; this.panY = topIn + availH / 2 - ((minY + maxY) / 2) * this.scale;
     }
 
@@ -113,10 +114,13 @@
         ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.strokeStyle = "#141518"; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(eb.x - w / 2, eb.y - 9, w, 18, 5); ctx.fill(); ctx.stroke();
         ctx.fillStyle = "#141518"; ctx.textAlign = "center"; ctx.fillText(eb.txt, eb.x, eb.y + 3.5); ctx.textAlign = "start";
       }
+      const cullPills = !isCard && vis.length > 48 && this.scale < 0.88, placed = [];
+      const prio = (n) => (n.id === focusId ? 9 : ego.has(n.id) || this.highlightIds.has(n.id) ? 7 : /LAW|PROPOSAL|BOTTLENECK|METHOD_CARD/.test(n.node_type) ? 4 : n.r);
       for (const n of [...vis].sort((a, b) => (a.id === focusId ? 1 : 0) - (b.id === focusId ? 1 : 0))) {
-        const dimmed = (ego.size && !ego.has(n.id)) || (this.highlightIds.size && !this.highlightIds.has(n.id)), active = n.id === this.selectedId || n.id === this.hoveredId || this.highlightIds.has(n.id), acc = ACCENTS[n.node_type] || "#475569", lbl = cleanTitle(n.title);
-        ctx.globalAlpha = dimmed ? 0.22 : 1;
+        const dimmed = (ego.size && !ego.has(n.id)) || (this.highlightIds.size && !this.highlightIds.has(n.id)), active = n.id === this.selectedId || n.id === this.hoveredId || this.highlightIds.has(n.id), acc = ACCENTS[n.node_type] || "#475569";
+        ctx.globalAlpha = dimmed ? 0.22 : 1; n.pillW = 0; n.pillH = 0;
         if (isCard) {
+          const lbl = cleanTitle(n.title);
           ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = active ? "#141518" : "#D5D1C7"; ctx.lineWidth = active ? 2 : 1;
           ctx.beginPath(); ctx.roundRect(n.x, n.y, n.w, n.h, 10); ctx.fill(); ctx.stroke();
           ctx.fillStyle = acc; ctx.beginPath(); ctx.roundRect(n.x + 1, n.y + 8, 4, n.h - 16, 2); ctx.fill();
@@ -125,12 +129,20 @@
         } else {
           ctx.fillStyle = acc; ctx.strokeStyle = active ? "#141518" : n.pinned ? "#D97706" : "#FFFFFF"; ctx.lineWidth = active ? 3 : 2.2;
           ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+      }
+      if (!isCard) {
+        for (const n of [...vis].sort((a, b) => prio(b) - prio(a))) {
+          const dimmed = (ego.size && !ego.has(n.id)) || (this.highlightIds.size && !this.highlightIds.has(n.id)), active = n.id === this.selectedId || n.id === this.hoveredId || this.highlightIds.has(n.id), lbl = cleanTitle(n.title);
+          if (dimmed && cullPills) continue;
           const txt = active ? `${n.id} · ${lbl.slice(0, 22)}` : n.id;
           ctx.font = active ? `700 ${fs + 1}px "Bear Sans UI", "Noto Sans", sans-serif` : `600 ${fs}px "JetBrains Mono", monospace`;
-          const tw = ctx.measureText(txt).width + 12; n.pillW = tw; n.pillH = pillH;
+          const tw = ctx.measureText(txt).width + 12, bx = n.x - tw / 2, by = n.y + n.r + 4;
+          if (cullPills && !active && placed.some((p) => bx < p.x2 + 4 && bx + tw > p.x1 - 4 && by < p.y2 + 3 && by + pillH > p.y1 - 3)) continue;
+          placed.push({ x1: bx, x2: bx + tw, y1: by, y2: by + pillH }); n.pillW = tw; n.pillH = pillH; ctx.globalAlpha = dimmed ? 0.22 : 1;
           ctx.fillStyle = "rgba(255,255,255,0.94)"; ctx.strokeStyle = active ? "#141518" : "#DEDAD0"; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.roundRect(n.x - tw / 2, n.y + n.r + 4, tw, pillH, 6); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = "#141518"; ctx.textAlign = "center"; ctx.fillText(txt, n.x, n.y + n.r + 4 + Math.round(pillH * 0.72)); ctx.textAlign = "start";
+          ctx.beginPath(); ctx.roundRect(bx, by, tw, pillH, 6); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#141518"; ctx.textAlign = "center"; ctx.fillText(txt, n.x, by + Math.round(pillH * 0.72)); ctx.textAlign = "start";
         }
       }
       ctx.globalAlpha = 1; ctx.restore();

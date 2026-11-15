@@ -61,6 +61,7 @@ def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
         tiers = compute_tier_telemetry(store)
         meta = store.get_all_meta()
         payload = {
+            "ui_version": __version__,
             "workspace_path": str(workspace_root),
             "is_global": workspace_root == ensure_global_memory(),
             "project": meta.get("project_name") or workspace_root.name,

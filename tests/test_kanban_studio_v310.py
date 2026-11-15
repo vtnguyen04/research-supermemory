@@ -137,6 +137,24 @@ def test_kanban_transitions_subtask_progress_and_proposal_sync(
         md_txt = tasks_md_files[0].read_text(encoding="utf-8")
         assert "- [x] Write unit test" in md_txt
         assert f"- [ ] {long_step}" in md_txt
+        assert g3["ui_version"] == "3.1.2"
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_all_pages_fluid_layout_and_version_sync() -> None:
+    """Ensure every Studio tab uses full-width fluid layout (no 86rem/88rem tunnel) and version sync."""
+    from supermemory import __version__
+
+    static_dir = Path(__file__).resolve().parents[1] / "src" / "supermemory" / "ui" / "static"
+    css = (static_dir / "styles.css").read_text(encoding="utf-8")
+    html = (static_dir / "index.html").read_text(encoding="utf-8")
+
+    assert f'<meta name="sm-version" content="{__version__}" />' in html
+    assert f'/styles.css?v={__version__}"' in html
+    assert "max-width: 88rem" not in css
+    assert "max-width: 86rem" not in css
+    assert "min(calc(100dvh - 17.5rem), 45rem)" in css
+    assert ".events-grid" in css
+    assert ".line-clamp-3" in css

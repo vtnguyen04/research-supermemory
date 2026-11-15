@@ -34,15 +34,16 @@
             return !q || `${n.id} ${n.title} ${n.summary} ${n.node_type}`.toLowerCase().includes(q);
           });
           const pg = paginate(items, `tier-${c.key}`, 5);
+          const shortT = { KNOWLEDGE_NODE: "KNOWLEDGE", OBSERVATION: "INSIGHT", EXPERIMENT: "EXP", ALGORITHM: "ALGO" };
           const rows = pg.slice
             .map((n) => {
               const checked = this.selectedIds.has(n.id) ? "checked" : "";
               return `<div class="selectable-row">
                 <input type="checkbox" class="merge-chk" data-id="${esc(n.id)}" aria-label="${tr("Select", "Chọn")} ${esc(n.id)}" ${checked} />
                 <button type="button" class="row-trigger" data-inspect="${esc(n.id)}">
-                  <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, `${n.node_type} / ${n.status}`)}</span>
-                  <span class="row-title">${esc(cleanText(n.title, 92))}</span>
-                  <span class="row-desc">${esc(cleanText(n.summary, 135))}</span>
+                  <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, shortT[n.node_type] || n.node_type)}</span>
+                  <span class="row-title">${esc(cleanText(n.title, 96))}</span>
+                  <span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 145))}</span>
                 </button></div>`;
             })
             .join("");

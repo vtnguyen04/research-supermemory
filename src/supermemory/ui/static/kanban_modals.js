@@ -28,7 +28,7 @@
       const roi = Number(md.occam_roi);
       return {
         kind: "PROPOSAL", id: n.id, col: md.kanban_col || "BACKLOG", status: n.status || "PROPOSED",
-        title: n.title, summary: n.summary || "", badge: roi > 0 ? `Proposal · ROI ${roi}` : "Proposal", wave: 0,
+        title: n.title, summary: n.summary || "", badge: roi > 0 ? `ROI ${roi}` : "", wave: 0,
         worker: (md.audits || []).length ? "audited" : "", deps: [], globs: [],
         targetId: md.bottleneck_id || "", smokeGate: md.kill_criterion || "", steps,
         stepsDone: steps.filter((s) => s.done).length, stepsTotal: steps.length,

@@ -81,7 +81,7 @@
 
     const chart = document.getElementById("exp-chart-box"), scored = [...filtered].reverse().filter((e) => Number.isFinite(numScore(e)));
     if (scored.length >= 2) {
-      const vals = scored.map(numScore), minV = Math.min(...vals), maxV = Math.max(...vals), span = maxV - minV || 1, W = 880, H = 148, px = 82, py = 28;
+      const vals = scored.map(numScore), minV = Math.min(...vals), maxV = Math.max(...vals), span = maxV - minV || 1, W = 1120, H = 152, px = 84, py = 28;
       const fmtV = (v) => (Math.abs(v) > 0 && Math.abs(v) < 1 ? v.toFixed(4) : Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(1));
       const pts = scored.map((e, i) => ({ x: px + (i / (scored.length - 1)) * (W - px * 2), y: H - py - ((vals[i] - minV) / span) * (H - py * 2), id: e.exp_id || e.id, v: vals[i] }));
       chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="${tr("Experiment score progression", "Đường cong điểm số thực nghiệm")}">
@@ -89,7 +89,7 @@
         <text x="6" y="${py + 4}" fill="#484C56" font-size="13" font-family="JetBrains Mono, monospace">${fmtV(maxV)}</text>
         <text x="6" y="${H - py + 4}" fill="#484C56" font-size="13" font-family="JetBrains Mono, monospace">${fmtV(minV)}</text>
         <polyline fill="none" stroke="#141518" stroke-width="2.25" points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />
-        ${pts.map((p, idx) => `<g class="chart-pt" data-nid="${esc(p.id)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="#0284C7" stroke="#FFFFFF" stroke-width="2"/>${(idx % Math.max(1, Math.ceil(pts.length / 6)) === 0 || idx === pts.length - 1) ? `<text class="chart-lbl" x="${p.x.toFixed(1)}" y="${Math.max(14, p.y - 10).toFixed(1)}" text-anchor="middle" fill="#141518" font-size="13" font-family="JetBrains Mono, monospace">${esc(p.id.replace(/^EXP-/, ""))}</text>` : ""}<title>${esc(p.id)}: ${p.v}</title></g>`).join("")}</svg>`;
+        ${pts.map((p, idx) => `<g class="chart-pt" data-nid="${esc(p.id)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="#0284C7" stroke="#FFFFFF" stroke-width="2"/>${(idx % Math.max(1, Math.ceil(pts.length / 7)) === 0 || idx === pts.length - 1) ? `<text class="chart-lbl" x="${p.x.toFixed(1)}" y="${Math.max(14, p.y - 10).toFixed(1)}" text-anchor="middle" fill="#141518" font-size="13" font-family="JetBrains Mono, monospace">${esc(p.id.replace(/^EXP-/, ""))}</text>` : ""}<title>${esc(p.id)}: ${p.v}</title></g>`).join("")}</svg>`;
       bindInspectTriggers(chart, h.onInspect);
     } else chart.innerHTML = `<div class="empty-state"><p class="empty-title">${tr("Need at least 2 numeric scores in filter to plot progression", "Cần ít nhất 2 điểm số định lượng để vẽ biểu đồ")}</p></div>`;
 
@@ -98,12 +98,13 @@
       tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><p class="empty-title">${tr("No experiments match current filter", "Không có thực nghiệm khớp bộ lọc")}</p><div><button type="button" id="cta-empty-exp" class="btn btn-secondary btn-sm">${tr("+ Log Experiment", "+ Ghi thực nghiệm")}</button></div></div></td></tr>`;
       pagerBox.innerHTML = ""; document.getElementById("cta-empty-exp").addEventListener("click", h.onOpenExp); return;
     }
-    const pg = paginate(filtered, "exp-table", 5);
+    const pg = paginate(filtered, "exp-table", 6);
     tbody.innerHTML = pg.slice.map((e) => {
       const eid = e.exp_id || e.id, delta = e.delta_vs_baseline != null ? (e.delta_vs_baseline >= 0 ? `+${e.delta_vs_baseline.toFixed(4)}` : e.delta_vs_baseline.toFixed(4)) : "—";
+      const cvTxt = String(e.cv_summary || (e.cv_score ?? "—")), tsTxt = String(e.test_summary || (e.test_score ?? "—"));
       return `<tr><td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="mono-id">${esc(eid)}</span></button></td><td class="mono-id">${esc(e.track)}</td>
-        <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="row-title">${esc(cleanText(e.title, 96))}</span><span class="row-desc">${esc(cleanText(e.single_var_diff || e.hypothesis, 115))}</span></button></td>
-        <td class="metric-cell">${esc(e.cv_summary || (e.cv_score ?? "—"))}</td><td class="metric-cell">${esc(e.test_summary || (e.test_score ?? "—"))}</td><td class="num-col">${delta}</td><td>${statusTag(e.verdict)}</td></tr>`;
+        <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="row-title">${esc(cleanText(e.title, 110))}</span><span class="row-desc line-clamp-3">${esc(cleanText(e.single_var_diff || e.hypothesis, 150))}</span></button></td>
+        <td class="metric-cell"><div class="line-clamp-3" title="${esc(cvTxt)}">${esc(cvTxt)}</div></td><td class="metric-cell"><div class="line-clamp-3" title="${esc(tsTxt)}">${esc(tsTxt)}</div></td><td class="num-col">${delta}</td><td>${statusTag(e.verdict)}</td></tr>`;
     }).join("");
     pagerBox.innerHTML = pg.html; bindInspectTriggers(tbody, h.onInspect); bindPagers(pagerBox, () => renderExperiments(state, h));
   }
@@ -119,13 +120,13 @@
     bar.querySelectorAll("[data-pstage]").forEach((b) => b.addEventListener("click", () => { activePropStage = b.dataset.pstage; renderLifecycle(state, h); }));
 
     const filteredProps = activePropStage === "ALL" ? props : activePropStage === "OPEN" ? props.filter((p) => p.status !== "ARCHIVED") : props.filter((p) => p.status === activePropStage);
-    const pgProps = paginate(filteredProps, `prop-${activePropStage}`, 6), grid = document.getElementById("proposal-grid");
+    const pgProps = paginate(filteredProps, `prop-${activePropStage}`, 8), grid = document.getElementById("proposal-grid");
     grid.innerHTML = pgProps.slice.length ? pgProps.slice.map((p) => {
       const idx = stages.indexOf(p.status); let acts = "";
       if (idx >= 0 && idx < 3) acts += `<button type="button" class="btn btn-secondary btn-xs" data-prop-adv="${esc(p.id)}" data-next="${stages[idx + 1]}">${tr("To", "Sang")} ${stages[idx + 1]}</button>`;
       if (p.status !== "AUDITED" && p.status !== "ARCHIVED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-audit="${esc(p.id)}">${tr("Approve Audit", "Duyệt Audit")}</button>`;
       if (p.status === "AUDITED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-adv="${esc(p.id)}" data-next="ARCHIVED">${tr("Archive", "Lưu trữ")}</button>`;
-      return `<div class="ledger-panel"><div class="ledger-item-static"><button type="button" class="row-trigger" data-nid="${esc(p.id)}"><span class="row-top"><span class="mono-id">${esc(p.id)}</span>${statusTag(p.status)}</span><span class="row-title">${esc(cleanText(p.title, 96))}</span><span class="row-desc">${esc(cleanText(p.summary, 145))}</span></button>${acts ? `<div class="row-actions">${acts}</div>` : ""}</div></div>`;
+      return `<div class="ledger-panel"><div class="ledger-item-static"><button type="button" class="row-trigger" data-nid="${esc(p.id)}"><span class="row-top"><span class="mono-id">${esc(p.id)}</span>${statusTag(p.status)}</span><span class="row-title">${esc(cleanText(p.title, 96))}</span><span class="row-desc line-clamp-3">${esc(cleanText(p.summary, 155))}</span></button>${acts ? `<div class="row-actions">${acts}</div>` : ""}</div></div>`;
     }).join("") : `<div class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No proposals in this stage", "Không có Proposal ở giai đoạn này")}</p></div></div>`;
     document.getElementById("proposal-pager").innerHTML = pgProps.html; bindInspectTriggers(grid, h.onInspect);
     grid.querySelectorAll("[data-prop-adv]").forEach((b) => b.addEventListener("click", () => h.onAdvanceProposal(b.dataset.propAdv, b.dataset.next)));
@@ -137,8 +138,9 @@
     vBar.innerHTML = vOpts.map(([k, lbl]) => `<button type="button" class="seg-btn" aria-pressed="${activeVaultType === k}" data-vtype="${k}">${esc(lbl)}</button>`).join("");
     vBar.querySelectorAll("[data-vtype]").forEach((b) => b.addEventListener("click", () => { activeVaultType = b.dataset.vtype; renderLifecycle(state, h); }));
     const ideas = activeVaultType === "ALL" ? allIdeas : activeVaultType === "DEAD_END" ? allIdeas.filter((x) => x.status === "REJECTED") : allIdeas.filter((x) => x.node_type === activeVaultType);
-    const pgIdeas = paginate(ideas, `ideas-${activeVaultType}`, 6), ideasGrid = document.getElementById("ideas-grid");
-    ideasGrid.innerHTML = ideas.length ? pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel"><button type="button" class="ledger-row" data-nid="${esc(n.id)}"><span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, `${n.node_type} / ${n.status}`)}</span><span class="row-title">${esc(cleanText(n.title, 96))}</span><span class="row-desc">${esc(cleanText(n.summary, 145))}</span></button></div>`).join("") : `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No vault items match filter", "Không có mục nào khớp bộ lọc")}</p></div></div>`;
+    const shortType = { OBSERVATION: "INSIGHT", KNOWLEDGE_NODE: "KNOWLEDGE", ALGORITHM: "ALGO" };
+    const pgIdeas = paginate(ideas, `ideas-${activeVaultType}`, 8), ideasGrid = document.getElementById("ideas-grid");
+    ideasGrid.innerHTML = ideas.length ? pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel"><button type="button" class="ledger-row" data-nid="${esc(n.id)}"><span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, shortType[n.node_type] || n.node_type)}</span><span class="row-title">${esc(cleanText(n.title, 96))}</span><span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 155))}</span></button></div>`).join("") : `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No vault items match filter", "Không có mục nào khớp bộ lọc")}</p></div></div>`;
     document.getElementById("ideas-pager").innerHTML = pgIdeas.html; bindInspectTriggers(ideasGrid, h.onInspect); bindPagers(root, () => renderLifecycle(state, h));
   }
 
@@ -151,11 +153,14 @@
     evBar.querySelectorAll("[data-ecat]").forEach((b) => b.addEventListener("click", () => { activeEvtCat = b.dataset.ecat; renderEvents(state, h); }));
 
     const evs = (state.events || []).filter((ev) => catMatch(String(ev.event_type || "")) && matchQ(q, ev.event_type, ev.entity_id, ev.summary));
-    const pg = paginate(evs, `ev-${activeEvtCat}`, 7);
-    box.innerHTML = pg.slice.length ? pg.slice.map((ev) => `<div role="listitem" class="ledger-item-static">
+    const pg = paginate(evs, `ev-${activeEvtCat}`, 8);
+    box.innerHTML = pg.slice.length ? pg.slice.map((ev) => {
+      const cleanSum = cleanText(String(ev.summary || "").replace(/^([A-Z0-9-]+):\s*\1:\s*/, "$1: "), 220);
+      return `<div role="listitem" class="ledger-item-static">
       <div class="row-top"><span class="mono-id">${esc(ev.event_type)}${ev.entity_id ? ` &middot; ${esc(ev.entity_id)}` : ""}</span><span class="mono-id">${esc((ev.created_at || "").slice(0, 19))}</span></div>
-      <div class="row-desc">${esc(cleanText(ev.summary || "", 200))}</div>
-      ${ev.entity_id && nodeSet.has(ev.entity_id) ? `<div><button type="button" class="btn btn-secondary btn-xs" data-nid="${esc(ev.entity_id)}">${tr("Open", "Mở")} ${esc(ev.entity_id)}</button></div>` : ""}</div>`).join("") + pg.html
+      <div class="row-desc line-clamp-3">${esc(cleanSum)}</div>
+      ${ev.entity_id && nodeSet.has(ev.entity_id) ? `<div><button type="button" class="btn btn-secondary btn-xs" data-nid="${esc(ev.entity_id)}">${tr("Open", "Mở")} ${esc(ev.entity_id)}</button></div>` : ""}</div>`;
+    }).join("") + pg.html
       : `<div role="listitem" class="empty-state"><p class="empty-desc">${tr("No telemetry events match current filter.", "Không có sự kiện nào khớp bộ lọc.")}</p></div>`;
     bindInspectTriggers(box, h.onInspect); bindPagers(box, () => renderEvents(state, h));
   }
