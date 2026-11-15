@@ -177,6 +177,12 @@ body {
   font-size: 0.8125rem;
   color: var(--text-muted);
 }
+.lang-pill {
+  margin-left: auto;
+  min-width: 2.25rem;
+  padding: 0 var(--sp-2);
+  font-family: var(--font-mono);
+}
 
 /* Double-Bezel Workspace Switcher Card */
 .workspace-bezel {
@@ -529,6 +535,8 @@ body {
 
 .control-input, .control-select, .control-textarea {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   background: var(--bg-surface);
   color: var(--text-primary);
   border: 1px solid var(--border-default);
@@ -1028,13 +1036,14 @@ body {
   box-shadow: 0 24px 60px rgba(20, 21, 24, 0.14);
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
   visibility: hidden;
   transform: translateX(calc(100% + 2rem));
-  transition: transform 280ms var(--ease-spring), visibility 280ms ease;
+  transition: transform 150ms var(--ease-spring), visibility 150ms ease;
 }
 .inspector-sheet.is-open {
   visibility: visible;
-  transform: translateX(0);
+  transform: none;
 }
 .inspector-top {
   padding: var(--sp-5) var(--sp-6);
@@ -1044,17 +1053,19 @@ body {
   align-items: flex-start;
   gap: var(--sp-3);
 }
-.inspector-title-group { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.inspector-title-group { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); min-width: 0; }
 .inspector-heading { font-family: var(--font-display); font-size: 1.125rem; font-weight: 700; word-break: break-word; }
 .inspector-content {
   padding: var(--sp-6);
   overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
 }
-.inspector-section { display: flex; flex-direction: column; gap: var(--sp-2); }
+.inspector-section { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .inspector-subhead {
   font-size: 0.8125rem;
   font-weight: 700;
@@ -1217,4 +1228,8 @@ body {
   .canvas-viewport { height: 22rem; min-height: 22rem; }
   .form-row-2, .link-composer { grid-template-columns: 1fr; }
   .inspector-sheet { top: 0; right: 0; bottom: 0; border-radius: 0; width: min(26rem, 100vw); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

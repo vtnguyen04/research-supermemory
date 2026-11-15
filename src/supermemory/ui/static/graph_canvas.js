@@ -1,14 +1,14 @@
 // Multi-Mode Interactive Knowledge Graph Canvas: FORCE (Network), RADIAL (Rings) & LANES (Cards)
 (function () {
-  const { esc } = window.SuperMemoryIcons;
+  const { esc, tr } = window.SuperMemoryIcons;
   const ACCENTS = {
     LAW: "#141518", PROCEDURE: "#334155", GATE: "#2563EB", KNOWLEDGE_NODE: "#0284C7", OBSERVATION: "#0284C7",
     ALGORITHM: "#0D9488", IDEA: "#0284C7", PROPOSAL: "#D97706", EXPERIMENT: "#6D28D9", LESSON: "#DC2626", AGENT_RUN: "#15803D",
   };
   const LANES = [
-    { key: "PROCEDURAL", title: "TẦNG L1 · HIẾN PHÁP & GATES", rx: 210, ry: 136 },
-    { key: "SEMANTIC", title: "TẦNG L2 · TRI THỨC & INSIGHT", rx: 332, ry: 214 },
-    { key: "EPISODIC", title: "TẦNG L3 · THỰC NGHIỆM & PROPOSALS", rx: 456, ry: 294 },
+    { key: "PROCEDURAL", en: "TIER L1 · CONSTITUTION & GATES", vi: "TẦNG L1 · HIẾN PHÁP & GATES", rx: 210, ry: 136 },
+    { key: "SEMANTIC", en: "TIER L2 · SEMANTIC & INSIGHTS", vi: "TẦNG L2 · TRI THỨC & INSIGHT", rx: 332, ry: 214 },
+    { key: "EPISODIC", en: "TIER L3 · EXPERIMENTS & PROPOSALS", vi: "TẦNG L3 · THỰC NGHIỆM & PROPOSALS", rx: 456, ry: 294 },
   ];
   const CARD_W = 204, CARD_H = 50, GAP_X = 14, GAP_Y = 10, LANE_GAP = 54;
   const cleanTitle = (s) => String(s || "").replace(/^(?:\[[^\]]+\]\s*|Guard for LESSON-\d+:\s*|SuperMemory v[\d.]+[:\s]*|VictoryAuditor Audit on\s*)/i, "");
@@ -61,7 +61,7 @@
           const items = vis.filter((n) => n.memory_tier === ln.key); if (!items.length) return;
           const cols = items.length > 6 ? 2 : 1, rows = Math.ceil(items.length / cols), boxW = cols * CARD_W + (cols - 1) * GAP_X + 32, boxH = rows * CARD_H + (rows - 1) * GAP_Y + 56;
           items.forEach((n, i) => { if (reset || !n.pinned) { n.x = curX + 16 + (i % cols) * (CARD_W + GAP_X); n.y = 42 + Math.floor(i / cols) * (CARD_H + GAP_Y); } });
-          this.laneBoxes.push({ title: `${ln.title} (${items.length})`, x: curX, y: 0, w: boxW, h: boxH }); curX += boxW + LANE_GAP;
+          this.laneBoxes.push({ title: `${tr(ln.en, ln.vi)} (${items.length})`, x: curX, y: 0, w: boxW, h: boxH }); curX += boxW + LANE_GAP;
         });
       }
       if (reset) this.fitView();

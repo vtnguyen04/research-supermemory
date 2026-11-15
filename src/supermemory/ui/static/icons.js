@@ -1,4 +1,4 @@
-// Crisp 1.5px Geometric Line Icons, Semantic Status Helpers & Shared Pagination (Zero Emojis)
+// Crisp 1.5px Geometric Line Icons, EN/VI i18n (EN Default), Status Tags & Pagination
 (function () {
   const esc = (val) =>
     String(val ?? "")
@@ -7,6 +7,31 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+
+  const qLang = new URLSearchParams(window.location.search).get("lang");
+  let curLang = (qLang || localStorage.getItem("sm_lang") || "en").toLowerCase() === "vi" ? "vi" : "en";
+  const getLang = () => curLang;
+  const tr = (en, vi) => (curLang === "vi" ? vi : en);
+
+  function setLang(next) {
+    curLang = next === "vi" ? "vi" : "en";
+    localStorage.setItem("sm_lang", curLang);
+    applyStaticLang();
+  }
+
+  function applyStaticLang() {
+    document.documentElement.lang = curLang;
+    document.querySelectorAll("[data-vi]").forEach((el) => {
+      if (el.dataset.en === undefined) el.dataset.en = el.textContent;
+      el.textContent = curLang === "vi" ? el.dataset.vi : el.dataset.en;
+    });
+    document.querySelectorAll("[data-vi-ph]").forEach((el) => {
+      if (el.dataset.enPh === undefined) el.dataset.enPh = el.getAttribute("placeholder") || "";
+      el.setAttribute("placeholder", curLang === "vi" ? el.dataset.viPh : el.dataset.enPh);
+    });
+    const btn = document.getElementById("btn-lang-toggle");
+    if (btn) btn.textContent = curLang === "vi" ? "EN" : "VI";
+  }
 
   const PATHS = {
     topology:
@@ -69,12 +94,12 @@
     const start = (cur - 1) * perPage;
     const slice = items.slice(start, start + perPage);
     if (total <= perPage) return { slice, html: "" };
-    const html = `<nav class="pager-bar" aria-label="Phân trang ${esc(key)}">
+    const html = `<nav class="pager-bar" aria-label="Pagination ${esc(key)}">
       <span class="pager-info">${start + 1}&ndash;${Math.min(total, start + perPage)} / ${total}</span>
       <div class="pager-btns">
-        <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur - 1}" ${cur <= 1 ? "disabled" : ""}>Trước</button>
-        <span class="pager-num">Trang ${cur}/${pages}</span>
-        <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur + 1}" ${cur >= pages ? "disabled" : ""}>Sau</button>
+        <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur - 1}" ${cur <= 1 ? "disabled" : ""}>${tr("Prev", "Trước")}</button>
+        <span class="pager-num">${tr("Page", "Trang")} ${cur}/${pages}</span>
+        <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur + 1}" ${cur >= pages ? "disabled" : ""}>${tr("Next", "Sau")}</button>
       </div></nav>`;
     return { slice, html };
   }
@@ -88,5 +113,5 @@
     });
   }
 
-  window.SuperMemoryIcons = { svg, hydrateIcons, statusTag, esc, paginate, bindPagers };
+  window.SuperMemoryIcons = { svg, hydrateIcons, statusTag, esc, paginate, bindPagers, tr, getLang, setLang, applyStaticLang };
 })();

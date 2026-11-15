@@ -1,366 +1,359 @@
 # Research SuperMemory (`v2.5`)
 
-**Hệ thống Bộ nhớ Đồ thị Nhận thức 4 Tầng (Zero-Amnesia 4-Tier Cognitive Graph), Chốt chặn Hiến pháp Thời gian thực (`PreToolUse CodeGates`), Cơ chế Tự học Bài học & Khóa Lỗi Lặp lại, Sổ cái Thực nghiệm Khoa học Đơn biến, Quản lý Vòng đời OpenSpec, và Giao diện Quản trị Daylight Architectural Studio — Tích hợp sâu làm Plugin gốc cho Antigravity CLI kiêm CLI/SDK độc lập không phụ thuộc thư viện ngoài.**
+> Language: **English (Default)** | **[Tiếng Việt](README.vi.md)**
+
+**Zero-Amnesia 4-Tier Cognitive Graph, Real-Time Constitutional `PreToolUse` CodeGates, Self-Learning Lesson-to-Gate Crystallization, Single-Variable Scientific Experiment Ledger, OpenSpec Lifecycle Governance, and Bilingual (`EN`/`VI`) Daylight Architectural Studio — Native Antigravity CLI Plugin & Zero-Dependency Python SDK.**
 
 ---
 
-## Mục lục
+## Table of Contents
 
-1. [Bài toán & Lý do ra đời](#1-bài-toán--lý-do-ra-đời)
-2. [Kiến trúc Nhận thức 4 Tầng & Liên thông Local + Global](#2-kiến-trúc-nhận-thức-4-tầng--liên-thông-local--global)
-3. [Hình ảnh Giao diện Thực tế (`Daylight Architectural Studio`)](#3-hình-ảnh-giao-diện-thực-tế-daylight-architectural-studio)
-4. [Cài đặt 1 Lệnh Duy nhất (`Zero-Clone`)](#4-cài-đặt-1-lệnh-duy-nhất-zero-clone)
-5. [Hướng dẫn Sử dụng Thực tế từ A–Z](#5-hướng-dẫn-sử-dụng-thực-tế-từ-az)
-6. [Cơ chế Vận hành Hooks Siêu nhẹ (`Zero-Overhead`) & Tự học (`Self-Learning`)](#6-cơ-chế-vận-hành-hooks-siêu-nhẹ-zero-overhead--tự-học-self-learning)
-7. [Bảng Tra cứu Đầy đủ Lệnh CLI (`supermemory`)](#7-bảng-tra-cứu-đầy-đủ-lệnh-cli-supermemory)
-8. [Bảng Tra cứu 14 MCP Tools, 4 Resources, 7 Skills & 4 Subagents](#8-bảng-tra-cứu-14-mcp-tools-4-resources-7-skills--4-subagents)
-9. [Cấu trúc Thư mục Lưu trữ & Quy tắc Git](#9-cấu-trúc-thư-mục-lưu-trữ--quy-tắc-git)
-10. [Xử lý Sự cố Thường gặp & Kiểm định Chất lượng](#10-xử-lý-sự-cố-thường-gặp--kiểm-định-chất-lượng)
-
----
-
-## 1. Bài toán & Lý do ra đời
-
-Các AI Coding & Research Agents hiện đại (Antigravity, Claude Code, Gemini CLI, Codex, Cursor) đều gặp **3 điểm mù cấu trúc** khi chạy dự án lớn hoặc nghiên cứu dài ngày:
-
-1. **Mất trí nhớ sau khi nén ngữ cảnh (`Context Compaction Amnesia`):** Mỗi khi chạy `/compact` hoặc mở phiên mới, các quy ước kiến trúc, yêu cầu riêng của bạn, và nguyên nhân sâu xa của các lỗi từng gặp bị rơi rụng.
-2. **Lặp lại hướng thử nghiệm đã thất bại (`Dead-End Repetition`):** Khi giao bài toán nghiên cứu dài hơi (ví dụ chạy `/goal` nhiều ngày), Agent dễ thử lại đúng ý tưởng/siêu tham số đã thất bại hôm trước, hoặc sửa nhiều biến cùng lúc làm nhiễu kết luận.
-3. **File `.md` phình to gây ngộp ngữ cảnh hoặc bị Agent phớt lờ:** Ghi chép thuần văn bản không có cơ chế phân tầng token và không thể chặn cứng hành vi sai trước khi lệnh sửa file được thực thi.
-
-**SuperMemory (`v2.5`)** giải quyết triệt để cả 3 vấn đề chỉ bằng **Python 3.10+ chuẩn (`stdlib` 100%, `0` thư viện ngoài, SQLite WAL + FTS5 BM25)**:
-
-- **Lưu trữ kép bất biến (`Dual-Persistence`):** Mọi thực thể sống đồng thời trong cơ sở dữ liệu đồ thị **SQLite FTS5** (`.supermemory/supermemory.db` — truy vấn `< 5ms`) và **JSON/Markdown đồng bộ Git** (`memory/graph_snapshot.json`, `00_MEMORY_GRAPH.md`, `01_ACTIVE_STATE.md`, `02_CONSTITUTION_AND_LESSONS.md`, `03_EXPERIMENTS_REGISTRY.md`). Khi sang máy mới `git clone`, toàn bộ đồ thị tự động khôi phục 100% từ `graph_snapshot.json`.
-- **Chặn lỗi bằng thực thi cơ học (`PreToolUse CodeGates < 20ms`):** Mọi bài học không nằm chết trên giấy mà gắn thẳng với chốt chặn `PreToolUse` để từ chối tức thì (`"decision": "deny"`) các thao tác vi phạm trước khi file bị ghi xuống đĩa.
-- **Vận hành `Zero-Overhead` không làm chậm hội thoại:** Trên các câu hỏi đáp, giải thích code hoặc trao đổi ngắn thông thường, Hook tiêu tốn **0 lượt gọi LLM phụ**; chỉ kích hoạt khóa kiểm tra khi có chỉ thị quy tắc mới, sửa lỗi thực sự hoặc chạy benchmark thực nghiệm.
+1. [Problem Statement & Motivation](#1-problem-statement--motivation)
+2. [4-Tier Cognitive Architecture & Local + Global Federation](#2-4-tier-cognitive-architecture--local--global-federation)
+3. [Daylight Architectural Studio (`Web UI`)](#3-daylight-architectural-studio-web-ui)
+4. [1-Command Installation (`Zero-Clone`)](#4-1-command-installation-zero-clone)
+5. [End-to-End Quickstart & Workflows](#5-end-to-end-quickstart--workflows)
+6. [Zero-Overhead Lifecycle Hooks & Self-Learning Loop](#6-zero-overhead-lifecycle-hooks--self-learning-loop)
+7. [Complete CLI Reference (`supermemory`)](#7-complete-cli-reference-supermemory)
+8. [14 MCP Tools, 4 Resources, 7 Skills & 4 Subagents](#8-14-mcp-tools-4-resources-7-skills--4-subagents)
+9. [Repository Storage Layout & Git Sync Model](#9-repository-storage-layout--git-sync-model)
+10. [Troubleshooting & Self-Audit Suite](#10-troubleshooting--self-audit-suite)
 
 ---
 
-## 2. Kiến trúc Nhận thức 4 Tầng & Liên thông Local + Global
+## 1. Problem Statement & Motivation
 
-Lấy cảm hứng từ kiến trúc nhận thức **CoALA / ACT-R**, SuperMemory chia tri thức thành **4 tầng bộ nhớ** kết hợp cơ chế **Liên thông 2 cấp (`Local` theo từng dự án + `Global` toàn máy tại `~/.supermemory/global`)** giúp Capsule nạp đầu phiên luôn gọn dưới **`850 tokens`** (tiết kiệm >95% ngữ cảnh):
+Modern AI Coding and Research Agents (Antigravity, Claude Code, Gemini CLI, Codex, Cursor) suffer from **three structural failure modes** during complex engineering or multi-day autonomous research:
+
+1. **Context Compaction Amnesia:** Every `/compact` or new session drops critical architectural invariants, user preferences, and hard-won root causes of past regressions.
+2. **Dead-End Repetition:** During long-horizon autonomous `/goal` runs, agents repeatedly revisit falsified hypotheses, dead-end hyperparameters, or multi-variable edits that confound attribution.
+3. **Unenforced Markdown Bloat:** Flat `.md` memory files balloon until they blow up the context budget—and passive prose cannot deterministically block a bad edit before it hits disk.
+
+**Research SuperMemory (`v2.5`)** solves all three using **100% pure Python 3.10+ standard library (`0` third-party dependencies, SQLite WAL + FTS5 BM25)**:
+
+- **Git-Backed Dual Persistence:** Every entity lives simultaneously in a sub-5ms **SQLite FTS5 Knowledge Graph** (`.supermemory/supermemory.db`) and deterministic **Git-tracked JSON/Markdown** (`memory/graph_snapshot.json`, `00_MEMORY_GRAPH.md`, `01_ACTIVE_STATE.md`, `02_CONSTITUTION_AND_LESSONS.md`, `03_EXPERIMENTS_REGISTRY.md`). Cloning on a fresh machine automatically reconstructs 100% of the SQLite graph from `graph_snapshot.json`.
+- **Deterministic Mechanical Enforcement (`PreToolUse CodeGates < 20ms`):** Lessons do not sit idle in prose—they bind directly to `PreToolUse` gates that immediately reject (`"decision": "deny"`) violating file writes or shell commands before execution.
+- **Zero-Overhead Conversational Turns:** Normal Q&A, code reading, and casual clarifications incur **0 extra LLM tool calls**; enforcement locks engage strictly when user rules are declared, real bugs are fixed, or scientific benchmarks run.
+
+---
+
+## 2. 4-Tier Cognitive Architecture & Local + Global Federation
+
+Inspired by **CoALA / ACT-R** cognitive architectures, Research SuperMemory organizes knowledge across **4 memory tiers** combined with **2-level Federation (`Local` per-repository + `Global` machine-wide at `~/.supermemory/global`)**, keeping the session-start capsule under **`850 tokens`** (>95% context compression):
 
 ```mermaid
 flowchart TB
-    subgraph FED["Liên thông 2 Cấp Bộ nhớ (Federated Scopes)"]
-        GLB["Global SuperMemory (~/.supermemory/global)<br/>Quy tắc cá nhân xuyên dự án, Quy trình chuẩn, Danh bạ dự án"]
-        LOC["Local SuperMemory (<project>/.supermemory + memory/)<br/>Kiến trúc riêng, Thực nghiệm, Proposals & CodeGates của dự án"]
+    subgraph FED["2-Level Federated Memory Scopes"]
+        GLB["Global SuperMemory (~/.supermemory/global)<br/>Cross-project personal rules, reusable procedures & workspace registry"]
+        LOC["Local SuperMemory (<project>/.supermemory + memory/)<br/>Project architecture, experiments, OpenSpec proposals & CodeGates"]
     end
 
-    subgraph TIERS["Kiến trúc Nhận thức 4 Tầng (Progressive Disclosure < 850 tok)"]
-        L0["L0 · WORKING MEMORY<br/>Mục tiêu hiện tại, Giai đoạn & Bước kế tiếp (01_ACTIVE_STATE.md)"]
-        L1["L1 · PROCEDURAL MEMORY<br/>Luật bất biến (LAW), Quy trình (PROCEDURE) & Chốt chặn (GATE)"]
-        L2["L2 · SEMANTIC MEMORY<br/>Tri thức đúc kết (OBSERVATION, ALGORITHM, IDEA, KNOWLEDGE_NODE)"]
-        L3["L3 · EPISODIC MEMORY<br/>Lịch sử phiên chạy, Thực nghiệm chi tiết (EXPERIMENT) & Bài học thô (LESSON)"]
+    subgraph TIERS["4-Tier Cognitive Hierarchy (Progressive Disclosure < 850 tok)"]
+        L0["L0 · WORKING MEMORY<br/>Active strategic goal, current phase & next actions (01_ACTIVE_STATE.md)"]
+        L1["L1 · PROCEDURAL MEMORY<br/>Non-negotiable Laws (LAW), Procedures (PROCEDURE) & PreToolUse CodeGates (GATE)"]
+        L2["L2 · SEMANTIC MEMORY<br/>Distilled domain insights (OBSERVATION, ALGORITHM, IDEA, KNOWLEDGE_NODE)"]
+        L3["L3 · EPISODIC MEMORY<br/>Run history, single-variable experiments (EXPERIMENT) & post-mortem lessons (LESSON)"]
     end
 
-    subgraph HOOKS["Vòng lặp Antigravity Hooks & MCP"]
-        SS["SessionStart / PreInvocation<br/>Nạp Capsule L0+L1 + Truy hồi BM25 2-hop"]
-        PTU["PreToolUse (< 20ms)<br/>Kiểm tra 6 loại CodeGate cứng"]
-        STOP["PostToolUse / Stop<br/>Khóa lưu Lesson hoặc Thực nghiệm khi có thay đổi thật"]
+    subgraph HOOKS["Antigravity Lifecycle Hooks & MCP Loop"]
+        SS["SessionStart / PreInvocation<br/>Inject L0+L1 Capsule + 2-hop BM25 Recall"]
+        PTU["PreToolUse (< 20ms)<br/>Enforce 6 deterministic CodeGate types"]
+        STOP["PostToolUse / Stop<br/>Attest Lesson or Experiment capture on real changes"]
     end
 
     GLB --> SS
     LOC --> SS
-    L3 -->|"Gộp & Chưng cất (Consolidate)"| L2
-    L2 -->|"Kết tinh thành Luật (Learn / Promote)"| L1
+    L3 -->|"Consolidate & Distill"| L2
+    L2 -->|"Crystallize into Law / Promote"| L1
     L0 & L1 --> SS
     SS --> PTU --> STOP
-    STOP -->|"Đồng bộ tức thì SQLite + Markdown + AGENTS.md"| LOC
+    STOP -->|"Atomic sync: SQLite + Markdown + AGENTS.md"| LOC
 ```
 
-| Tầng nhận thức | Thực thể đại diện | Cơ chế nạp vào Agent |
+| Cognitive Tier | Entity Types | Context Injection Strategy |
 | :--- | :--- | :--- |
-| **`L0 · WORKING`** | `01_ACTIVE_STATE.md` (`< 150` dòng) | Luôn nạp đầu phiên để giữ mục tiêu chiến lược và tiến độ hiện tại. |
-| **`L1 · PROCEDURAL`** | `LAW`, `PROCEDURE`, `GATE` (`< 200` dòng) | Luôn nạp tóm tắt vào Capsule và đồng bộ thẳng ra `AGENTS.md` / `GEMINI.md` / `CLAUDE.md`. |
-| **`L2 · SEMANTIC`** | `OBSERVATION`, `ALGORITHM`, `IDEA`, `KNOWLEDGE_NODE` | Không nhồi toàn bộ vào đầu phiên; tự động truy hồi theo ngữ cảnh qua **FTS5 BM25 + lan truyền đồ thị 2-hop**. |
-| **`L3 · EPISODIC`** | `EXPERIMENT`, `PROPOSAL`, `LESSON`, `AGENT_RUN` | Lưu phân trang trên đĩa; cảnh báo tức thì nếu trùng hướng đã thất bại (`Anti-Repeat`) và hỗ trợ gộp cụm lên `L2`/`L1`. |
+| **`L0 · WORKING`** | `01_ACTIVE_STATE.md` (`< 150` lines) | Always loaded at `SessionStart` to preserve strategic goals and immediate next steps. |
+| **`L1 · PROCEDURAL`** | `LAW`, `PROCEDURE`, `GATE` (`< 200` lines) | Summarized in the active Capsule and synced to `AGENTS.md` / `GEMINI.md` / `CLAUDE.md`. |
+| **`L2 · SEMANTIC`** | `OBSERVATION`, `ALGORITHM`, `IDEA`, `KNOWLEDGE_NODE` | Retrieved on demand via **SQLite FTS5 BM25 + 2-hop graph neighborhood expansion**. |
+| **`L3 · EPISODIC`** | `EXPERIMENT`, `PROPOSAL`, `LESSON`, `AGENT_RUN` | Stored paginated on disk; surfaces instant `Anti-Repeat` warnings on dead-ends and consolidates into `L2`/`L1`. |
 
 ---
 
-## 3. Hình ảnh Giao diện Thực tế (`Daylight Architectural Studio`)
+## 3. Daylight Architectural Studio (`Web UI`)
 
-Giao diện Web quản trị chạy cục bộ không cần Internet/CDN (`http://127.0.0.1:8765`), thiết kế theo phong cách **Daylight Utilitarian Minimalism**, chữ tối thiểu `>= 13px` dễ đọc, phân trang toàn diện và không tràn viền trên cả Desktop lẫn Mobile:
+A zero-CDN local management workbench (`http://127.0.0.1:8765`) built with **Daylight Utilitarian Minimalism**, **English by default** with a 1-click **`VI` / `EN` language toggle**, strict `>= 13px` typography, full pagination across every view, and zero horizontal overflow on Desktop (`1440x900`) and Mobile (`375x812`):
 
-### Bản đồ Tri thức Chuyển đổi 3 Chế độ (`Mạng tự do` · `Đồng tâm` · `Phân tầng`)
-![Chế độ Mạng tự do (Force Network)](docs/screenshots/graph_force.png)
+### 3-Mode Interactive Knowledge Graph (`Force` · `Radial` · `Lanes`)
+![Force Network Mode](docs/screenshots/graph_force.png)
 
-![Chế độ Phân tầng 3 Làn Thẻ (3-Lane Architectural Cards)](docs/screenshots/graph_lanes.png)
+![3-Lane Architectural Cards Mode](docs/screenshots/graph_lanes.png)
 
-### Quản lý Vòng đời Proposals Phân trang & Sổ cái Thực nghiệm Đơn biến
-![Proposals & Kho Idea có bộ lọc giai đoạn và phân trang](docs/screenshots/proposals_paginated.png)
+### Paginated OpenSpec Proposals & Single-Variable Experiment Ledger
+![Paginated Proposals & Ideas Vault](docs/screenshots/proposals_paginated.png)
 
-![Sổ cái Thực nghiệm Đơn biến & Đường cong điểm số](docs/screenshots/experiments_ledger.png)
+![Single-Variable Experiment Ledger & Score Progression](docs/screenshots/experiments_ledger.png)
 
 ---
 
-## 4. Cài đặt 1 Lệnh Duy nhất (`Zero-Clone`)
+## 4. 1-Command Installation (`Zero-Clone`)
 
-### Yêu cầu hệ thống
-- Hệ điều hành: **Linux**, **macOS** hoặc **WSL2**.
-- **Python `>= 3.10`** (không cần cài bất kỳ package phụ thuộc bên thứ ba nào).
-- *(Tùy chọn)* `uv` hoặc `pipx` và `agy` (Antigravity CLI) — trình cài đặt sẽ tự động nhận diện tất cả.
+### Prerequisites
+- OS: **Linux**, **macOS**, or **WSL2**.
+- **Python `>= 3.10`** (zero external packages required).
+- *(Optional)* `uv` or `pipx` and `agy` (Antigravity CLI) — automatically detected by the installer.
 
-### Cài đặt mới hoặc Cập nhật lên bản mới nhất (1 dòng duy nhất, đứng ở bất kỳ đâu)
+### Install or Upgrade in 1 Line (from any directory)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vtnguyen04/research-supermemory/main/install.sh | bash
 ```
 
-Lệnh duy nhất trên tự động thực hiện trọn gói:
-1. Tải và cài đặt CLI `supermemory` (cùng alias `research-supermemory`) vào `~/.local/bin/` (ưu tiên `uv tool` -> `pipx` -> hoặc tự tạo môi trường cô lập `~/.local/share/supermemory-venv` nếu máy chỉ có `python3` thuần).
-2. Tự chạy `supermemory install-plugin` để kiểm định nghiêm ngặt (`agy plugin validate --strict`) và kích hoạt bộ **7 Skills · 4 Subagents · 1 Rule · 1 Lifecycle Hook · 1 MCP Server** vào Antigravity CLI.
+This single command automatically:
+1. Installs the `supermemory` (and `research-supermemory`) CLI into `~/.local/bin/` (preferring `uv tool` -> `pipx` -> or an isolated `~/.local/share/supermemory-venv` fallback when only stock `python3` is available).
+2. Runs `supermemory install-plugin` to validate (`agy plugin validate --strict`) and register all **7 Skills · 4 Subagents · 1 Rule · 1 Lifecycle Hook · 1 MCP Server** inside Antigravity CLI.
 
-> **Lưu ý biến môi trường `PATH`:** Nếu lần đầu máy bạn chưa thêm `~/.local/bin` vào `PATH`, hãy thêm dòng sau vào `~/.bashrc` hoặc `~/.zshrc`:
+> **`PATH` Note:** If `~/.local/bin` is not yet on your `PATH`, add this line to `~/.bashrc` or `~/.zshrc`:
 > ```bash
 > export PATH="$HOME/.local/bin:$PATH"
 > ```
 
-### Các cách cài đặt thay thế
+### Alternative Installation Methods
 
 ```bash
-# Cài trực tiếp 1 dòng qua uv:
+# Direct 1-liner via uv:
 uv tool install git+https://github.com/vtnguyen04/research-supermemory.git && ~/.local/bin/supermemory install-plugin
 
-# Hoặc cài ở chế độ phát triển (Editable mode) khi muốn chỉnh sửa mã nguồn:
+# Editable developer installation:
 git clone https://github.com/vtnguyen04/research-supermemory.git
 cd research-supermemory
 uv tool install --editable . --force && supermemory install-plugin
 ```
 
-### Gỡ cài đặt (nếu cần)
+### Uninstall
 
 ```bash
 agy plugin uninstall supermemory
-uv tool uninstall research-supermemory   # hoặc: rm -rf ~/.local/share/supermemory-venv ~/.local/bin/supermemory
+uv tool uninstall research-supermemory   # or: rm -rf ~/.local/share/supermemory-venv ~/.local/bin/supermemory ~/.local/bin/research-supermemory
 ```
 
 ---
 
-## 5. Hướng dẫn Sử dụng Thực tế từ A–Z
+## 5. End-to-End Quickstart & Workflows
 
-### 5.1. Khởi tạo cho dự án mới (hoặc dự án có sẵn chưa có SuperMemory)
+### 5.1. Initialize a Project Workspace (or Use Global-Only Mode)
 
-Bạn có thể làm việc theo 2 cách hoàn toàn linh hoạt:
-- **Chưa chạy `init`:** Agent vẫn hoạt động bình thường dựa trên **Global SuperMemory** (`~/.supermemory/global`) mà không tạo bất kỳ file nào làm bẩn repo hiện tại.
-- **Khởi tạo Local SuperMemory riêng cho dự án:**
+You can operate in two modes:
+- **Zero-Init Global Mode:** Without running `init`, agents automatically use **Global SuperMemory** (`~/.supermemory/global`) without writing any files into the current repository.
+- **Project-Scoped Local SuperMemory:**
 
 ```bash
-cd /duong-dan/toi/du-an
+cd /path/to/your-project
 supermemory init . \
   --name "WorldModel-Research" \
   --max-lines 300 \
-  --goal "Đạt chuẩn SOTA trên benchmark dự đoán trạng thái tiềm ẩn mà không rò rỉ tập test"
+  --goal "Achieve reproducible SOTA on latent state prediction with zero test-set leakage"
 ```
 
-Lệnh `init` sẽ khởi tạo `.supermemory/supermemory.db`, thư mục `memory/`, 8 Luật Hiến pháp gốc (`LAW-01`..`LAW-08`), 4 chốt chặn mặc định (`GATE-001`..`GATE-004`), đồng thời sinh file quy tắc gọn nhẹ cho mọi Agent (`AGENTS.md`, `GEMINI.md`, `CLAUDE.md`, `.agents/`).
+`supermemory init` creates `.supermemory/supermemory.db`, `memory/`, 8 canonical Constitutional Laws (`LAW-01`..`LAW-08`), 4 default CodeGates (`GATE-001`..`GATE-004`), and synchronized agent rules (`AGENTS.md`, `GEMINI.md`, `CLAUDE.md`, `.agents/`).
 
-### 5.2. Mở Giao diện Web Studio (Local & Global)
+### 5.2. Launch the Daylight Architectural Studio (`Local` & `Global`)
 
 ```bash
-# Đứng trong thư mục dự án để mở Local Studio của dự án đó:
+# Inside an initialized project directory:
 supermemory ui --port 8765
 
-# Hoặc đứng ở BẤT KỲ ĐÂU trên máy để mở thẳng Global SuperMemory:
+# Or from ANY directory on your machine to open Global SuperMemory directly:
 supermemory ui --global
-# (viết tắt: supermemory ui -g)
+# (shorthand: supermemory ui -g)
 ```
 
-Sau khi mở `http://127.0.0.1:8765`:
-- **Chuyển đổi dự án tức thì:** Dùng hộp chọn **Không gian bộ nhớ** ở góc trên bên trái để chuyển qua lại giữa `Global: Tất cả dự án` và mọi dự án `Local` mà không cần khởi động lại server (hoặc bấm `+ Thêm dự án` ngay trên web).
-- **3 Chế độ Bản đồ Tri thức:** Chuyển đổi mượt giữa **`Mạng tự do`** (`FORCE` mặc định), **`Đồng tâm`** (`RADIAL` 3 vòng tầng `L1`/`L2`/`L3`), và **`Phân tầng`** (`LANES` 3 cột thẻ kiến trúc); bấm vào bất kỳ nút nào để mở ngăn kéo chi tiết bên phải (**Slide-Over Inspector**) sửa/xóa/nối cạnh hoặc **Đẩy lên Global**.
-- **Gộp & Nén Tri thức (`Phân tầng & Gộp`):** Tick chọn các bài học/thực nghiệm rời rạc ở tầng `L3` để chưng cất thành nguyên lý `L2 Semantic` hoặc luật `L1 Procedural` (hoặc bấm **Tự động nén theo cụm**).
-- **Phím tắt tiện lợi:** Nhấn `/` để nhảy nhanh vào ô tìm kiếm liên thông BM25, `Esc` để đóng ngăn chi tiết, `+` / `-` / `0` trên bản đồ để phóng to, thu nhỏ, vừa khung.
+Inside `http://127.0.0.1:8765`:
+- **Bilingual `EN` / `VI` Switcher:** Defaults to **English (`EN`)**; click **`VI`** in the top-left brand header at any time to switch the entire studio to Vietnamese (persisted in `localStorage`, or pass `?lang=en` / `?lang=vi`).
+- **Instant Workspace Switching:** Use the **Memory Workspace** selector in the left sidebar to switch between `Global: All Workspaces` and any registered `Local` project without restarting the server (or click `+ Add Workspace`).
+- **3 Graph Layout Modes:** Switch seamlessly between **`Force`** (`FORCE` default network), **`Radial`** (`RADIAL` concentric `L1`/`L2`/`L3` rings), and **`Lanes`** (`LANES` 3-column architectural cards); click any node to open the **Slide-Over Inspector** to edit, link edges, delete, or **Promote to Global**.
+- **Cognitive Consolidation (`Tiers & Consolidate`):** Select scattered `L3` episodes and distill them into `L2 Semantic` insights or `L1 Procedural` rules (or click **Auto-Consolidate Clusters**).
+- **Keyboard Shortcuts:** Press `/` to focus federated BM25 search, `Esc` to close the inspector/dialog, and `+` / `-` / `0` on the graph canvas to zoom or fit.
 
-### 5.3. Ra lệnh trực tiếp bằng ngôn ngữ tự nhiên cho Agent tự lưu Rule / Bài học
+### 5.3. Natural-Language Rule & Lesson Capture
 
-Bạn không bắt buộc phải mở UI hay gõ CLI thủ công. Ngay trong khung chat Antigravity, bạn có thể ra lệnh tự nhiên:
-- *"Lưu rule vào global: luôn viết docstring kiểu Google và không dùng toán tử walrus trong Python."* -> Agent tự gọi `supermemory_record_lesson(scope="global")` và cập nhật Global Law.
-- *"Mỗi lần sửa UI xong phải tự chụp ảnh màn hình kiểm tra hết các tab xem có tràn viền không, lưu vào lesson và khóa gate lại."* -> Agent tự kết tinh thành `LESSON` + `LAW` + `CodeGate` kiểm tra tự động ở `PreToolUse`.
+You never have to leave chat to teach the agent permanent rules:
+- *"Save rule to global: always write Google-style docstrings and never use the walrus operator in Python."* -> The agent calls `supermemory_record_lesson(scope="global")` and updates Global Laws.
+- *"Every time you edit the UI, capture headless screenshots across all tabs to verify zero overflow, record this as a lesson, and bind a CodeGate."* -> Crystallizes into a `LESSON` + `LAW` + `PreToolUse` `CodeGate`.
 
-Hoặc ghi bằng CLI bất kỳ lúc nào:
+Or record directly via CLI:
 
 ```bash
-# Lưu bài học + khóa Regex chặn cứng vào dự án hiện tại:
+# Record a project-local lesson + PreToolUse regex gate:
 supermemory learn \
-  --title "Cấm lưới CSS cố định 5+ cột gây tràn khung hình" \
-  --mistake "Dùng repeat(6, minmax(14.5rem, 1fr)) làm cắt mất cột cuối trên màn 1440px" \
-  --root-cause "Tổng chiều rộng tối thiểu vượt quá khung nhìn trung tâm" \
-  --rule "Chỉ dùng auto-fill kết hợp phân trang danh sách" \
+  --title "Ban fixed 5+ column CSS grids causing viewport clipping" \
+  --mistake "Used repeat(6, minmax(14.5rem, 1fr)) which clipped rightmost column on 1440px" \
+  --root-cause "Total min-width exceeded center viewport" \
+  --rule "Always use auto-fill with paginated lists" \
   --law LAW-03 \
   --forbid-regex "repeat\(\s*[5-9]\s*,\s*minmax\(" \
   --target-glob "src/**/*.css"
 
-# Thêm cờ -g (--global) nếu muốn lưu thành quy tắc áp dụng cho MỌI dự án trên máy:
+# Pass -g (--global) to enforce across ALL projects on your machine:
 supermemory learn -g --title "..." --mistake "..." --root-cause "..." --rule "..."
 ```
 
-### 5.4. Khóa bất biến tập đánh giá (`SHA-256 Freeze`) & Quản lý Thực nghiệm Khoa học
+### 5.4. Cryptographic Evaluator Freeze (`SHA-256`) & Scientific Experiments
 
 ```bash
-# 1. Khóa cứng file chấm điểm để Agent không bao giờ vô tình sửa hàm tính điểm:
+# 1. Freeze benchmark/evaluator integrity so agents can never tamper with scoring:
 supermemory gate freeze scripts/evaluate_benchmark.py --law LAW-05
 
-# 2. Ghi nhận hướng tiếp cận thất bại (Dead-End) để Agent tuần sau không bao giờ lặp lại:
+# 2. Record a falsified Dead-End so future sessions never repeat it:
 supermemory idea \
-  --title "Dùng bộ nhúng nặng chạy đồng bộ trong PreToolUse" \
-  --summary "Tăng độ trễ mỗi lần sửa file lên >1.8s" \
+  --title "Heavy synchronous dense embeddings inside PreToolUse" \
+  --summary "Increased file-edit hook latency to >1.8s" \
   --status REJECTED \
-  --reject-reason "Vi phạm ngân sách độ trễ <20ms của PreToolUse Hook"
+  --reject-reason "Violated <20ms PreToolUse hook latency budget"
 
-# 3. Tạo OpenSpec Proposal trước khi thay đổi kiến trúc lớn:
+# 3. Draft an OpenSpec Proposal before major architectural changes:
 supermemory proposal create \
-  --title "Bổ sung bộ dự đoán tiềm ẩn đa bước" \
-  --why "Giảm sai số tích lũy khi rollout dài hơn 16 bước" \
-  --changes "Thêm module latent_rollout.py (<200 dòng) và bài test đơn vị"
+  --title "Multi-step latent rollout predictor" \
+  --why "Reduce compounding drift beyond 16 rollout steps" \
+  --changes "Add latent_rollout.py (<200 lines) and unit tests"
 
-# 4. Ghi sổ thực nghiệm đơn biến (tự động tính Delta so với Baseline & rút trích Observation L2):
+# 4. Log a single-variable experiment (auto-computes baseline delta & extracts L2 Observations):
 supermemory exp \
   --track "world-model" \
-  --title "Thử hàm mất mát dự đoán nhất quán tiềm ẩn (SimSiam Stop-Grad)" \
-  --hypothesis "Stop-grad ngăn sụp đổ biểu diễn mà không cần EMA encoder" \
-  --diff "Thay MSE trực tiếp bằng cosine stop-grad loss trong loss.py" \
+  --title "SimSiam Stop-Grad Latent Consistency Loss" \
+  --hypothesis "Stop-grad prevents representation collapse without an EMA target encoder" \
+  --diff "Replaced direct MSE with cosine stop-grad loss in loss.py" \
   --cv-score 0.8420 --cv "5-fold mean F1 = 0.8420" \
   --verdict KEEP \
-  --insight "Cosine stop-grad ổn định norm tiềm ẩn ngay từ epoch 3, giảm 18% VRAM so với EMA"
+  --insight "Cosine stop-grad stabilized latent norm from epoch 3 and cut VRAM by 18% vs EMA"
 ```
 
-> **Bảo hiểm Thực nghiệm Thất bại:** Nếu `--verdict` là `FAILED` hoặc `REVERT`, SuperMemory **bắt buộc** phải có `--post-mortem` hoặc `--insight` giải thích vì sao sai. Các nhận xét này tự động tách thành nút `OBSERVATION` ở tầng `L2` để mỗi lần truy hồi về sau Agent đều thấy cảnh báo `SUPERMEMORY ANTI-REPEAT`.
+> **Failed-Experiment Post-Mortem Enforcement:** Whenever `--verdict` is `FAILED` or `REVERT`, SuperMemory **requires** a non-empty `--post-mortem` or `--insight`. Extracted insights automatically become `L2 OBSERVATION` nodes so future recalls surface `SUPERMEMORY ANTI-REPEAT` warnings.
 
-### 5.5. Bàn giao không mất ngữ cảnh trước khi `/compact` hoặc đổi sang Agent khác
+### 5.5. Compaction-Proof Handoff Across Sessions & Agents
 
 ```bash
 supermemory handoff
 ```
 
-Lệnh trên kết xuất tệp `memory/HANDOFF_BRIEFING.md` chứa đầy đủ: Capsule trạng thái hiện tại, các luật/chốt chặn đang bật, những bẫy vừa gặp không được lặp lại, và chuỗi thực nghiệm gần nhất — giúp phiên mới hoặc Agent khác (Claude Code / Codex / Gemini CLI) tiếp quản công việc ngay lập tức với **0% lệch pha**.
+Generates `memory/HANDOFF_BRIEFING.md` containing the active Capsule, enforced CodeGates, recent anti-repeat traps, and latest experiment deltas—enabling zero-loss continuation after `/compact` or when switching between Antigravity, Claude Code, Codex, and Gemini CLI.
 
 ---
 
-## 6. Cơ chế Vận hành Hooks Siêu nhẹ (`Zero-Overhead`) & Tự học (`Self-Learning`)
+## 6. Zero-Overhead Lifecycle Hooks & Self-Learning Loop
 
-| Sự kiện Hook | Thời gian chạy | Hành vi chính xác trong `v2.5` |
+| Hook Event | Latency Budget | Exact `v2.5` Runtime Behavior |
 | :--- | :--- | :--- |
-| **`SessionStart`** | `< 30ms` | Tự động nạp Capsule 4 tầng (`L0 + L1` Local + Global `< 850` tokens). Nếu phát hiện phiên vừa qua `/compact`, tự động nạp kèm tóm tắt khôi phục từ `HANDOFF_BRIEFING.md`. |
-| **`PreInvocation`** | `< 15ms` | **Im lặng hoàn toàn (`{}`)** trên các câu trò chuyện/hỏi đáp ngắn để tiết kiệm token. Chỉ tiêm cảnh báo khi: (1) bạn ra quy tắc/chỉnh đốn rõ ràng, (2) truy vấn kỹ thuật khớp cảnh báo `Anti-Repeat` điểm cao (`BM25 >= 8.5`), hoặc (3) phiên chạy tự hành `/goal` mỗi mốc 15 bước. |
-| **`PreToolUse`** | `< 20ms` | Kiểm tra tức thì mọi lệnh `write_file`, `edit_file`, `run_command` qua **6 loại chốt chặn cơ học**: `MAX_LINES`, `FORBIDDEN_FILENAME`, `AST_SYNTAX`, `FORBIDDEN_CMD_PATTERN`, `FORBIDDEN_REGEX`, và `FROZEN_SHA256`. Vi phạm sẽ bị chặn cứng trước khi chạm vào ổ đĩa. |
-| **`PostToolUse`** | `< 15ms` | Theo dõi lệnh benchmark thực nghiệm chưa ghi sổ và tự xóa cờ khóa ngay khi Agent gọi `supermemory_record_lesson` hoặc `supermemory_log_experiment`. |
-| **`Stop`** | `< 10ms` | Cho phép kết thúc lượt trả lời ngay lập tức (`0` lượt lặp phụ) với mọi câu hỏi đáp bình thường; chỉ giữ Agent lại nếu có bài học quy tắc đang khóa hoặc thực nghiệm vừa chạy chưa được ghi sổ. |
+| **`SessionStart`** | `< 30ms` | Injects the 4-tier federated Capsule (`L0 + L1` Local + Global `< 850` tokens). Automatically attaches recovery context from `HANDOFF_BRIEFING.md` after `/compact`. |
+| **`PreInvocation`** | `< 15ms` | **100% silent (`{}`)** on normal Q&A and short prompts for zero token overhead. Injects context strictly on: (1) explicit user rules/corrections, (2) high-confidence `Anti-Repeat` matches (`BM25 >= 8.5`), or (3) autonomous `/goal` heartbeat intervals (every 15 steps). |
+| **`PreToolUse`** | `< 20ms` | Deterministically validates `write_file`, `edit_file`, and `run_command` against **6 mechanical gate types**: `MAX_LINES`, `FORBIDDEN_FILENAME`, `AST_SYNTAX`, `FORBIDDEN_CMD_PATTERN`, `FORBIDDEN_REGEX`, and `FROZEN_SHA256`. |
+| **`PostToolUse`** | `< 15ms` | Tracks unlogged benchmark runs and clears pending attestation locks immediately when `supermemory_record_lesson` or `supermemory_log_experiment` executes. |
+| **`Stop`** | `< 10ms` | Allows immediate turn completion (`0` extra turns) on normal chat; holds the turn strictly when an explicit rule lesson or completed benchmark run has not yet been persisted. |
 
 ---
 
-## 7. Bảng Tra cứu Đầy đủ Lệnh CLI (`supermemory`)
+## 7. Complete CLI Reference (`supermemory`)
 
-| Lệnh CLI | Cờ quan trọng | Chức năng chi tiết |
+| Command | Key Flags | Description |
 | :--- | :--- | :--- |
-| `supermemory init [dir]` | `--name`, `--max-lines`, `--goal` | Khởi tạo Local SuperMemory, 8 luật gốc, 4 CodeGates mặc định và bộ file `AGENTS.md` / `GEMINI.md` / `CLAUDE.md`. |
-| `supermemory status` | `-w <dir>`, `-g` (`--global`) | Hiển thị Capsule nhận thức 4 tầng, mức tiêu thụ token và thống kê đồ thị của Local hoặc Global. |
-| `supermemory workspaces` | *(không)* | Liệt kê Global SuperMemory (`~/.supermemory/global`) cùng toàn bộ các dự án Local đã đăng ký. |
-| `supermemory recall "<câu truy vấn>"` | `--limit`, `--hops`, `-w`, `-g` | Tìm kiếm liên thông `LOCAL + GLOBAL` bằng SQLite FTS5 BM25 + mở rộng lân cận đồ thị 2-hop + cảnh báo lặp lỗi. |
-| `supermemory learn` | `--title`, `--mistake`, `--root-cause`, `--rule`, `--law`, `--forbid-regex`, `--target-glob`, `--forbid-cmd-regex`, `-g` | Kết tinh lỗi sai hoặc quy tắc người dùng thành `LESSON` + `LAW` + `CodeGate` (Local hoặc Global). |
-| `supermemory consolidate` | `--ids A,B` hoặc `--auto`, `--tier SEMANTIC\|PROCEDURAL`, `-g` | Gộp các mảnh lịch sử `L3` thành tri thức chưng cất `L2` hoặc quy trình `L1` để nén ngữ cảnh. |
-| `supermemory promote <NODE_ID>` | `-w <dir>` | Đưa một bài học, luật, thuật toán hoặc quy trình giá trị cao từ dự án Local lên Global SuperMemory. |
-| `supermemory gate list` | `-w <dir>` | Liệt kê toàn bộ chốt chặn `PreToolUse` đang hoạt động và số lần đã chặn vi phạm. |
-| `supermemory gate add` | `--type`, `--name`, `--law`, `--glob`, `--pattern` | Tạo mới chốt chặn kiểm tra mã nguồn hoặc lệnh shell tùy chỉnh. |
-| `supermemory gate freeze <file>` | `--law LAW-05`, `-w <dir>` | Khóa mã băm mật mã học `SHA-256` cho tệp chấm điểm/baseline để cấm chỉnh sửa trái phép. |
-| `supermemory idea` | `--title`, `--summary`, `--status`, `--reject-reason`, `--algorithm` | Lưu ý tưởng hoặc thuật toán mới (bao gồm cả trạng thái `REJECTED` để chống lặp hướng cụt). |
-| `supermemory proposal create\|advance` | `--title`, `--why`, `--changes` / `<ID> <STAGE>` | Tạo mới hoặc chuyển giai đoạn OpenSpec Proposal (`PROPOSED` -> `DESIGNED` -> `IMPLEMENTING` -> `CHALLENGED` -> `AUDITED` -> `ARCHIVED`). |
-| `supermemory exp` | `--track`, `--title`, `--hypothesis`, `--diff`, `--cv-score`, `--test-score`, `--verdict`, `--post-mortem`, `--insight` | Ghi nhận thực nghiệm đơn biến, tự tính độ lệch so với Baseline và tách insight sang tầng `L2`. |
-| `supermemory audit` | `-w <dir>` | Quét kiểm định toàn bộ tệp trong dự án đối chiếu với tất cả `CodeGate` đang bật (trả mã thoát `!= 0` nếu vi phạm, dùng tốt cho CI). |
-| `supermemory sync` | `-w <dir>` | Đồng bộ lại toàn bộ dữ liệu từ SQLite ra hệ thống tệp Markdown, `graph_snapshot.json` và `AGENTS.md`. |
-| `supermemory handoff` | `-w <dir>` | Sinh bản bàn giao `memory/HANDOFF_BRIEFING.md` chống mất trí nhớ trước khi `/compact` hoặc đổi Agent. |
-| `supermemory checkpoint` | `--status CLEAN\|CAPTURED`, `-g` | Xác nhận hoàn tất kiểm tra bộ nhớ cuối lượt. |
-| `supermemory ui` | `-w <dir>`, `-g` (`--global`), `--host`, `--port` | Khởi chạy máy chủ giao diện **Daylight Architectural Studio** (tự mở Global nếu đứng ngoài dự án). |
-| `supermemory install-plugin` | `--validate-only` | Kiểm định cấu trúc (`--strict`) và cài đặt/cập nhật Plugin vào Antigravity CLI. |
-| `supermemory import-zaloai <src>` | `--target <dir>`, `--name` | Nhập khẩu tự động Luật, Bài học, SHA-256 Gates, Proposals và Thực nghiệm từ kho cấu trúc ZALOAI/OpenSpec cũ. |
+| `supermemory init [dir]` | `--name`, `--max-lines`, `--goal` | Initialize Local SuperMemory, 8 Constitutional Laws, 4 default CodeGates, and `AGENTS.md` / `GEMINI.md` / `CLAUDE.md`. |
+| `supermemory status` | `-w <dir>`, `-g` (`--global`) | Show the 4-tier cognitive Capsule, token budget telemetry, and graph counts (`Local` or `Global`). |
+| `supermemory workspaces` | *(none)* | List Global SuperMemory (`~/.supermemory/global`) and all registered Local project workspaces. |
+| `supermemory recall "<query>"` | `--limit`, `--hops`, `-w`, `-g` | Federated `LOCAL + GLOBAL` SQLite FTS5 BM25 search + 2-hop graph expansion + dead-end anti-repeat warnings. |
+| `supermemory learn` | `--title`, `--mistake`, `--root-cause`, `--rule`, `--law`, `--forbid-regex`, `--target-glob`, `--forbid-cmd-regex`, `-g` | Crystallize a bug post-mortem or user rule into `LESSON` + `LAW` + `CodeGate` (`Local` or `Global`). |
+| `supermemory consolidate` | `--ids A,B` or `--auto`, `--tier SEMANTIC\|PROCEDURAL`, `-g` | Distill scattered `L3` episodes into `L2` semantic insights or `L1` procedural rules. |
+| `supermemory promote <NODE_ID>` | `-w <dir>` | Promote a high-value local Law, Lesson, Algorithm, or Procedure to Global SuperMemory. |
+| `supermemory gate list` | `-w <dir>` | List all configured `PreToolUse` CodeGates and blocked-regression counters. |
+| `supermemory gate add` | `--type`, `--name`, `--law`, `--glob`, `--pattern` | Register a new source-code or shell-command `PreToolUse` gate. |
+| `supermemory gate freeze <file>` | `--law LAW-05`, `-w <dir>` | Lock cryptographic `SHA-256` integrity on an evaluator or baseline artifact. |
+| `supermemory idea` | `--title`, `--summary`, `--status`, `--reject-reason`, `--algorithm` | Record a new `IDEA` / `ALGORITHM` or log a falsified `REJECTED` dead-end. |
+| `supermemory proposal create\|advance` | `--title`, `--why`, `--changes` / `<ID> <STAGE>` | Create or advance OpenSpec Proposals (`PROPOSED` -> `DESIGNED` -> `IMPLEMENTING` -> `CHALLENGED` -> `AUDITED` -> `ARCHIVED`). |
+| `supermemory exp` | `--track`, `--title`, `--hypothesis`, `--diff`, `--cv-score`, `--test-score`, `--verdict`, `--post-mortem`, `--insight` | Log a single-variable experiment, compute baseline delta, and extract `L2` observations. |
+| `supermemory audit` | `-w <dir>` | Scan all workspace files against every enabled `CodeGate` (non-zero exit code on violations for CI). |
+| `supermemory sync` | `-w <dir>` | Re-export SQLite graph state to deterministic Markdown files, `graph_snapshot.json`, and `AGENTS.md`. |
+| `supermemory handoff` | `-w <dir>` | Generate `memory/HANDOFF_BRIEFING.md` prior to `/compact` or cross-agent handoff. |
+| `supermemory checkpoint` | `--status CLEAN\|CAPTURED`, `-g` | Attest end-of-turn memory hygiene status. |
+| `supermemory ui` | `-w <dir>`, `-g` (`--global`), `--host`, `--port` | Launch the **Daylight Architectural Studio** web server (auto-falls back to Global outside initialized repos). |
+| `supermemory install-plugin` | `--validate-only` | Validate (`--strict`) and install/update the native Antigravity CLI plugin. |
+| `supermemory import-zaloai <src>` | `--target <dir>`, `--name` | Migrate Laws, Lessons, SHA-256 Gates, Proposals, and Experiments from legacy ZALOAI/OpenSpec workspaces. |
 
 ---
 
-## 8. Bảng Tra cứu 14 MCP Tools, 4 Resources, 7 Skills & 4 Subagents
+## 8. 14 MCP Tools, 4 Resources, 7 Skills & 4 Subagents
 
-### 8.1. 14 Công cụ MCP Gốc (`mcp_config.json`)
-Khi cài Plugin, Agent tự động có quyền gọi trực tiếp 14 công cụ chuẩn JSON-RPC 2.0 qua Stdio:
-1. `supermemory_init` — Khởi tạo không gian bộ nhớ Local mới.
-2. `supermemory_status` — Đọc thông số Capsule 4 tầng (`scope: "local" | "global"`).
-3. `supermemory_recall` — Truy hồi ngữ nghĩa BM25 + đồ thị 2-hop + kiểm tra chống lặp hướng sai.
-4. `supermemory_record_lesson` — Tự lưu quy tắc người dùng hoặc bài học hậu kiểm kèm `CodeGate`.
-5. `supermemory_add_gate` — Bổ sung chốt chặn `PreToolUse` hoặc khóa `SHA-256`.
-6. `supermemory_propose_idea` — Lưu `IDEA` / `ALGORITHM` hoặc đánh dấu hướng cụt `REJECTED`.
-7. `supermemory_manage_proposal` — Tạo và chuyển trạng thái vòng đời OpenSpec Proposal.
-8. `supermemory_log_experiment` — Ghi sổ thực nghiệm đơn biến và tự trích xuất `OBSERVATION`.
-9. `supermemory_update_state` — Cập nhật mục tiêu, giai đoạn và bước tiếp theo ở tầng `L0`.
-10. `supermemory_link_knowledge` — Tạo nút tri thức tùy chỉnh và nối cạnh có hướng trên đồ thị.
-11. `supermemory_consolidate` — Nén/gộp các nút `L3` thành tri thức `L2` hoặc quy trình `L1`.
-12. `supermemory_checkpoint` — Đánh dấu xác nhận trạng thái bộ nhớ của lượt hiện tại.
-13. `supermemory_audit_gates` — Chạy kiểm định toàn bộ CodeGates trên workspace.
-14. `supermemory_record_audit` — Ghi chữ ký phê duyệt/từ chối của Challenger hoặc VictoryAuditor lên Proposal.
+### 8.1. 14 Native Stdio MCP Tools (`mcp_config.json`)
+1. `supermemory_init` — Initialize a new Local SuperMemory workspace.
+2. `supermemory_status` — Inspect the 4-tier Capsule and token budget (`scope: "local" | "global"`).
+3. `supermemory_recall` — Federated BM25 + 2-hop graph recall with dead-end anti-repeat detection.
+4. `supermemory_record_lesson` — Persist user rules or bug post-mortems with optional `CodeGate` binding.
+5. `supermemory_add_gate` — Add a `PreToolUse` CodeGate or `FROZEN_SHA256` lock.
+6. `supermemory_propose_idea` — Record an `IDEA` / `ALGORITHM` or mark a `REJECTED` dead-end.
+7. `supermemory_manage_proposal` — Create and advance OpenSpec Proposal lifecycle stages.
+8. `supermemory_log_experiment` — Log single-variable scientific experiments and auto-extract `OBSERVATION` nodes.
+9. `supermemory_update_state` — Update `L0` active goal, phase, and next actions.
+10. `supermemory_link_knowledge` — Upsert custom knowledge nodes and directed graph edges.
+11. `supermemory_consolidate` — Distill `L3` episodes into `L2` semantic or `L1` procedural nodes.
+12. `supermemory_checkpoint` — Attest turn-level memory status.
+13. `supermemory_audit_gates` — Run full workspace CodeGate verification.
+14. `supermemory_record_audit` — Record `experiment-challenger` or `victory-auditor` sign-off on a Proposal.
 
-**4 MCP Resources đọc nhanh:** `supermemory://active_state`, `supermemory://constitution`, `supermemory://experiments`, `supermemory://memory_graph`.
+**4 Fast-Read MCP Resources:** `supermemory://active_state`, `supermemory://constitution`, `supermemory://experiments`, `supermemory://memory_graph`.
 
-### 8.2. 7 Kỹ năng Slash Skills & 4 Subagents Chuyên biệt trong Antigravity
+### 8.2. 7 Slash Skills & 4 Specialized Subagents
 - **Skills:** `supermemory-init`, `supermemory-learn`, `supermemory-propose`, `supermemory-experiment`, `supermemory-audit`, `supermemory-handoff`, `supermemory-ui`.
 - **Subagents:**
-  - `experiment-challenger`: Phản biện đối kháng thiết kế thực nghiệm (săn lỗi rò rỉ dữ liệu, nhập nhằng đa biến, lặp lại hướng chết).
-  - `victory-auditor`: Kiểm toán viên độc lập xác minh điểm số, tính toàn vẹn file `FROZEN_SHA256` và bộ test trước khi đóng Proposal.
-  - `root-cause-investigator`: Điều tra nguyên nhân gốc rễ 5-Whys và thiết kế biểu thức `CodeGate` chặn tái phát.
-  - `memory-curator`: Kiểm toán vệ sinh bộ nhớ, chống phình dòng (`< 150`L / `< 200`L) và gộp các nút mồ côi trên đồ thị.
+  - `experiment-challenger`: Adversarial red-team reviewer hunting data leakage, multi-variable confounding, silent fallbacks, and repeated dead-ends.
+  - `victory-auditor`: Independent auditor verifying metric deltas, `FROZEN_SHA256` evaluator integrity, and test suites before archiving proposals.
+  - `root-cause-investigator`: 5-Whys debugger that isolates structural root causes and formulates `PreToolUse` CodeGates.
+  - `memory-curator`: Knowledge graph hygiene auditor keeping `01_ACTIVE_STATE.md` (`< 150`L) and `02_CONSTITUTION_AND_LESSONS.md` (`< 200`L) compact and orphan-free.
 
 ---
 
-## 9. Cấu trúc Thư mục Lưu trữ & Quy tắc Git
+## 9. Repository Storage Layout & Git Sync Model
 
-Khi một dự án được khởi tạo `supermemory init .`, cấu trúc tệp được tổ chức sạch sẽ như sau:
+Initializing a project with `supermemory init .` produces a clean, Git-friendly layout:
 
 ```text
-<thu-muc-du-an>/
+<project-root>/
 ├── .supermemory/
-│   ├── supermemory.db          # [Git Ignored] CSDL SQLite WAL + FTS5 tốc độ cao (tự tái tạo được)
-│   └── runtime/                # [Git Ignored] Trạng thái phiên tạm thời của Hook
-├── memory/                     # [Git Tracked] Nguồn chân lý chia sẻ qua Git cho cả nhóm & đa Agent
-│   ├── graph_snapshot.json     # Ảnh chụp toàn vẹn đồ thị + Gates + Thực nghiệm để tự khôi phục .db
-│   ├── 00_MEMORY_GRAPH.md      # Tổng quan sơ đồ liên kết tri thức
-│   ├── 01_ACTIVE_STATE.md      # Tầng L0 Working Memory (< 150 dòng)
-│   ├── 02_CONSTITUTION_AND_LESSONS.md # Tầng L1 Hiến pháp & CodeGates (< 200 dòng)
-│   ├── 03_EXPERIMENTS_REGISTRY.md     # Bảng tổng hợp thực nghiệm đơn biến
-│   ├── HANDOFF_BRIEFING.md     # Bản bàn giao chống mất ngữ cảnh
-│   ├── lessons/                # Chi tiết từng bài học hậu kiểm (LESSON-*.md)
-│   ├── experiments/            # Nhật ký từng thực nghiệm theo nhánh (EXP-*.md)
-│   ├── 04_PROPOSALS/           # Đặc tả OpenSpec (proposal.md, design.md, tasks.md)
-│   ├── 05_IDEAS_AND_ALGORITHMS/# Ý tưởng, thuật toán & hướng bị loại bỏ
-│   └── 06_KNOWLEDGE_NODES/     # Các nhận xét khoa học đúc kết (OBS-*.md)
+│   ├── supermemory.db          # [Git Ignored] Fast SQLite WAL + FTS5 graph index (auto-rebuilt)
+│   └── runtime/                # [Git Ignored] Ephemeral hook session state
+├── memory/                     # [Git Tracked] Team-shared & multi-agent source of truth
+│   ├── graph_snapshot.json     # Full graph + CodeGates + Experiments snapshot for 100% DB rebuild
+│   ├── 00_MEMORY_GRAPH.md      # Knowledge graph topology overview
+│   ├── 01_ACTIVE_STATE.md      # L0 Working Memory (< 150 lines)
+│   ├── 02_CONSTITUTION_AND_LESSONS.md # L1 Constitution & CodeGates (< 200 lines)
+│   ├── 03_EXPERIMENTS_REGISTRY.md     # Single-variable experiment leaderboard
+│   ├── HANDOFF_BRIEFING.md     # Compaction-proof handoff briefing
+│   ├── lessons/                # Individual post-mortem records (LESSON-*.md)
+│   ├── experiments/            # Per-experiment scientific logs (EXP-*.md)
+│   ├── 04_PROPOSALS/           # OpenSpec artifacts (proposal.md, design.md, tasks.md)
+│   ├── 05_IDEAS_AND_ALGORITHMS/# Ideas, algorithms & falsified dead-ends
+│   └── 06_KNOWLEDGE_NODES/     # Distilled domain observations (OBS-*.md)
 ├── .agents/
-│   ├── rules/00_supermemory_constitution.md  # Quy tắc tự nạp cho Antigravity
-│   └── hooks.json              # Chốt chặn PreToolUse cấp dự án
-├── AGENTS.md / GEMINI.md / CLAUDE.md         # Quy tắc đồng bộ cho Claude Code, Codex, Gemini CLI
+│   ├── rules/00_supermemory_constitution.md  # Auto-loaded Antigravity project rule
+│   └── hooks.json              # Project-level PreToolUse enforcement hook
+├── AGENTS.md / GEMINI.md / CLAUDE.md         # Synchronized rules for Claude Code, Codex & Gemini CLI
 ```
 
 ---
 
-## 10. Xử lý Sự cố Thường gặp & Kiểm định Chất lượng
+## 10. Troubleshooting & Self-Audit Suite
 
-### Cổng `8765` đang bận khi bật lại Web UI
+### Port `8765` already in use when restarting Web UI
 ```bash
 fuser -k 8765/tcp 2>/dev/null; supermemory ui --port 8765
-# Hoặc chạy sang cổng khác:
+# Or bind to another port:
 supermemory ui --port 8766
 ```
 
-### Lệnh `supermemory: command not found` sau khi mới cài
-Đảm bảo `~/.local/bin` đã nằm trong `PATH`:
+### `supermemory: command not found` after installation
+Ensure `~/.local/bin` is exported in your shell `PATH`:
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 which supermemory
 ```
 
-### Đẩy dự án lên GitHub lần đầu (dành cho Maintainer)
-```bash
-# Đăng nhập lại GitHub CLI nếu token hết hạn:
-gh auth login -h github.com
-
-# Tạo repo công khai và đẩy toàn bộ mã nguồn lên:
-gh repo create research-supermemory --public --source=. --remote=origin --push
-```
-
-### Chạy bộ kiểm thử & tự kiểm định Hiến pháp của dự án
+### Run the Full Verification & Constitutional Self-Audit Suite
 ```bash
 pytest -v
 ruff check src tests plugin/scripts setup.py
@@ -371,6 +364,6 @@ supermemory audit
 
 ---
 
-## Giấy phép (`License`)
+## License
 
-Phát hành theo giấy phép **MIT License**.
+Released under the **MIT License**.

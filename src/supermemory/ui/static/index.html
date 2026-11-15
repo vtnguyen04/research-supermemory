@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,11 +8,11 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <a href="#main-content" class="skip-link">Chuyển tới nội dung chính</a>
+  <a href="#main-content" class="skip-link" data-vi="Chuyển tới nội dung chính">Skip to main content</a>
 
   <div class="app-shell">
     <!-- ARCHITECTURAL LEFT SIDEBAR -->
-    <aside class="nav-rail" aria-label="Điều hướng dự án và phân hệ">
+    <aside class="nav-rail" aria-label="Workspace and module navigation">
       <div class="rail-brand">
         <span class="brand-badge" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -26,71 +26,72 @@
           <span class="brand-name">SuperMemory</span>
           <span class="version-tag">Studio 2.5</span>
         </div>
+        <button type="button" id="btn-lang-toggle" class="btn btn-secondary btn-xs lang-pill" aria-label="Switch language EN / VI">VI</button>
       </div>
 
       <div class="workspace-bezel">
         <div class="workspace-core">
           <div class="workspace-head">
-            <label for="workspace-switcher" class="workspace-label">Không gian bộ nhớ</label>
-            <button type="button" id="btn-open-init" class="text-action">+ Thêm dự án</button>
+            <label for="workspace-switcher" class="workspace-label" data-vi="Không gian bộ nhớ">Memory Scope</label>
+            <button type="button" id="btn-open-init" class="text-action" data-vi="+ Thêm dự án">+ Add Project</button>
           </div>
-          <select id="workspace-switcher" class="workspace-select" aria-label="Chọn không gian bộ nhớ"></select>
+          <select id="workspace-switcher" class="workspace-select" aria-label="Select memory workspace"></select>
         </div>
       </div>
 
-      <nav class="rail-nav" role="tablist" aria-label="Phân hệ quản trị">
+      <nav class="rail-nav" role="tablist" aria-label="Studio modules">
         <button type="button" role="tab" id="tabbtn-graph" class="nav-item active" aria-selected="true" aria-controls="tab-graph" data-tab="tab-graph">
           <span class="nav-icon" data-icon="topology" aria-hidden="true"></span>
-          <span class="nav-label">Bản đồ Tri thức</span>
+          <span class="nav-label" data-vi="Bản đồ Tri thức">Knowledge Graph</span>
           <span id="nav-count-nodes" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-constitution" class="nav-item" aria-selected="false" aria-controls="tab-constitution" tabindex="-1" data-tab="tab-constitution">
           <span class="nav-icon" data-icon="shield" aria-hidden="true"></span>
-          <span class="nav-label">Hiến pháp &amp; Gates</span>
+          <span class="nav-label" data-vi="Hiến pháp &amp; Gates">Constitution &amp; Gates</span>
           <span id="nav-count-gates" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-tiers" class="nav-item" aria-selected="false" aria-controls="tab-tiers" tabindex="-1" data-tab="tab-tiers">
           <span class="nav-icon" data-icon="layers" aria-hidden="true"></span>
-          <span class="nav-label">Phân tầng &amp; Gộp</span>
+          <span class="nav-label" data-vi="Phân tầng &amp; Gộp">Tiers &amp; Consolidation</span>
           <span id="nav-count-episodic" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-experiments" class="nav-item" aria-selected="false" aria-controls="tab-experiments" tabindex="-1" data-tab="tab-experiments">
           <span class="nav-icon" data-icon="activity" aria-hidden="true"></span>
-          <span class="nav-label">Sổ cái Thực nghiệm</span>
+          <span class="nav-label" data-vi="Sổ cái Thực nghiệm">Experiment Ledger</span>
           <span id="nav-count-exps" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-lifecycle" class="nav-item" aria-selected="false" aria-controls="tab-lifecycle" tabindex="-1" data-tab="tab-lifecycle">
           <span class="nav-icon" data-icon="gitBranch" aria-hidden="true"></span>
-          <span class="nav-label">Proposals &amp; Kho Idea</span>
+          <span class="nav-label" data-vi="Proposals &amp; Kho Idea">Proposals &amp; Ideas</span>
           <span id="nav-count-props" class="nav-count">0</span>
         </button>
         <button type="button" role="tab" id="tabbtn-events" class="nav-item" aria-selected="false" aria-controls="tab-events" tabindex="-1" data-tab="tab-events">
           <span class="nav-icon" data-icon="terminal" aria-hidden="true"></span>
-          <span class="nav-label">Nhật ký Hệ thống</span>
+          <span class="nav-label" data-vi="Nhật ký Hệ thống">System Events</span>
         </button>
       </nav>
 
-      <div class="telemetry-card" aria-label="Thông số bộ nhớ đệm">
+      <div class="telemetry-card" aria-label="Prompt capsule telemetry">
         <div class="meter-head">
           <span class="meter-label">Prompt Capsule</span>
           <strong id="kpi-tokens" class="meter-val">0 / 850 tok</strong>
         </div>
-        <div class="meter-track" role="progressbar" aria-label="Dung lượng Prompt Capsule" aria-valuemin="0" aria-valuemax="850" id="token-meter-bar">
+        <div class="meter-track" role="progressbar" aria-label="Prompt Capsule token budget" aria-valuemin="0" aria-valuemax="850" id="token-meter-bar">
           <div id="token-meter-fill" class="meter-fill"></div>
         </div>
         <div class="telemetry-grid">
           <div class="telemetry-stat">
-            <span>Nén ngữ cảnh</span>
+            <span data-vi="Nén ngữ cảnh">Compression</span>
             <strong id="kpi-compression">0%</strong>
           </div>
           <div class="telemetry-stat">
-            <span>Đã chặn lỗi</span>
+            <span data-vi="Đã chặn lỗi">Gate Blocks</span>
             <strong id="kpi-blocks">0</strong>
           </div>
         </div>
         <div class="rail-footer-actions">
-          <button type="button" id="btn-run-audit" class="btn btn-secondary btn-sm">Kiểm định Gates</button>
-          <button type="button" id="btn-handoff" class="btn btn-secondary btn-sm">Xuất Handoff</button>
+          <button type="button" id="btn-run-audit" class="btn btn-secondary btn-sm" data-vi="Kiểm định Gates">Audit Gates</button>
+          <button type="button" id="btn-handoff" class="btn btn-secondary btn-sm" data-vi="Xuất Handoff">Handoff</button>
         </div>
       </div>
     </aside>
@@ -103,22 +104,22 @@
           <div class="project-titles">
             <div class="title-row">
               <h1 id="project-title" class="page-title">SuperMemory</h1>
-              <button type="button" id="btn-open-state" class="text-action" aria-label="Chỉnh sửa mục tiêu chiến lược">Sửa mục tiêu</button>
+              <button type="button" id="btn-open-state" class="text-action" aria-label="Edit active strategic goal" data-vi="Sửa mục tiêu">Edit Goal</button>
             </div>
-            <p id="active-goal-line" class="goal-summary">Đang đồng bộ trạng thái bộ nhớ...</p>
+            <p id="active-goal-line" class="goal-summary" data-vi="Đang đồng bộ trạng thái bộ nhớ...">Synchronizing memory state...</p>
           </div>
         </div>
 
         <div class="command-actions">
           <div class="search-field">
             <span class="search-icon" data-icon="search" aria-hidden="true"></span>
-            <label for="global-search" class="sr-only">Tìm kiếm liên thông BM25 và đồ thị 2-hop</label>
-            <input id="global-search" type="search" placeholder="Tìm luật, bài học, thực nghiệm..." autocomplete="off" />
+            <label for="global-search" class="sr-only">Federated BM25 and 2-hop graph search</label>
+            <input id="global-search" type="search" placeholder="Search laws, lessons, experiments..." data-vi-ph="Tìm luật, bài học, thực nghiệm..." autocomplete="off" />
             <kbd class="kbd-hint" id="search-kbd" aria-hidden="true">/</kbd>
-            <button type="button" id="btn-clear-search" class="icon-btn hidden" aria-label="Xóa từ khóa tìm kiếm">&times;</button>
+            <button type="button" id="btn-clear-search" class="icon-btn hidden" aria-label="Clear search query">&times;</button>
           </div>
-          <button type="button" id="btn-refresh" class="btn btn-secondary">Đồng bộ</button>
-          <button type="button" id="btn-open-quick-node" class="btn btn-primary">+ Tạo thực thể</button>
+          <button type="button" id="btn-refresh" class="btn btn-secondary" data-vi="Đồng bộ">Sync</button>
+          <button type="button" id="btn-open-quick-node" class="btn btn-primary" data-vi="+ Tạo thực thể">+ New Entity</button>
         </div>
       </header>
 
@@ -131,41 +132,41 @@
           <div class="canvas-stage">
             <div class="floating-toolbar">
               <div class="toolbar-cluster">
-                <div class="segmented-tray" role="group" aria-label="Chế độ hiển thị đồ thị" id="graph-mode-bar">
-                  <button type="button" class="seg-btn" aria-pressed="true" data-gmode="FORCE">Mạng tự do</button>
-                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="RADIAL">Đồng tâm</button>
-                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="LANES">Phân tầng</button>
+                <div class="segmented-tray" role="group" aria-label="Graph layout mode" id="graph-mode-bar">
+                  <button type="button" class="seg-btn" aria-pressed="true" data-gmode="FORCE" data-vi="Mạng tự do">Force</button>
+                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="RADIAL" data-vi="Đồng tâm">Radial</button>
+                  <button type="button" class="seg-btn" aria-pressed="false" data-gmode="LANES" data-vi="Phân tầng">Lanes</button>
                 </div>
-                <div class="segmented-tray" role="group" aria-label="Lọc theo tầng nhận thức" id="tier-filters"></div>
+                <div class="segmented-tray" role="group" aria-label="Filter by cognitive tier" id="tier-filters"></div>
               </div>
               <div class="toolbar-cluster">
                 <label class="checkbox-label toolbar-chk">
                   <input type="checkbox" id="chk-hide-aux" checked />
-                  <span>Ẩn Audit phụ</span>
+                  <span data-vi="Ẩn Audit phụ">Hide Aux Runs</span>
                 </label>
-                <label for="type-filter-select" class="sr-only">Lọc theo loại thực thể</label>
+                <label for="type-filter-select" class="sr-only">Filter by entity type</label>
                 <select id="type-filter-select" class="control-select select-compact">
-                  <option value="ALL">Tất cả loại thực thể</option>
+                  <option value="ALL">All Types</option>
                 </select>
                 <div class="zoom-pill">
-                  <button type="button" id="btn-zoom-out" class="zoom-btn" aria-label="Thu nhỏ bản đồ">&minus;</button>
-                  <button type="button" id="btn-reset-zoom" class="zoom-reset">Vừa khung</button>
-                  <button type="button" id="btn-zoom-in" class="zoom-btn" aria-label="Phóng to bản đồ">+</button>
+                  <button type="button" id="btn-zoom-out" class="zoom-btn" aria-label="Zoom out">&minus;</button>
+                  <button type="button" id="btn-reset-zoom" class="zoom-reset" data-vi="Vừa khung">Fit</button>
+                  <button type="button" id="btn-zoom-in" class="zoom-btn" aria-label="Zoom in">+</button>
                 </div>
-                <button type="button" id="btn-relayout" class="btn btn-secondary btn-sm">Xếp lại</button>
+                <button type="button" id="btn-relayout" class="btn btn-secondary btn-sm" data-vi="Xếp lại">Relayout</button>
               </div>
             </div>
 
             <div class="canvas-viewport">
-              <canvas id="graph-canvas" tabindex="0" aria-label="Bản đồ tri thức 3 tầng. Kéo thả thẻ để di chuyển, cuộn để thu phóng, nhấp vào thẻ để mở chi tiết."></canvas>
+              <canvas id="graph-canvas" tabindex="0" aria-label="Interactive 3-tier knowledge graph. Drag nodes to move, scroll to zoom, click any node to inspect."></canvas>
               <div id="graph-tooltip" class="graph-tooltip hidden" role="tooltip"></div>
 
               <div class="canvas-legend">
-                <span class="legend-item"><span class="legend-swatch" data-tone="LAW"></span>L1 Luật &amp; Gate</span>
-                <span class="legend-item"><span class="legend-swatch" data-tone="SEMANTIC"></span>L2 Tri thức &amp; Insight</span>
-                <span class="legend-item"><span class="legend-swatch" data-tone="EXPERIMENT"></span>L3 Thực nghiệm &amp; Proposal</span>
-                <span class="legend-item"><span class="legend-swatch" data-tone="LESSON"></span>Bài học sai lầm</span>
-                <span class="legend-hint">Nhấp vào bất kỳ nút nào để mở bảng chi tiết</span>
+                <span class="legend-item"><span class="legend-swatch" data-tone="LAW"></span><span data-vi="L1 Luật &amp; Gate">L1 Laws &amp; Gates</span></span>
+                <span class="legend-item"><span class="legend-swatch" data-tone="SEMANTIC"></span><span data-vi="L2 Tri thức &amp; Insight">L2 Semantic Insights</span></span>
+                <span class="legend-item"><span class="legend-swatch" data-tone="EXPERIMENT"></span><span data-vi="L3 Thực nghiệm &amp; Proposal">L3 Experiments &amp; Proposals</span></span>
+                <span class="legend-item"><span class="legend-swatch" data-tone="LESSON"></span><span data-vi="Bài học sai lầm">Mistake Lessons</span></span>
+                <span class="legend-hint" data-vi="Nhấp vào bất kỳ nút nào để mở bảng chi tiết">Click any node to open the inspector sheet</span>
               </div>
             </div>
           </div>
@@ -176,19 +177,19 @@
           <div class="content-wrap">
             <div class="panel-header">
               <div>
-                <h2>Hiến pháp, Chốt chặn CodeGate &amp; Bài học</h2>
-                <p class="section-subtitle">Mọi quy tắc được kiểm tra tức thời tại PreToolUse và đồng bộ trực tiếp vào AGENTS.md của dự án.</p>
+                <h2 data-vi="Hiến pháp, Chốt chặn CodeGate &amp; Bài học">Constitution, CodeGates &amp; Lessons</h2>
+                <p class="section-subtitle" data-vi="Mọi quy tắc được kiểm tra tức thời tại PreToolUse và đồng bộ trực tiếp vào AGENTS.md của dự án.">Every rule is enforced in real time at PreToolUse and synced directly into AGENTS.md.</p>
               </div>
               <div class="toolbar-right">
-                <button type="button" id="btn-add-gate" class="btn btn-secondary">Thêm Gate / Khóa SHA-256</button>
-                <button type="button" id="btn-add-lesson" class="btn btn-primary">+ Ghi bài học / Thêm Rule</button>
+                <button type="button" id="btn-add-gate" class="btn btn-secondary" data-vi="Thêm Gate / Khóa SHA-256">Add Gate / Freeze SHA-256</button>
+                <button type="button" id="btn-add-lesson" class="btn btn-primary" data-vi="+ Ghi bài học / Thêm Rule">+ Record Lesson / Rule</button>
               </div>
             </div>
 
             <div class="bento-constitution">
               <div class="surface-card">
                 <div class="card-header">
-                  <h3>Luật bất biến &amp; Quy trình chuẩn (L1)</h3>
+                  <h3 data-vi="Luật bất biến &amp; Quy trình chuẩn (L1)">Constitutional Laws &amp; Procedures (L1)</h3>
                 </div>
                 <div id="laws-list" class="ledger-list" role="list"></div>
               </div>
@@ -196,14 +197,14 @@
               <div class="stack-column">
                 <div class="surface-card">
                   <div class="card-header">
-                    <h3>Chốt chặn PreToolUse CodeGates đang hoạt động</h3>
+                    <h3 data-vi="Chốt chặn PreToolUse CodeGates đang hoạt động">Active PreToolUse CodeGates</h3>
                   </div>
                   <div id="gates-list" class="ledger-list" role="list"></div>
                 </div>
 
                 <div class="surface-card">
                   <div class="card-header">
-                    <h3>Sổ cái Bài học rút ra từ thực tế</h3>
+                    <h3 data-vi="Sổ cái Bài học rút ra từ thực tế">Self-Learning Lessons Ledger</h3>
                   </div>
                   <div id="lessons-list" class="ledger-list" role="list"></div>
                 </div>
@@ -217,40 +218,40 @@
           <div class="content-wrap">
             <div class="panel-header">
               <div>
-                <h2>Phân tầng Nhận thức &amp; Nén Tri thức</h2>
-                <p id="tier-budget-summary" class="section-subtitle">Đang tính toán dung lượng ngữ cảnh...</p>
+                <h2 data-vi="Phân tầng Nhận thức &amp; Nén Tri thức">Cognitive Tiers &amp; Memory Consolidation</h2>
+                <p id="tier-budget-summary" class="section-subtitle">Computing token budget...</p>
               </div>
               <div class="toolbar-right">
                 <label class="checkbox-label">
                   <input type="checkbox" id="chk-hide-consolidated" checked />
-                  <span>Ẩn mục đã gộp</span>
+                  <span data-vi="Ẩn mục đã gộp">Hide Consolidated</span>
                 </label>
-                <button type="button" id="btn-select-episodic" class="btn btn-secondary">Chọn L3 chưa gộp</button>
-                <button type="button" id="btn-clear-merge-sel" class="btn btn-ghost">Bỏ chọn</button>
-                <button type="button" id="btn-auto-consolidate" class="btn btn-primary">Tự động nén theo cụm</button>
+                <button type="button" id="btn-select-episodic" class="btn btn-secondary" data-vi="Chọn L3 chưa gộp">Select Unmerged L3</button>
+                <button type="button" id="btn-clear-merge-sel" class="btn btn-ghost" data-vi="Bỏ chọn">Clear</button>
+                <button type="button" id="btn-auto-consolidate" class="btn btn-primary" data-vi="Tự động nén theo cụm">Auto-Consolidate Clusters</button>
               </div>
             </div>
 
             <form id="merge-form" class="composer-card" novalidate>
               <div class="composer-grid">
                 <div class="field-group">
-                  <label for="merge-title" class="field-label">Tiêu đề tri thức chưng cất</label>
-                  <input id="merge-title" class="control-input" type="text" placeholder="Ví dụ: Quy luật ổn định phân phối tiềm ẩn trong World Model" required />
+                  <label for="merge-title" class="field-label" data-vi="Tiêu đề tri thức chưng cất">Distilled Knowledge Title</label>
+                  <input id="merge-title" class="control-input" type="text" placeholder="e.g. Latent Rollout Stability Invariant in World Models" data-vi-ph="Ví dụ: Quy luật ổn định phân phối tiềm ẩn trong World Model" required />
                 </div>
                 <div class="field-group">
-                  <label for="merge-tier" class="field-label">Tầng lưu trữ đích</label>
+                  <label for="merge-tier" class="field-label" data-vi="Tầng lưu trữ đích">Target Memory Tier</label>
                   <select id="merge-tier" class="control-select">
-                    <option value="SEMANTIC">L2 Semantic — Tri thức miền bài toán</option>
-                    <option value="PROCEDURAL">L1 Procedural — Quy trình / Luật chuẩn</option>
+                    <option value="SEMANTIC" data-vi="L2 Semantic — Tri thức miền bài toán">L2 Semantic — Domain Knowledge</option>
+                    <option value="PROCEDURAL" data-vi="L1 Procedural — Quy trình / Luật chuẩn">L1 Procedural — Canonical Rule / SOP</option>
                   </select>
                 </div>
                 <div class="field-group">
-                  <button type="submit" id="btn-merge-selected" class="btn btn-primary">Gộp mục đã chọn (0)</button>
+                  <button type="submit" id="btn-merge-selected" class="btn btn-primary">Consolidate Selected (0)</button>
                 </div>
               </div>
               <div class="field-group">
-                <label for="merge-summary" class="field-label">Nguyên lý tổng hợp từ các mảnh nguồn</label>
-                <textarea id="merge-summary" class="control-textarea" rows="2" placeholder="Viết quy luật khái quát để Agent ghi nhớ dài hạn mà không tốn token..." required></textarea>
+                <label for="merge-summary" class="field-label" data-vi="Nguyên lý tổng hợp từ các mảnh nguồn">Synthesized Principle Across Source Episodes</label>
+                <textarea id="merge-summary" class="control-textarea" rows="2" placeholder="Write the generalized principle for long-term low-token recall..." data-vi-ph="Viết quy luật khái quát để Agent ghi nhớ dài hạn mà không tốn token..." required></textarea>
               </div>
               <p id="merge-feedback" class="inline-feedback" role="status" aria-live="polite"></p>
             </form>
@@ -264,31 +265,31 @@
           <div class="content-wrap">
             <div class="panel-header">
               <div>
-                <h2>Sổ cái Thực nghiệm Đơn biến</h2>
-                <p class="section-subtitle">Theo dõi điểm số định lượng so với Baseline và kết tinh hậu kiểm thất bại thành tri thức L2.</p>
+                <h2 data-vi="Sổ cái Thực nghiệm Đơn biến">Single-Variable Experiment Ledger</h2>
+                <p class="section-subtitle" data-vi="Theo dõi điểm số định lượng so với Baseline và kết tinh hậu kiểm thất bại thành tri thức L2.">Track monotonic baseline deltas and crystallize post-mortem insights into L2 Semantic nodes.</p>
               </div>
               <div class="toolbar-right">
-                <label for="exp-track-filter" class="sr-only">Lọc theo nhánh thực nghiệm</label>
+                <label for="exp-track-filter" class="sr-only">Filter by experiment track</label>
                 <select id="exp-track-filter" class="control-select select-compact">
-                  <option value="ALL">Tất cả nhánh</option>
+                  <option value="ALL">All Tracks</option>
                 </select>
-                <button type="button" id="btn-add-exp" class="btn btn-primary">+ Ghi thực nghiệm</button>
+                <button type="button" id="btn-add-exp" class="btn btn-primary" data-vi="+ Ghi thực nghiệm">+ Log Experiment</button>
               </div>
             </div>
 
-            <div id="exp-chart-box" class="surface-card chart-card" aria-label="Biểu đồ tiến trình điểm số thực nghiệm"></div>
+            <div id="exp-chart-box" class="surface-card chart-card" aria-label="Experiment metric progression chart"></div>
 
             <div class="surface-card table-card">
               <table class="ledger-table">
                 <thead>
                   <tr>
-                    <th scope="col">Mã thực nghiệm</th>
-                    <th scope="col">Nhánh</th>
-                    <th scope="col">Giả thuyết &amp; Biến thay đổi</th>
-                    <th scope="col">Điểm CV</th>
+                    <th scope="col" data-vi="Mã thực nghiệm">Exp ID</th>
+                    <th scope="col" data-vi="Nhánh">Track</th>
+                    <th scope="col" data-vi="Giả thuyết &amp; Biến thay đổi">Hypothesis &amp; Single-Var Diff</th>
+                    <th scope="col" data-vi="Điểm CV">CV Metric</th>
                     <th scope="col">Test / LB</th>
-                    <th scope="col" class="num-col">Chênh lệch</th>
-                    <th scope="col">Kết luận</th>
+                    <th scope="col" class="num-col" data-vi="Chênh lệch">Delta</th>
+                    <th scope="col" data-vi="Kết luận">Verdict</th>
                   </tr>
                 </thead>
                 <tbody id="exp-table-body"></tbody>
@@ -303,21 +304,21 @@
           <div class="content-wrap">
             <div class="panel-header">
               <div>
-                <h2>Vòng đời OpenSpec Proposal &amp; Kho Ý tưởng</h2>
-                <p class="section-subtitle">Kiểm tra chống lặp hướng thất bại trước khi triển khai và lưu vết phê duyệt kiến trúc.</p>
+                <h2 data-vi="Vòng đời OpenSpec Proposal &amp; Kho Ý tưởng">OpenSpec Proposals &amp; Idea Vault</h2>
+                <p class="section-subtitle" data-vi="Kiểm tra chống lặp hướng thất bại trước khi triển khai và lưu vết phê duyệt kiến trúc.">Guard against repeating falsified dead-ends and track architectural audit sign-offs.</p>
               </div>
               <div class="toolbar-right">
-                <button type="button" id="btn-add-idea" class="btn btn-secondary">Lưu Idea / Dead-End</button>
-                <button type="button" id="btn-add-proposal" class="btn btn-primary">+ Tạo Proposal</button>
+                <button type="button" id="btn-add-idea" class="btn btn-secondary" data-vi="Lưu Idea / Dead-End">Log Idea / Dead-End</button>
+                <button type="button" id="btn-add-proposal" class="btn btn-primary" data-vi="+ Tạo Proposal">+ New Proposal</button>
               </div>
             </div>
 
-            <div id="proposal-stage-bar" class="segmented-tray stage-filter-bar" role="group" aria-label="Lọc giai đoạn Proposal"></div>
-            <div id="proposal-grid" class="vault-grid" aria-label="Danh sách Proposal"></div>
+            <div id="proposal-stage-bar" class="segmented-tray stage-filter-bar" role="group" aria-label="Filter proposal stages"></div>
+            <div id="proposal-grid" class="vault-grid" aria-label="Proposals list"></div>
             <div id="proposal-pager" class="standalone-pager"></div>
 
             <div class="subsection-block">
-              <h3>Kho Ý tưởng, Thuật toán &amp; Nhận xét Đúc kết</h3>
+              <h3 data-vi="Kho Ý tưởng, Thuật toán &amp; Nhận xét Đúc kết">Ideas, Algorithms &amp; Distilled Observations</h3>
               <div id="ideas-grid" class="vault-grid" role="list"></div>
               <div id="ideas-pager" class="standalone-pager"></div>
             </div>
@@ -329,8 +330,8 @@
           <div class="content-wrap">
             <div class="panel-header">
               <div>
-                <h2>Nhật ký Sự kiện Bất biến</h2>
-                <p class="section-subtitle">Lịch sử thời gian thực của các chốt chặn Hook, Kiểm định, Gộp tầng và Cập nhật đồ thị.</p>
+                <h2 data-vi="Nhật ký Sự kiện Bất biến">Immutable Audit &amp; System Events</h2>
+                <p class="section-subtitle" data-vi="Lịch sử thời gian thực của các chốt chặn Hook, Kiểm định, Gộp tầng và Cập nhật đồ thị.">Real-time ledger of PreToolUse blocks, audits, consolidations, and graph mutations.</p>
               </div>
             </div>
             <div class="surface-card">
@@ -342,15 +343,15 @@
     </div>
   </div>
 
-  <!-- CONTEXTUAL SLIDE-OVER INSPECTOR SHEET (HIDDEN UNTIL NODE SELECTED!) -->
+  <!-- CONTEXTUAL SLIDE-OVER INSPECTOR SHEET -->
   <div id="inspector-backdrop" class="sheet-backdrop hidden" aria-hidden="true"></div>
-  <aside id="inspector-drawer" class="inspector-sheet" aria-label="Chi tiết và chỉnh sửa thực thể" aria-hidden="true">
+  <aside id="inspector-drawer" class="inspector-sheet" aria-label="Entity inspector and editor" aria-hidden="true">
     <div class="inspector-top">
       <div class="inspector-title-group">
-        <span id="insp-badge" class="status-tag">CHI TIẾT THỰC THỂ</span>
-        <h2 id="insp-id" class="inspector-heading">Thanh tra thực thể</h2>
+        <span id="insp-badge" class="status-tag" data-vi="CHI TIẾT THỰC THỂ">ENTITY INSPECTOR</span>
+        <h2 id="insp-id" class="inspector-heading" data-vi="Thanh tra thực thể">Entity Details</h2>
       </div>
-      <button type="button" id="btn-close-inspector" class="icon-btn" aria-label="Đóng bảng chi tiết">&times;</button>
+      <button type="button" id="btn-close-inspector" class="icon-btn" aria-label="Close inspector">&times;</button>
     </div>
     <div id="insp-body" class="inspector-content"></div>
   </aside>
@@ -359,8 +360,8 @@
   <dialog id="workbench-dialog" class="workbench-dialog" aria-labelledby="dialog-title">
     <div class="dialog-shell">
       <div class="dialog-header">
-        <h2 id="dialog-title">Thao tác</h2>
-        <button type="button" id="btn-close-dialog" class="icon-btn" aria-label="Đóng hộp thoại">&times;</button>
+        <h2 id="dialog-title" data-vi="Thao tác">Action</h2>
+        <button type="button" id="btn-close-dialog" class="icon-btn" aria-label="Close dialog">&times;</button>
       </div>
       <div id="dialog-error" class="dialog-error hidden" role="alert"></div>
       <div id="dialog-body" class="dialog-body"></div>

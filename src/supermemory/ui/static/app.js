@@ -1,6 +1,6 @@
 // Main State Container & Accessible Multi-Mode Studio Controller
 (function () {
-  const { hydrateIcons, esc } = window.SuperMemoryIcons;
+  const { hydrateIcons, esc, tr, getLang, setLang, applyStaticLang } = window.SuperMemoryIcons;
   const { ForceGraphCanvas } = window.SuperMemoryGraph;
   const { InspectorController } = window.SuperMemoryInspector;
   const { MergeStudioController } = window.SuperMemoryMergeStudio;
@@ -32,15 +32,23 @@
   function buildViewHandlers() {
     return {
       onInspect: (nid) => { graphView.selectedId = nid; inspector.inspect(nid); },
-      onToggleGate: (gid, enabled) => mutateAndRefresh("/api/gates", { action: "toggle", gate_id: gid, enabled }, `Đã cập nhật ${gid}`),
-      onDeleteGate: (gid) => mutateAndRefresh("/api/gates", { action: "delete", gate_id: gid }, `Đã xóa ${gid}`),
+      onToggleGate: (gid, enabled) => mutateAndRefresh("/api/gates", { action: "toggle", gate_id: gid, enabled }, tr(`Updated ${gid}`, `Đã cập nhật ${gid}`)),
+      onDeleteGate: (gid) => mutateAndRefresh("/api/gates", { action: "delete", gate_id: gid }, tr(`Deleted ${gid}`, `Đã xóa ${gid}`)),
       onOpenLesson: () => modals.openAddLesson(),
       onOpenExp: () => modals.openAddExperiment(),
       onOpenProposal: () => modals.openAddProposal(),
       onOpenIdea: () => modals.openAddIdea(),
-      onAdvanceProposal: (pid, next) => mutateAndRefresh("/api/proposals", { action: "advance", proposal_id: pid, new_stage: next }, `Đã chuyển ${pid} sang ${next}`),
-      onAuditProposal: (pid) => mutateAndRefresh("/api/proposals", { action: "audit", proposal_id: pid, verdict: "APPROVE" }, `Đã phê duyệt Audit cho ${pid}`),
+      onAdvanceProposal: (pid, next) => mutateAndRefresh("/api/proposals", { action: "advance", proposal_id: pid, new_stage: next }, tr(`Moved ${pid} to ${next}`, `Đã chuyển ${pid} sang ${next}`)),
+      onAuditProposal: (pid) => mutateAndRefresh("/api/proposals", { action: "audit", proposal_id: pid, verdict: "APPROVE" }, tr(`Approved Audit for ${pid}`, `Đã phê duyệt Audit cho ${pid}`)),
     };
+  }
+
+  function rerenderAll() {
+    renderWorkspaceSwitcher(); renderCommandAndTelemetry(); renderGraphToolbar();
+    graphView._applyLayout(false); mergeStudio.render();
+    const h = buildViewHandlers();
+    Views.renderConstitution(state, h); Views.renderExperiments(state, h);
+    Views.renderLifecycle(state, h); Views.renderEvents(state, h);
   }
 
   async function loadGraph() {
@@ -48,27 +56,19 @@
     errStrip.classList.add("hidden");
     try {
       const res = await fetch(`/api/graph?scope=${encodeURIComponent(currentScope)}`);
-      if (!res.ok) throw new Error(`Không thể tải dữ liệu đồ thị (HTTP ${res.status})`);
+      if (!res.ok) throw new Error(tr(`Failed to load graph (HTTP ${res.status})`, `Không thể tải dữ liệu đồ thị (HTTP ${res.status})`));
       state = await res.json();
-      renderWorkspaceSwitcher();
-      renderCommandAndTelemetry();
-      renderGraphToolbar();
       graphView.setData(state.nodes, state.edges);
-      mergeStudio.render();
-      const handlers = buildViewHandlers();
-      Views.renderConstitution(state, handlers);
-      Views.renderExperiments(state, handlers);
-      Views.renderLifecycle(state, handlers);
-      Views.renderEvents(state, handlers);
+      rerenderAll();
       const qs = new URLSearchParams(window.location.search);
       const qMode = qs.get("mode");
       if (qMode && ["FORCE", "RADIAL", "LANES"].includes(qMode.toUpperCase())) setGraphMode(qMode.toUpperCase());
       const qInspect = qs.get("inspect");
-      if (qInspect && !inspector.selectedId) { graphView.selectedId = qInspect; inspector.inspect(qInspect); }
+      if (qInspect && !inspector.currentNodeId) { graphView.selectedId = qInspect; inspector.inspect(qInspect); }
     } catch (err) {
       errStrip.classList.remove("hidden");
-      errStrip.innerHTML = `<span>Lỗi kết nối máy chủ: ${esc(err.message)}</span>
-        <button type="button" id="btn-retry-load" class="btn btn-secondary btn-sm">Thử lại</button>`;
+      errStrip.innerHTML = `<span>${tr("Server connection error:", "Lỗi kết nối máy chủ:")} ${esc(err.message)}</span>
+        <button type="button" id="btn-retry-load" class="btn btn-secondary btn-sm">${tr("Retry", "Thử lại")}</button>`;
       document.getElementById("btn-retry-load").addEventListener("click", loadGraph);
     }
   }
@@ -80,7 +80,7 @@
     (state.workspaces || []).forEach((w) => {
       const opt = document.createElement("option");
       opt.value = w.id === "global" ? "global" : w.path;
-      opt.textContent = w.id === "global" ? "Global: Tất cả dự án" : `Local: ${w.name}`;
+      opt.textContent = w.id === "global" ? tr("Global: All Workspaces", "Global: Tất cả dự án") : `Local: ${w.name}`;
       if ((currentScope === "global" && w.id === "global") || w.path === state.workspace_path) { opt.selected = true; matched = true; }
       sel.appendChild(opt);
     });
@@ -109,7 +109,7 @@
 
   function renderGraphToolbar() {
     const tc = ((state.cognitive_tiers || {}).counts_by_tier) || {}, total = (state.nodes || []).length;
-    const segs = [["ALL", `Tất cả (${total})`], ["PROCEDURAL", `L1 (${tc.PROCEDURAL || 0})`], ["SEMANTIC", `L2 (${tc.SEMANTIC || 0})`], ["EPISODIC", `L3 (${tc.EPISODIC || 0})`]];
+    const segs = [["ALL", `${tr("All", "Tất cả")} (${total})`], ["PROCEDURAL", `L1 (${tc.PROCEDURAL || 0})`], ["SEMANTIC", `L2 (${tc.SEMANTIC || 0})`], ["EPISODIC", `L3 (${tc.EPISODIC || 0})`]];
     const tray = document.getElementById("tier-filters");
     tray.innerHTML = segs.map(([k, lbl]) => `<button type="button" class="seg-btn" aria-pressed="${activeTier === k}" data-tier="${k}">${esc(lbl)}</button>`).join("");
     tray.querySelectorAll("[data-tier]").forEach((btn) => btn.addEventListener("click", () => {
@@ -117,7 +117,7 @@
     }));
     const sel = document.getElementById("type-filter-select"), nc = (state.analytics || {}).nodes_by_type || {}, keys = Object.keys(nc).sort();
     if (activeType !== "ALL" && !nc[activeType]) activeType = "ALL";
-    sel.innerHTML = `<option value="ALL">Tất cả loại (${total})</option>` + keys.map((k) => `<option value="${esc(k)}" ${activeType === k ? "selected" : ""}>${esc(k)} (${nc[k]})</option>`).join("");
+    sel.innerHTML = `<option value="ALL">${tr("All Types", "Tất cả loại")} (${total})</option>` + keys.map((k) => `<option value="${esc(k)}" ${activeType === k ? "selected" : ""}>${esc(k)} (${nc[k]})</option>`).join("");
   }
 
   function setGraphMode(mode) {
@@ -158,7 +158,7 @@
         const data = await (await fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${encodeURIComponent(currentScope)}`)).json();
         graphView.highlightIds = new Set((data.results || []).map((r) => r.id));
         banner.classList.toggle("hidden", !data.anti_repeat_warnings?.length);
-        banner.innerHTML = data.anti_repeat_warnings?.length ? `<span>Cảnh báo trùng hướng thất bại: ${data.anti_repeat_warnings.map(esc).join(" | ")}</span>` : "";
+        banner.innerHTML = data.anti_repeat_warnings?.length ? `<span>${tr("Dead-End Anti-Repeat Warning:", "Cảnh báo trùng hướng thất bại:")} ${data.anti_repeat_warnings.map(esc).join(" | ")}</span>` : "";
       }, 200);
     });
     clearBtn.addEventListener("click", () => {
@@ -172,22 +172,24 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    hydrateIcons(document); Views.renderSkeletons();
+    applyStaticLang(); hydrateIcons(document); Views.renderSkeletons();
     graphView = new ForceGraphCanvas(document.getElementById("graph-canvas"), document.getElementById("graph-tooltip"), (n) => inspector.inspect(n.id));
     modals = new ModalController(() => state, (sc) => { currentScope = sc; }, postJson, loadGraph, toast);
     inspector = new InspectorController(() => state, () => currentScope, postJson, loadGraph, (n) => modals.openUpsertNode(n), toast, () => { graphView.selectedId = null; });
     mergeStudio = new MergeStudioController(() => state, postJson, loadGraph, (id) => { graphView.selectedId = id; inspector.inspect(id); }, toast);
     bindTabsAndShortcuts();
+    document.getElementById("btn-lang-toggle").addEventListener("click", () => {
+      setLang(getLang() === "en" ? "vi" : "en"); rerenderAll();
+      if (inspector.currentNodeId) inspector.inspect(inspector.currentNodeId);
+    });
     document.querySelectorAll("[data-gmode]").forEach((b) => b.addEventListener("click", () => setGraphMode(b.dataset.gmode)));
-    document.getElementById("chk-hide-aux").addEventListener("change", (ev) => graphView.setHideAux(ev.target.checked));
-    document.getElementById("workspace-switcher").addEventListener("change", (ev) => { currentScope = ev.target.value; inspector.resetEmpty(); loadGraph(); });
-    document.getElementById("type-filter-select").addEventListener("change", (ev) => { activeType = ev.target.value; graphView.setFilter(activeTier, activeType); });
-    document.getElementById("btn-refresh").addEventListener("click", loadGraph);
-    document.getElementById("btn-zoom-in").addEventListener("click", () => graphView.zoomBy(1.18));
-    document.getElementById("btn-zoom-out").addEventListener("click", () => graphView.zoomBy(0.85));
-    document.getElementById("btn-reset-zoom").addEventListener("click", () => graphView.fitView());
-    document.getElementById("btn-relayout").addEventListener("click", () => graphView.relayout());
-    document.getElementById("exp-track-filter").addEventListener("change", () => Views.renderExperiments(state, buildViewHandlers()));
+    const on = (id, ev, fn) => document.getElementById(id).addEventListener(ev, fn);
+    on("chk-hide-aux", "change", (ev) => graphView.setHideAux(ev.target.checked));
+    on("workspace-switcher", "change", (ev) => { currentScope = ev.target.value; inspector.resetEmpty(); loadGraph(); });
+    on("type-filter-select", "change", (ev) => { activeType = ev.target.value; graphView.setFilter(activeTier, activeType); });
+    on("btn-refresh", "click", loadGraph); on("btn-zoom-in", "click", () => graphView.zoomBy(1.18));
+    on("btn-zoom-out", "click", () => graphView.zoomBy(0.85)); on("btn-reset-zoom", "click", () => graphView.fitView());
+    on("btn-relayout", "click", () => graphView.relayout()); on("exp-track-filter", "change", () => Views.renderExperiments(state, buildViewHandlers()));
     loadGraph();
   });
 })();
