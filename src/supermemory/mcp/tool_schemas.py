@@ -15,7 +15,7 @@ _SCOPE_PROP = {
 
 MCP_TOOLS: List[Dict[str, Any]] = [
     {
-        "name": "supermemory_init",
+        "name": "init",
         "description": "Initialize isolated Local SuperMemory in a project folder and register it in Global workspaces.",
         "inputSchema": {
             "type": "object",
@@ -27,7 +27,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_status",
+        "name": "status",
         "description": "Return 4-Tier Cognitive Capsule (Working/Procedural/Semantic/Episodic), token budget stats, and workspaces.",
         "inputSchema": {
             "type": "object",
@@ -35,7 +35,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_recall",
+        "name": "recall",
         "description": "Federated (Local + Global) BM25 + 2-hop Knowledge Graph progressive-disclosure search & Anti-Repeat check.",
         "inputSchema": {
             "type": "object",
@@ -50,7 +50,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_record_lesson",
+        "name": "record_lesson",
         "description": "Autonomous self-learning commit: record any critique, mistake, or new user rule into Local or Global LAW + CodeGate.",
         "inputSchema": {
             "type": "object",
@@ -72,7 +72,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_add_gate",
+        "name": "add_gate",
         "description": "Register an executable PreToolUse CodeGate (MAX_LINES, FORBIDDEN_REGEX, FROZEN_SHA256, FORBIDDEN_CMD_PATTERN).",
         "inputSchema": {
             "type": "object",
@@ -90,7 +90,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_propose_idea",
+        "name": "propose_idea",
         "description": "Log an IDEA or ALGORITHM into Semantic/Procedural memory with Dead-End Anti-Repeat check.",
         "inputSchema": {
             "type": "object",
@@ -110,7 +110,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_manage_proposal",
+        "name": "manage_proposal",
         "description": "Create or advance an OpenSpec lifecycle PROPOSAL (PROPOSED -> DESIGNED -> IMPLEMENTING -> CHALLENGED -> AUDITED -> ARCHIVED).",
         "inputSchema": {
             "type": "object",
@@ -135,7 +135,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_log_experiment",
+        "name": "log_experiment",
         "description": "Record a scientific EXPERIMENT (enforces post_mortem on failures and crystallizes insights into OBS-XXX Semantic nodes).",
         "inputSchema": {
             "type": "object",
@@ -162,7 +162,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_update_state",
+        "name": "update_state",
         "description": "Atomically update L0 Working State (01_ACTIVE_STATE.md), Agent Rules, and Snapshot.",
         "inputSchema": {
             "type": "object",
@@ -177,7 +177,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_link_knowledge",
+        "name": "link_knowledge",
         "description": "Upsert a PROCEDURAL (PROCEDURE) or SEMANTIC (KNOWLEDGE_NODE / OBSERVATION) entity and/or typed edge.",
         "inputSchema": {
             "type": "object",
@@ -197,7 +197,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_consolidate",
+        "name": "consolidate",
         "description": "Consolidate/merge Episodic nodes into compact Semantic/Procedural memory, auto-compact tracks, or promote Local -> Global.",
         "inputSchema": {
             "type": "object",
@@ -214,7 +214,7 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_checkpoint",
+        "name": "checkpoint",
         "description": "Semantic turn-closing attestation: mark turn CLEAN (no memory delta) or capture a quick Semantic/Procedural insight.",
         "inputSchema": {
             "type": "object",
@@ -230,12 +230,12 @@ MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_audit_gates",
+        "name": "audit_gates",
         "description": "Run all active Constitutional CodeGates across the workspace and return violations.",
         "inputSchema": {"type": "object", "properties": {"workspace": {"type": "string"}}},
     },
     {
-        "name": "supermemory_record_audit",
+        "name": "record_audit",
         "description": "Record Challenger / VictoryAuditor verdict on a Proposal/Experiment, or generate HANDOFF_BRIEFING.md.",
         "inputSchema": {
             "type": "object",

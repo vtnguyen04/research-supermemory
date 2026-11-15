@@ -62,7 +62,7 @@ def dispatch_hook(event_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             extra = ("\n• Global Learned Rules: " + " | ".join(g_titles[:4])) if g_titles else ""
             msg = (
                 "🌐 SUPERMEMORY GLOBAL HARNESS ACTIVE (No Local `.supermemory` in this folder yet)."
-                f"{extra}\n• Normal Q&A requires ZERO memory calls. Only call `supermemory_record_lesson` "
+                f"{extra}\n• Normal Q&A requires ZERO memory calls. Only call `record_lesson` "
                 "(`scope='global'`) for genuine cross-project rules, or `supermemory init` when requested."
             )
             return {"injectSteps": [{"systemMessage": {"systemMessage": msg}}]}
@@ -173,22 +173,23 @@ def _on_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) 
     err = str(payload.get("error") or "")
 
     cmd = str(t_args.get("CommandLine") or t_args.get("command") or "")
+    mcp_srv = str(t_args.get("ServerName") or "").lower()
     mcp_tool = str(t_args.get("ToolName") or "").lower()
-    combined = f"{t_name} {mcp_tool}"
+    is_sm_mcp = "supermemory" in t_name or "supermemory" in mcp_srv or mcp_tool.startswith("supermemory_")
+    norm_mcp = mcp_tool[12:] if mcp_tool.startswith("supermemory_") else mcp_tool
 
     if (
         "supermemory learn" in cmd
         or "supermemory gate" in cmd
-        or "supermemory_record_lesson" in combined
-        or "supermemory_add_gate" in combined
+        or (is_sm_mcp and (norm_mcp in ("record_lesson", "add_gate") or "record_lesson" in t_name or "add_gate" in t_name))
     ) and not err:
         st["pending_lesson_lock"] = False
         st["turn_memory_handled"] = True
 
-    sm_cli = ("supermemory sync", "supermemory exp", "supermemory learn", "supermemory idea", "supermemory proposal", "supermemory gate", "supermemory checkpoint", "supermemory consolidate", "supermemory promote")
-    sm_mcp = ("supermemory_update_state", "supermemory_log_experiment", "supermemory_record_lesson", "supermemory_link_knowledge", "supermemory_manage_proposal", "supermemory_propose_idea", "supermemory_add_gate", "supermemory_checkpoint", "supermemory_consolidate")
+    sm_cli = ("supermemory sync", "supermemory exp", "supermemory learn", "supermemory idea", "supermemory proposal", "supermemory gate", "supermemory checkpoint", "supermemory consolidate", "supermemory promote", "supermemory bottleneck", "supermemory scout", "supermemory orchestrate")
+    sm_mcp = ("update_state", "log_experiment", "record_lesson", "link_knowledge", "manage_proposal", "propose_idea", "add_gate", "checkpoint", "consolidate", "diagnose_bottleneck", "scout_sota", "orchestrate")
 
-    if (any(m in cmd for m in sm_cli) or any(m in combined for m in sm_mcp)) and not err:
+    if (any(m in cmd for m in sm_cli) or (is_sm_mcp and (norm_mcp in sm_mcp or any(m in t_name for m in sm_mcp)))) and not err:
         st["turn_memory_handled"] = True
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
@@ -225,7 +226,7 @@ def _on_stop(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[s
             "decision": "continue",
             "reason": (
                 "🛡️ SUPERMEMORY SELF-LEARNING COMMIT REQUIRED (LAW-08): "
-                "Persist the explicit lesson/rule + CodeGate via `supermemory learn` or `supermemory_record_lesson` "
+                "Persist the explicit lesson/rule + CodeGate via `supermemory learn` or MCP `record_lesson` "
                 "before finishing your response."
             ),
         }
@@ -239,7 +240,7 @@ def _on_stop(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[s
             "decision": "continue",
             "reason": (
                 f"🧪 SUPERMEMORY EXPERIMENT LOG REQUIRED: {reason_txt} ran this turn without logging. "
-                "Record the experiment result & insights via `supermemory_log_experiment` (`supermemory exp`) before stopping."
+                "Record the experiment result & insights via MCP `log_experiment` (`supermemory exp`) before stopping."
             ),
         }
     return {"decision": "allow"}

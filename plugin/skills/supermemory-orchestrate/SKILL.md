@@ -8,7 +8,7 @@ description: Multi-Agent Fast-DAG Sprint Orchestration — fan out Wave-1 parall
 Use this skill to accelerate research & engineering throughput via parallel subagents without file collisions, context bloat, or wasted GPU/API runs.
 
 ## 3-Wave Fast-DAG Workflow
-1. **Compile Sprint DAG:** Call `supermemory_orchestrate(action="plan_sprint", goal=..., bottleneck_id=..., smoke_cmd=..., target_globs=["src/**"])`.
+1. **Compile Sprint DAG:** Call `orchestrate(action="plan_sprint", goal=..., bottleneck_id=..., smoke_cmd=..., target_globs=["src/**"])`.
 2. **Wave 1 — Parallel Read-Only Discovery (Spawn Concurrently):**
    - Spawn `bottleneck-profiler`, `sota-scout`, and `memory-curator` in parallel (`workspace="inherit"`). Each worker claims its Wave-1 task and returns a `< 180`-token JSON receipt.
 3. **Wave 2 — Occam Synthesis & Adversarial Red-Team:**

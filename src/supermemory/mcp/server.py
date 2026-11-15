@@ -124,7 +124,7 @@ def handle_rpc_request(msg: Dict[str, Any], default_ws: Optional[Path] = None) -
 
         if method == "prompts/get":
             ws = default_ws or Path.cwd()
-            out = execute_mcp_tool("supermemory_status", {"workspace": str(ws)})
+            out = execute_mcp_tool("status", {"workspace": str(ws)})
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,

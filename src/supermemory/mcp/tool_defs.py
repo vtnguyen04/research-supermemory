@@ -44,16 +44,17 @@ def _resolve_target_root(args: Dict[str, Any]) -> Path:
 
 
 def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-    """Dispatch an MCP tool call against Local or Global SuperMemory."""
+    """Dispatch an MCP tool call against Local or Global SuperMemory (supports short & legacy names)."""
+    canon = name[12:] if name.startswith("supermemory_") else name
     raw_ws = Path(str(args.get("workspace") or Path.cwd())).resolve()
-    if name == "supermemory_init":
+    if canon == "init":
         return init_workspace(
             raw_ws,
             project_name=str(args.get("project_name") or raw_ws.name),
             max_lines=int(args.get("max_lines") or 300),
         )
 
-    if name == "supermemory_recall":
+    if canon == "recall":
         local_ok = (raw_ws / ".supermemory").is_dir() or (raw_ws / "memory" / "graph_snapshot.json").is_file()
         return federated_recall(
             str(args["query"]),
@@ -69,12 +70,12 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         str(args.get("scope") or "local").lower() == "local"
         and not (target_root / ".supermemory").is_dir()
         and not (target_root / "memory" / "graph_snapshot.json").is_file()
-        and name in ("supermemory_status", "supermemory_checkpoint")
+        and canon in ("status", "checkpoint")
     ):
         target_root = ensure_global_memory()
 
     with GraphStore(target_root) as store:
-        if name == "supermemory_status":
+        if canon == "status":
             qe = QueryEngine(store)
             return {
                 "scope": "global" if target_root == ensure_global_memory() else "local",
@@ -84,7 +85,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
                 "workspaces": list_registered_workspaces(),
             }
 
-        if name == "supermemory_record_lesson":
+        if canon == "record_lesson":
             res = LessonConsolidator(store).record_lesson(
                 title=str(args["title"]),
                 mistake=str(args["mistake"]),
@@ -101,7 +102,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             MarkdownCompiler(store).compile_all()
             return res
 
-        if name == "supermemory_add_gate":
+        if canon == "add_gate":
             enf = GateEnforcer(store)
             if args.get("freeze_path"):
                 gate = enf.freeze_file(str(args["freeze_path"]), law_id=str(args.get("law_id") or "LAW-05"))
@@ -121,7 +122,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             MarkdownCompiler(store).compile_all()
             return gate.to_dict()
 
-        if name == "supermemory_propose_idea":
+        if canon == "propose_idea":
             res = LifecycleManager(store).register_idea(
                 title=str(args["title"]),
                 summary=str(args["summary"]),
@@ -137,7 +138,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             MarkdownCompiler(store).compile_all()
             return res
 
-        if name == "supermemory_manage_proposal":
+        if canon == "manage_proposal":
             lm = LifecycleManager(store)
             if args.get("action") == "advance":
                 nd = lm.advance_proposal(str(args["proposal_id"]), str(args["new_stage"]), str(args.get("note") or ""))
@@ -161,7 +162,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             MarkdownCompiler(store).compile_all()
             return out
 
-        if name == "supermemory_log_experiment":
+        if canon == "log_experiment":
             res = LifecycleManager(store).log_experiment(
                 track=str(args.get("track") or "main"),
                 exp_id=str(args.get("exp_id") or ""),
@@ -184,14 +185,14 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             MarkdownCompiler(store).compile_all()
             return res
 
-        if name == "supermemory_update_state":
+        if canon == "update_state":
             for k in ("active_goal", "current_phase", "primary_targets", "next_actions", "state_notes"):
                 if args.get(k) is not None:
                     store.set_meta(k, str(args[k]))
             mark_turn_memory_handled(store)
             return MarkdownCompiler(store).compile_all()
 
-        if name == "supermemory_link_knowledge":
+        if canon == "link_knowledge":
             created: Dict[str, Any] = {}
             if args.get("node_id") and args.get("title"):
                 meta = {"memory_tier": str(args["memory_tier"])} if args.get("memory_tier") else {}
@@ -218,7 +219,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             MarkdownCompiler(store).compile_all()
             return created
 
-        if name == "supermemory_consolidate":
+        if canon == "consolidate":
             mode = str(args.get("mode") or "merge").lower()
             if mode == "promote":
                 res = promote_node_to_global(store, str(args["promote_node_id"]))
@@ -237,7 +238,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             MarkdownCompiler(store).compile_all()
             return res
 
-        if name == "supermemory_checkpoint":
+        if canon == "checkpoint":
             captured = None
             if args.get("insight_title") and args.get("insight_summary"):
                 tier = str(args.get("memory_tier") or MemoryTier.SEMANTIC.value).upper()
@@ -261,10 +262,10 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             mark_turn_memory_handled(store)
             return {"status": str(args.get("status") or "CLEAN"), "turn_memory_handled": True, "captured": captured}
 
-        if name == "supermemory_audit_gates":
+        if canon == "audit_gates":
             return GateEnforcer(store).audit_workspace()
 
-        if name == "supermemory_record_audit":
+        if canon == "record_audit":
             out_res: Dict[str, Any] = {}
             if args.get("target_id") and args.get("verdict"):
                 out_res["audit"] = LifecycleManager(store).record_audit_verdict(
@@ -279,7 +280,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             MarkdownCompiler(store).compile_all()
             return out_res
 
-        if name in RESEARCH_TOOL_NAMES:
-            return execute_research_mcp_tool(name, store, args)
+        if canon in RESEARCH_TOOL_NAMES:
+            return execute_research_mcp_tool(canon, store, args)
 
     raise ValueError(f"Unknown MCP tool: {name}")

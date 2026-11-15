@@ -220,3 +220,36 @@ def test_hook_compaction_recovery_and_stop_lesson_lock(tmp_path: Path) -> None:
         },
     )
     assert stop_2["decision"] == "allow"
+
+    # Also verify lazy call_mcp_tool with compact v3.0.1 server='supermemory_graph' & ToolName='record_lesson'
+    dispatch_hook(
+        "PreInvocation",
+        {
+            "conversationId": conv,
+            "workspacePaths": [str(tmp_path)],
+            "invocationNum": 4,
+            "initialNumSteps": 14,
+            "lastUserInput": "Thêm rule: không bao giờ hardcode đường dẫn tuyệt đối!",
+        },
+    )
+    dispatch_hook(
+        "PostToolUse",
+        {
+            "conversationId": conv,
+            "workspacePaths": [str(tmp_path)],
+            "toolCall": {
+                "name": "call_mcp_tool",
+                "args": {"ServerName": "supermemory_graph", "ToolName": "record_lesson"},
+            },
+        },
+    )
+    stop_3 = dispatch_hook(
+        "Stop",
+        {
+            "conversationId": conv,
+            "workspacePaths": [str(tmp_path)],
+            "continuationActive": False,
+            "terminationReason": "NO_TOOL_CALL",
+        },
+    )
+    assert stop_3["decision"] == "allow"

@@ -198,7 +198,7 @@ supermemory ui --global         # Hoặc mở Global SuperMemory từ bất kỳ
 | **`SessionStart`** | `< 30ms` | Nạp Capsule 4 tầng (`L0 + L1` + Top Điểm nghẽn `BOTTLENECK` đang mở `< 850` tokens) và khôi phục `HANDOFF_BRIEFING.md` sau `/compact`. |
 | **`PreInvocation`** | `< 15ms` | **Im lặng 100% (`{}`)** trên các câu hỏi đáp thông thường; chỉ tiêm cảnh báo khi có quy tắc mới, khớp cảnh báo lặp lỗi `Anti-Repeat` hoặc nhịp `/goal`. |
 | **`PreToolUse`** | `< 20ms` | Chặn cứng mọi thao tác vi phạm qua **6 loại chốt chặn**: `MAX_LINES`, `FORBIDDEN_FILENAME`, `AST_SYNTAX`, `FORBIDDEN_CMD_PATTERN`, `FORBIDDEN_REGEX`, `FROZEN_SHA256`. |
-| **`PostToolUse`** | `< 15ms` | Theo dõi lệnh chạy benchmark thực nghiệm và tự mở khóa ngay khi đã gọi `supermemory_record_lesson` hoặc `supermemory_log_experiment`. |
+| **`PostToolUse`** | `< 15ms` | Theo dõi lệnh chạy benchmark thực nghiệm và tự mở khóa ngay khi đã gọi `record_lesson` hoặc `log_experiment`. |
 | **`Stop`** | `< 10ms` | Kết thúc lượt trả lời ngay lập tức (`0` lượt phụ) với hội thoại thường; chỉ giữ lại nếu bài học quy tắc hoặc kết quả benchmark chưa được ghi sổ. |
 
 ---
@@ -231,23 +231,23 @@ supermemory ui --global         # Hoặc mở Global SuperMemory từ bất kỳ
 ## 9. Bảng Tra cứu 17 MCP Tools, 4 Resources, 9 Skills & 8 Subagents
 
 ### 9.1. 17 Công cụ MCP Gốc (`mcp_config.json`)
-1. `supermemory_init` — Khởi tạo không gian bộ nhớ Local mới.
-2. `supermemory_status` — Đọc Capsule 4 tầng, danh sách điểm nghẽn mở và thống kê token.
-3. `supermemory_recall` — Truy hồi lai Subword TF-IDF + Empirical Utility PageRank (`include_siblings` hỗ trợ quét dự án anh em).
-4. `supermemory_diagnose_bottleneck` — Chẩn đoán/xếp hạng/đóng điểm nghẽn Pareto `BNK-XXX`, `RQ-XXX` và chấm điểm `Occam ROI`.
-5. `supermemory_scout_sota` — Tìm bài báo trên arXiv, Semantic Scholar & OpenAlex (lưu đệm SQLite) và đúc thẻ `METH-XXX` vào `07_METHOD_VAULT`.
-6. `supermemory_orchestrate` — Lập lịch `3-Wave Fast-DAG`, nhận việc nguyên tử có khóa file `locked_globs`, và kích hoạt dừng sớm 10% `EARLY_KILLED`.
-7. `supermemory_record_lesson` — Tự lưu quy tắc người dùng hoặc bài học hậu kiểm kèm `CodeGate`.
-8. `supermemory_add_gate` — Bổ sung chốt chặn `PreToolUse` hoặc khóa `SHA-256`.
-9. `supermemory_propose_idea` — Lưu `IDEA` / `ALGORITHM` (chấm `Occam ROI`) hoặc đánh dấu hướng cụt `REJECTED`.
-10. `supermemory_manage_proposal` — Tạo và chuyển giai đoạn OpenSpec Proposal kèm cổng kiểm tra Occam & chống lặp.
-11. `supermemory_log_experiment` — Ghi sổ thực nghiệm đơn biến và tự trích xuất `OBSERVATION`.
-12. `supermemory_update_state` — Cập nhật mục tiêu, giai đoạn và bước tiếp theo ở tầng `L0`.
-13. `supermemory_link_knowledge` — Tạo nút tri thức tùy chỉnh và nối cạnh có hướng trên đồ thị.
-14. `supermemory_consolidate` — Nén/gộp các nút `L3` thành tri thức `L2` hoặc quy trình `L1`.
-15. `supermemory_checkpoint` — Xác nhận trạng thái bộ nhớ cuối lượt.
-16. `supermemory_audit_gates` — Kiểm định toàn bộ CodeGates trên workspace.
-17. `supermemory_record_audit` — Ghi chữ ký phê duyệt/phản biện của `Challenger` hoặc `VictoryAuditor`.
+1. `init` — Khởi tạo không gian bộ nhớ Local mới.
+2. `status` — Đọc Capsule 4 tầng, danh sách điểm nghẽn mở và thống kê token.
+3. `recall` — Truy hồi lai Subword TF-IDF + Empirical Utility PageRank (`include_siblings` hỗ trợ quét dự án anh em).
+4. `diagnose_bottleneck` — Chẩn đoán/xếp hạng/đóng điểm nghẽn Pareto `BNK-XXX`, `RQ-XXX` và chấm điểm `Occam ROI`.
+5. `scout_sota` — Tìm bài báo trên arXiv, Semantic Scholar & OpenAlex (lưu đệm SQLite) và đúc thẻ `METH-XXX` vào `07_METHOD_VAULT`.
+6. `orchestrate` — Lập lịch `3-Wave Fast-DAG`, nhận việc nguyên tử có khóa file `locked_globs`, và kích hoạt dừng sớm 10% `EARLY_KILLED`.
+7. `record_lesson` — Tự lưu quy tắc người dùng hoặc bài học hậu kiểm kèm `CodeGate`.
+8. `add_gate` — Bổ sung chốt chặn `PreToolUse` hoặc khóa `SHA-256`.
+9. `propose_idea` — Lưu `IDEA` / `ALGORITHM` (chấm `Occam ROI`) hoặc đánh dấu hướng cụt `REJECTED`.
+10. `manage_proposal` — Tạo và chuyển giai đoạn OpenSpec Proposal kèm cổng kiểm tra Occam & chống lặp.
+11. `log_experiment` — Ghi sổ thực nghiệm đơn biến và tự trích xuất `OBSERVATION`.
+12. `update_state` — Cập nhật mục tiêu, giai đoạn và bước tiếp theo ở tầng `L0`.
+13. `link_knowledge` — Tạo nút tri thức tùy chỉnh và nối cạnh có hướng trên đồ thị.
+14. `consolidate` — Nén/gộp các nút `L3` thành tri thức `L2` hoặc quy trình `L1`.
+15. `checkpoint` — Xác nhận trạng thái bộ nhớ cuối lượt.
+16. `audit_gates` — Kiểm định toàn bộ CodeGates trên workspace.
+17. `record_audit` — Ghi chữ ký phê duyệt/phản biện của `Challenger` hoặc `VictoryAuditor`.
 
 ### 9.2. 9 Kỹ năng Slash Skills & 8 Subagents Chuyên biệt
 - **9 Skills:** `supermemory-init`, `supermemory-research`, `supermemory-orchestrate`, `supermemory-learn`, `supermemory-propose`, `supermemory-experiment`, `supermemory-audit`, `supermemory-handoff`, `supermemory-ui`.

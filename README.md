@@ -246,7 +246,7 @@ supermemory exp \
 | **`SessionStart`** | `< 30ms` | Injects the 4-tier federated Capsule (`L0 + L1` + Top Open `BOTTLENECK`s `< 850` tokens) plus `HANDOFF_BRIEFING.md` recovery after `/compact`. |
 | **`PreInvocation`** | `< 15ms` | **100% silent (`{}`)** on normal Q&A and short prompts. Injects context strictly on explicit user rules, high-confidence `Anti-Repeat` matches, or `/goal` heartbeat intervals. |
 | **`PreToolUse`** | `< 20ms` | Deterministically validates `write_file`, `edit_file`, and `run_command` against **6 mechanical gate types**: `MAX_LINES`, `FORBIDDEN_FILENAME`, `AST_SYNTAX`, `FORBIDDEN_CMD_PATTERN`, `FORBIDDEN_REGEX`, and `FROZEN_SHA256`. |
-| **`PostToolUse`** | `< 15ms` | Tracks unlogged benchmark runs and clears attestation locks as soon as `supermemory_record_lesson` or `supermemory_log_experiment` runs. |
+| **`PostToolUse`** | `< 15ms` | Tracks unlogged benchmark runs and clears attestation locks as soon as `record_lesson` or `log_experiment` runs. |
 | **`Stop`** | `< 10ms` | Allows immediate turn completion (`0` extra turns) on normal chat; holds strictly when an explicit rule or completed benchmark has not yet been persisted. |
 
 ---
@@ -279,23 +279,23 @@ supermemory exp \
 ## 9. 17 MCP Tools, 4 Resources, 9 Skills & 8 Subagents
 
 ### 9.1. 17 Native Stdio MCP Tools (`mcp_config.json`)
-1. `supermemory_init` — Initialize a new Local SuperMemory workspace.
-2. `supermemory_status` — Inspect the 4-tier Capsule, open bottlenecks, and token budget.
-3. `supermemory_recall` — Federated Hybrid Subword TF-IDF + Empirical Utility PageRank recall (`include_siblings` supported).
-4. `supermemory_diagnose_bottleneck` — Register/rank/resolve Pareto `BNK-XXX` bottlenecks, `RQ-XXX` questions, and score `Occam ROI`.
-5. `supermemory_scout_sota` — Search arXiv, Semantic Scholar & OpenAlex (SQLite cached) and mint `METH-XXX` cards into `07_METHOD_VAULT`.
-6. `supermemory_orchestrate` — Plan 3-Wave Multi-Agent Fast-DAG sprints, atomically claim tasks with glob-lease locks, and trigger 10% `EARLY_KILLED` cascades.
-7. `supermemory_record_lesson` — Persist user rules or bug post-mortems with `CodeGate` binding.
-8. `supermemory_add_gate` — Add a `PreToolUse` CodeGate or `FROZEN_SHA256` lock.
-9. `supermemory_propose_idea` — Record an `IDEA` / `ALGORITHM` with Occam ROI scoring or mark a `REJECTED` dead-end.
-10. `supermemory_manage_proposal` — Create and advance OpenSpec Proposals with Occam & novelty gates.
-11. `supermemory_log_experiment` — Log single-variable scientific experiments and auto-extract `OBSERVATION` nodes.
-12. `supermemory_update_state` — Update `L0` active goal, phase, and next actions.
-13. `supermemory_link_knowledge` — Upsert custom knowledge nodes and directed graph edges.
-14. `supermemory_consolidate` — Distill `L3` episodes into `L2` semantic or `L1` procedural nodes.
-15. `supermemory_checkpoint` — Attest turn-level memory status.
-16. `supermemory_audit_gates` — Run full workspace CodeGate verification.
-17. `supermemory_record_audit` — Record `experiment-challenger` or `victory-auditor` sign-off on a Proposal.
+1. `init` — Initialize a new Local SuperMemory workspace.
+2. `status` — Inspect the 4-tier Capsule, open bottlenecks, and token budget.
+3. `recall` — Federated Hybrid Subword TF-IDF + Empirical Utility PageRank recall (`include_siblings` supported).
+4. `diagnose_bottleneck` — Register/rank/resolve Pareto `BNK-XXX` bottlenecks, `RQ-XXX` questions, and score `Occam ROI`.
+5. `scout_sota` — Search arXiv, Semantic Scholar & OpenAlex (SQLite cached) and mint `METH-XXX` cards into `07_METHOD_VAULT`.
+6. `orchestrate` — Plan 3-Wave Multi-Agent Fast-DAG sprints, atomically claim tasks with glob-lease locks, and trigger 10% `EARLY_KILLED` cascades.
+7. `record_lesson` — Persist user rules or bug post-mortems with `CodeGate` binding.
+8. `add_gate` — Add a `PreToolUse` CodeGate or `FROZEN_SHA256` lock.
+9. `propose_idea` — Record an `IDEA` / `ALGORITHM` with Occam ROI scoring or mark a `REJECTED` dead-end.
+10. `manage_proposal` — Create and advance OpenSpec Proposals with Occam & novelty gates.
+11. `log_experiment` — Log single-variable scientific experiments and auto-extract `OBSERVATION` nodes.
+12. `update_state` — Update `L0` active goal, phase, and next actions.
+13. `link_knowledge` — Upsert custom knowledge nodes and directed graph edges.
+14. `consolidate` — Distill `L3` episodes into `L2` semantic or `L1` procedural nodes.
+15. `checkpoint` — Attest turn-level memory status.
+16. `audit_gates` — Run full workspace CodeGate verification.
+17. `record_audit` — Record `experiment-challenger` or `victory-auditor` sign-off on a Proposal.
 
 **4 Fast-Read MCP Resources:** `supermemory://active_state`, `supermemory://constitution`, `supermemory://experiments`, `supermemory://memory_graph`.
 

@@ -25,14 +25,14 @@ from supermemory.storage.sqlite_store import GraphStore
 from supermemory.sync.markdown_compiler import MarkdownCompiler
 
 RESEARCH_TOOL_NAMES = {
-    "supermemory_diagnose_bottleneck",
-    "supermemory_scout_sota",
-    "supermemory_orchestrate",
+    "diagnose_bottleneck",
+    "scout_sota",
+    "orchestrate",
 }
 
 RESEARCH_MCP_TOOLS: List[Dict[str, Any]] = [
     {
-        "name": "supermemory_diagnose_bottleneck",
+        "name": "diagnose_bottleneck",
         "description": "Bottleneck-First Research Engine: profile/register quantified BOTTLENECK (BNK-XXX) + falsifiable RQ-XXX, rank Pareto bottlenecks, or propose/score a single-variable hypothesis via Occam ROI Gate.",
         "inputSchema": {
             "type": "object",
@@ -64,7 +64,7 @@ RESEARCH_MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_scout_sota",
+        "name": "scout_sota",
         "description": "SOTA Literature & Method Scout: search arXiv + Semantic Scholar + OpenAlex (SQLite cached) or register a structured METHOD_CARD (METH-XXX) linked to a BOTTLENECK.",
         "inputSchema": {
             "type": "object",
@@ -89,7 +89,7 @@ RESEARCH_MCP_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "supermemory_orchestrate",
+        "name": "orchestrate",
         "description": "Multi-Agent Fast-DAG Orchestrator: plan a 3-Wave parallel research sprint, enqueue tasks, atomically claim glob-locked tasks, complete with <180-token receipts, or inspect DAG telemetry.",
         "inputSchema": {
             "type": "object",
@@ -121,8 +121,9 @@ RESEARCH_MCP_TOOLS: List[Dict[str, Any]] = [
 
 
 def execute_research_mcp_tool(name: str, store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute one of the v3.0 Research & Multi-Agent MCP tools."""
-    if name == "supermemory_diagnose_bottleneck":
+    """Execute one of the v3.0 Research & Multi-Agent MCP tools (accepts short or legacy names)."""
+    canon = name[12:] if name.startswith("supermemory_") else name
+    if canon == "diagnose_bottleneck":
         act = str(args.get("action") or "diagnose").lower()
         if act == "rank":
             return {"bottlenecks": rank_bottlenecks(store, include_resolved=bool(args.get("include_resolved", False)))}
@@ -181,7 +182,7 @@ def execute_research_mcp_tool(name: str, store: GraphStore, args: Dict[str, Any]
         MarkdownCompiler(store).compile_all()
         return res
 
-    if name == "supermemory_scout_sota":
+    if canon == "scout_sota":
         act = str(args.get("action") or "search").lower()
         if act == "register_card":
             card = register_method_card(
@@ -214,7 +215,7 @@ def execute_research_mcp_tool(name: str, store: GraphStore, args: Dict[str, Any]
             MarkdownCompiler(store).compile_all()
         return res
 
-    if name == "supermemory_orchestrate":
+    if canon == "orchestrate":
         act = str(args.get("action") or "status").lower()
         if act == "plan_sprint":
             res = plan_research_sprint(

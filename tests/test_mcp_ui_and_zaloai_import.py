@@ -33,7 +33,7 @@ def test_stdio_mcp_server_end_to_end(tmp_path: Path) -> None:
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "supermemory_init",
+                "name": "init",
                 "arguments": {"workspace": str(tmp_path), "project_name": "MCPDemo", "max_lines": 300},
             },
         },
@@ -42,7 +42,7 @@ def test_stdio_mcp_server_end_to_end(tmp_path: Path) -> None:
             "id": 4,
             "method": "tools/call",
             "params": {
-                "name": "supermemory_record_lesson",
+                "name": "record_lesson",
                 "arguments": {
                     "workspace": str(tmp_path),
                     "title": "Never swallow exceptions silently",
@@ -79,17 +79,19 @@ def test_stdio_mcp_server_end_to_end(tmp_path: Path) -> None:
     assert by_id[1]["result"]["serverInfo"]["name"] == "supermemory"
     tools = by_id[2]["result"]["tools"]
     assert len(tools) == 17
+    assert all(not t["name"].startswith("supermemory_") for t in tools)
     assert {t["name"] for t in tools} >= {
-        "supermemory_init",
-        "supermemory_recall",
-        "supermemory_record_lesson",
-        "supermemory_log_experiment",
-        "supermemory_manage_proposal",
-        "supermemory_checkpoint",
-        "supermemory_consolidate",
-        "supermemory_diagnose_bottleneck",
-        "supermemory_scout_sota",
-        "supermemory_orchestrate",
+        "init",
+        "recall",
+        "record_lesson",
+        "log_experiment",
+        "manage_proposal",
+        "link_knowledge",
+        "checkpoint",
+        "consolidate",
+        "diagnose_bottleneck",
+        "scout_sota",
+        "orchestrate",
     }
 
     lesson_res = json.loads(by_id[4]["result"]["content"][0]["text"])

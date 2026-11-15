@@ -252,7 +252,7 @@ class MarkdownCompiler:
             "",
         ]
         if not by_track:
-            lines.append("_No experiments logged yet. Run `supermemory exp log ...` or call MCP `supermemory_log_experiment`._")
+            lines.append("_No experiments logged yet. Run `supermemory exp log ...` or call MCP `log_experiment`._")
         for track, items in sorted(by_track.items()):
             lines.extend([
                 f"## 📊 Track / Module: `{track.upper()}` (`{len(items)}` Experiments)",

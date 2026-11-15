@@ -59,7 +59,7 @@ def handle_promote(args: argparse.Namespace) -> int:
 
 def handle_checkpoint(args: argparse.Namespace) -> int:
     out = execute_mcp_tool(
-        "supermemory_checkpoint",
+        "checkpoint",
         {
             "workspace": str(Path(args.workspace).resolve()),
             "scope": "global" if getattr(args, "use_global", False) else "local",

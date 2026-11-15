@@ -117,7 +117,7 @@ class SelfLearningDetector:
             guidance = (
                 f"🛡️ SELF-LEARNING TRIGGERED ({best_cat} -> {law_id}): "
                 f"Explicit user rule or technical correction detected. Before ending this turn, record the "
-                f"root-cause lesson via `supermemory learn` or `supermemory_record_lesson` (and bind a "
+                f"root-cause lesson via `supermemory learn` or MCP `record_lesson` (and bind a "
                 f"`CodeGate` if mechanically checkable)."
             )
             return UserSignal(
@@ -134,7 +134,7 @@ class SelfLearningDetector:
             if re.search(d_pat, text, flags=re.IGNORECASE | re.UNICODE) and len(text) >= 40:
                 guidance = (
                     f"🧭 STRATEGIC DIRECTIVE DETECTED ({d_cat}): "
-                    f"Persist updated project targets/architecture via `supermemory_update_state` if scope changed."
+                    f"Persist updated project targets/architecture via MCP `update_state` if scope changed."
                 )
                 return UserSignal(False, True, d_cat, "LAW-07", 75, excerpt, guidance)
 
