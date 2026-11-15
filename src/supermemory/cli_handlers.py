@@ -257,4 +257,10 @@ def handle_install_plugin(args: argparse.Namespace) -> int:
 
 
 def handle_ui(args: argparse.Namespace) -> int:
-    return run_ui_server(Path(args.workspace).resolve(), host=args.host, port=args.port)
+    if getattr(args, "use_global", False):
+        target = ensure_global_memory()
+    else:
+        cand = Path(args.workspace).expanduser().resolve()
+        has_local = (cand / ".supermemory").is_dir() or (cand / "memory" / "graph_snapshot.json").is_file()
+        target = cand if (has_local or args.workspace != ".") else ensure_global_memory()
+    return run_ui_server(target, host=args.host, port=args.port)

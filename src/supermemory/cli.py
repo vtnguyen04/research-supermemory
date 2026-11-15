@@ -175,6 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_ui = sub.add_parser("ui", help="Launch Multi-Project & Tiered Knowledge Graph Web Observatory")
     p_ui.add_argument("-w", "--workspace", default=".")
+    p_ui.add_argument("-g", "--global", dest="use_global", action="store_true", help="Open Global SuperMemory directly")
     p_ui.add_argument("--host", default="127.0.0.1")
     p_ui.add_argument("--port", type=int, default=8765)
 
