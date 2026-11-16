@@ -104,7 +104,7 @@ def _cmd_record_lesson(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any
 
 @REGISTRY.register(
     name="add_gate",
-    description="Register an executable PreToolUse CodeGate (MAX_LINES, FORBIDDEN_REGEX, FROZEN_SHA256, FORBIDDEN_CMD_PATTERN).",
+    description="Register an executable PreToolUse CodeGate (MAX_LINES, FORBIDDEN_REGEX, FROZEN_SHA256, FORBIDDEN_CMD_PATTERN, CHANGELOG_SYNC).",
     input_schema={
         "type": "object",
         "properties": {

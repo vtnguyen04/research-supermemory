@@ -77,6 +77,7 @@ class GateType(str, Enum):
     FROZEN_SHA256 = "FROZEN_SHA256"
     FORBIDDEN_CMD_PATTERN = "FORBIDDEN_CMD_PATTERN"
     AST_SYNTAX = "AST_SYNTAX"
+    CHANGELOG_SYNC = "CHANGELOG_SYNC"
 
 
 class ProposalStage(str, Enum):

@@ -225,10 +225,22 @@ class GateEnforcer:
                     violations.append(msg)
                     triggered.append(g.id)
 
+            elif g.gate_type == GateType.CHANGELOG_SYNC.value:
+                m_ver = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+                if m_ver:
+                    ver = m_ver.group(1)
+                    cl_rel = g.pattern or "CHANGELOG.md"
+                    cl_file = self.store.workspace_root / cl_rel
+                    cl_txt = cl_file.read_text(encoding="utf-8") if cl_file.is_file() else ""
+                    if not re.search(rf"^##\s+\[{re.escape(ver)}\]\s+-\s+\d{{4}}-\d{{2}}-\d{{2}}\b", cl_txt, re.MULTILINE):
+                        msg = f"[{g.id}/{g.law_id}] `{cl_rel}` missing `## [{ver}] - YYYY-MM-DD` entry for `{rel}` version `{ver}`"
+                        violations.append(msg)
+                        triggered.append(g.id)
+
             elif g.gate_type == GateType.FORBIDDEN_REGEX.value and g.pattern and text:
                 ignore_comments = bool(g.config.get("ignore_comments", True))
                 for idx, ln in enumerate(lines, 1):
-                    if ignore_comments and ln.lstrip().startswith("#"):
+                    if ignore_comments and not rel.endswith(".md") and ln.lstrip().startswith("#"):
                         continue
                     if re.search(g.pattern, ln):
                         msg = f"[{g.id}/{g.law_id}] Forbidden pattern in `{rel}:{idx}` ({g.name}): `{ln.strip()[:90]}`"

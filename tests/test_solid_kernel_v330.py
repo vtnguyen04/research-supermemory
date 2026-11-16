@@ -134,3 +134,39 @@ def test_immutable_audit_and_system_events_completeness(tmp_path: Path) -> None:
     with GraphStore(ws) as store:
         ev_types = {e["event_type"] for e in store.list_events(limit=50)}
     assert {"GATE_UPSERTED", "GATE_AUDIT_PASSED", "DAG_TASK_ENQUEUED", "KANBAN_STEP_TOGGLED", "STOP_GATE_ENFORCED"} <= ev_types
+
+
+def test_changelog_sync_gate_enforces_documented_releases(tmp_path: Path) -> None:
+    """Ensure CHANGELOG.md tracks live pyproject.toml version and CHANGELOG_SYNC blocks undocumented bumps."""
+    import re
+
+    from supermemory.gates.enforcer import GateEnforcer
+    from supermemory.kernel import execute_command
+    from supermemory.storage.sqlite_store import GraphStore
+
+    repo_root = Path(__file__).resolve().parents[1]
+    live_ver = resolve_live_version()
+    repo_cl = (repo_root / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert re.search(rf"^##\s+\[{re.escape(live_ver)}\]\s+-\s+\d{{4}}-\d{{2}}-\d{{2}}\b", repo_cl, re.MULTILINE)
+
+    ws = tmp_path / "cl_proj"
+    init_workspace(ws, project_name="ClProj")
+    (ws / "pyproject.toml").write_text('[project]\nname = "demo"\nversion = "1.0.0"\n', encoding="utf-8")
+    (ws / "CHANGELOG.md").write_text("# Changelog\n\n## [1.0.0] - 2026-11-17\n- Initial\n", encoding="utf-8")
+    execute_command(
+        "add_gate",
+        {"workspace": str(ws), "gate_type": "CHANGELOG_SYNC", "name": "Require Changelog", "law_id": "LAW-07", "target_glob": "pyproject.toml", "pattern": "CHANGELOG.md"},
+    )
+    with GraphStore(ws) as store:
+        enf = GateEnforcer(store)
+        blocked = enf.evaluate_tool_call(
+            "edit_file",
+            {"Path": str(ws / "pyproject.toml"), "Target": 'version = "1.0.0"', "Replacement": 'version = "1.1.0"'},
+        )
+        assert not blocked.allowed and "1.1.0" in blocked.reason
+        (ws / "CHANGELOG.md").write_text("# Changelog\n\n## [1.1.0] - 2026-11-17\n- Feature\n\n## [1.0.0] - 2026-11-17\n", encoding="utf-8")
+        allowed = enf.evaluate_tool_call(
+            "edit_file",
+            {"Path": str(ws / "pyproject.toml"), "Target": 'version = "1.0.0"', "Replacement": 'version = "1.1.0"'},
+        )
+        assert allowed.allowed

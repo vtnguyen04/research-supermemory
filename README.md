@@ -1,6 +1,6 @@
-# SuperMemory (`v3.2`)
+# SuperMemory
 
-**[English](README.md)** · **[Tiếng Việt](README.vi.md)**
+**[English](README.md)** · **[Tiếng Việt](README.vi.md)** · **[Changelog](CHANGELOG.md)**
 
 Persistent SQLite + Markdown memory graph, research vault (`arXiv` / `Semantic Scholar` / `OpenAlex`), real-time `PreToolUse` code gates, and local Kanban web UI for **Antigravity CLI** and **Claude Code**. Pure Python `>= 3.10` (`0` third-party runtime dependencies).
 
@@ -61,7 +61,7 @@ supermemory handoff
 flowchart LR
     A["Antigravity / Claude Code"] <-->|"MCP (17 tools) + Hooks (<20ms)"| B[("SQLite WAL + FTS5\n.supermemory/supermemory.db")]
     B <-->|"Auto-Sync"| C["Markdown Vaults\nmemory/01..08"]
-    B <-->|"Live Poll"| D["Web Studio 3.1\n127.0.0.1:8765"]
+    B <-->|"Live Poll"| D["Web Studio\n127.0.0.1:8765"]
 ```
 
 | Path | Purpose |

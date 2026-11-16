@@ -1,6 +1,6 @@
-# SuperMemory (`v3.2`)
+# SuperMemory
 
-**[English](README.md)** · **[Tiếng Việt](README.vi.md)**
+**[English](README.md)** · **[Tiếng Việt](README.vi.md)** · **[Changelog](CHANGELOG.md)**
 
 Đồ thị bộ nhớ SQLite + Markdown, kho bài báo nghiên cứu (`arXiv` / `Semantic Scholar` / `OpenAlex`), chốt chặn code `PreToolUse`, và giao diện Web Kanban cục bộ cho **Antigravity CLI** và **Claude Code**. Thuần Python `>= 3.10` (`0` thư viện ngoài).
 
@@ -61,7 +61,7 @@ supermemory handoff
 flowchart LR
     A["Antigravity / Claude Code"] <-->|"MCP (17 tools) + Hooks (<20ms)"| B[("SQLite WAL + FTS5\n.supermemory/supermemory.db")]
     B <-->|"Tự đồng bộ"| C["Kho Markdown\nmemory/01..08"]
-    B <-->|"Cập nhật trực tiếp"| D["Web Studio 3.1\n127.0.0.1:8765"]
+    B <-->|"Cập nhật trực tiếp"| D["Web Studio\n127.0.0.1:8765"]
 ```
 
 | Đường dẫn | Chức năng |

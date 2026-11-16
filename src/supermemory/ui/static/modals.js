@@ -105,7 +105,7 @@
       this.open(ex ? tr(`Edit CodeGate ${ex.id}`, `Chỉnh sửa CodeGate ${ex.id}`) : tr("Add PreToolUse CodeGate / SHA-256 Freeze", "Thêm Chốt chặn PreToolUse CodeGate / Khóa SHA-256"),
         (ex ? "" : fld("freeze_path", tr("Freeze File Integrity via SHA-256 (optional)", "Khóa toàn vẹn tệp bằng SHA-256 (tùy chọn)"), inp("freeze_path", "", "eval/evaluate.py"))) +
         row2(fld("name", tr("Gate Name", "Tên Gate"), inp("name", ex?.name || "", "Block Print Debug")), fld("law_id", tr("Bound LAW", "Thuộc LAW"), inp("law_id", ex?.law_id || "LAW-08"))) +
-        row2(fld("gate_type", tr("Gate Type", "Loại Gate"), sel("gate_type", ["FORBIDDEN_REGEX", "FORBIDDEN_CMD_PATTERN", "MAX_LINES", "FROZEN_SHA256"], ex?.gate_type || "FORBIDDEN_REGEX")),
+        row2(fld("gate_type", tr("Gate Type", "Loại Gate"), sel("gate_type", ["FORBIDDEN_REGEX", "FORBIDDEN_CMD_PATTERN", "MAX_LINES", "FROZEN_SHA256", "CHANGELOG_SYNC"], ex?.gate_type || "FORBIDDEN_REGEX")),
              fld("target_glob", "Target Glob", inp("target_glob", ex?.target_glob || "**/*.py"))) +
         fld("pattern", tr("Rule Pattern / Max Lines / SHA-256", "Biểu thức Regex / Số dòng / SHA-256"), area("pattern", ex?.pattern || "", 2)),
         async (v) => {
