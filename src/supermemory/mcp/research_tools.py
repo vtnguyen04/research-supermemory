@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from supermemory.lifecycle.manager import LifecycleManager
+from supermemory.mcp.checkpoint_sync import execute_kanban_orchestrate_ext
 from supermemory.research.bottleneck_engine import (
     diagnose_bottleneck,
     evaluate_occam_gate,
@@ -91,13 +92,13 @@ RESEARCH_MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "orchestrate",
-        "description": "Multi-Agent Fast-DAG Orchestrator: plan a 3-Wave parallel research sprint, enqueue tasks, atomically claim glob-locked tasks, complete with <180-token receipts, or inspect DAG telemetry.",
+        "description": "Multi-Agent Fast-DAG & Kanban Orchestrator: plan sprints, enqueue/move tasks, toggle/add subtask steps, claim glob-locked slices, or complete tasks.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["plan_sprint", "enqueue", "claim", "complete", "clear_done", "status"],
+                    "enum": ["plan_sprint", "enqueue", "claim", "move", "toggle_step", "add_step", "delete", "complete", "clear_done", "status"],
                     "default": "status",
                 },
                 "goal": {"type": "string"},
@@ -105,6 +106,13 @@ RESEARCH_MCP_TOOLS: List[Dict[str, Any]] = [
                 "smoke_cmd": {"type": "string", "default": "pytest -q"},
                 "target_globs": {"type": "array", "items": {"type": "string"}},
                 "task_id": {"type": "string"},
+                "item_id": {"type": "string"},
+                "kind": {"type": "string", "enum": ["TASK", "PROPOSAL"], "default": "TASK"},
+                "step_idx": {"type": "integer"},
+                "done": {"type": "boolean"},
+                "text": {"type": "string"},
+                "target_stage": {"type": "string"},
+                "steps": {"type": "array", "items": {"type": "string"}},
                 "wave": {"type": "integer", "default": 1},
                 "role": {"type": "string"},
                 "title": {"type": "string"},
@@ -218,6 +226,9 @@ def execute_research_mcp_tool(name: str, store: GraphStore, args: Dict[str, Any]
 
     if canon == "orchestrate":
         act = str(args.get("action") or "status").lower()
+        kb_res = execute_kanban_orchestrate_ext(act, store, args)
+        if kb_res is not None:
+            return kb_res
         if act == "plan_sprint":
             res = plan_research_sprint(
                 store,
@@ -226,9 +237,12 @@ def execute_research_mcp_tool(name: str, store: GraphStore, args: Dict[str, Any]
                 smoke_cmd=str(args.get("smoke_cmd") or "pytest -q"),
                 target_globs=list(args["target_globs"]) if args.get("target_globs") is not None else None,
             )
+            mark_turn_memory_handled(store)
             MarkdownCompiler(store).compile_all()
             return res
         if act == "enqueue":
+            raw_steps = args.get("steps")
+            steps = [str(s).strip() for s in raw_steps if str(s).strip()] if isinstance(raw_steps, list) else None
             task = enqueue_task(
                 store,
                 role=str(args.get("role") or "self"),
@@ -240,7 +254,9 @@ def execute_research_mcp_tool(name: str, store: GraphStore, args: Dict[str, Any]
                 target_id=str(args.get("bottleneck_id") or ""),
                 smoke_gate=str(args.get("smoke_cmd") or ""),
                 task_id=str(args.get("task_id") or ""),
+                steps=steps,
             )
+            mark_turn_memory_handled(store)
             MarkdownCompiler(store).compile_all()
             return {"task": task.to_dict()}
         if act == "claim":

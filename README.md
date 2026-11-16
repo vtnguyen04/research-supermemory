@@ -1,4 +1,4 @@
-# SuperMemory (`v3.1`)
+# SuperMemory (`v3.2`)
 
 **[English](README.md)** · **[Tiếng Việt](README.vi.md)**
 
@@ -90,5 +90,6 @@ flowchart LR
 | `supermemory orchestrate` | `orchestrate` | Plan 3-wave multi-agent DAG sprints and claim glob-locked slices. |
 | `supermemory exp` | `log_experiment` | Record single-variable experiments and compute baseline deltas. |
 | `supermemory learn` / `gate` | `record_lesson` / `add_gate` | Save bug post-mortems and bind `PreToolUse` regex/AST/SHA-256 gates. |
+| `supermemory checkpoint` | `checkpoint` | 1-call auto-sync: save insights (`OBS`), create/tick Kanban subtasks, and update `L0` state. |
 | `supermemory audit` | `audit_gates` | Check all project files against active CodeGates. |
 | `supermemory ui` | *(Skill: `/supermemory-ui`)* | Run local Kanban, Knowledge Graph & Research Web Studio (`127.0.0.1:8765`). |

@@ -1,4 +1,4 @@
-# SuperMemory (`v3.1`)
+# SuperMemory (`v3.2`)
 
 **[English](README.md)** · **[Tiếng Việt](README.vi.md)**
 
@@ -90,5 +90,6 @@ flowchart LR
 | `supermemory orchestrate` | `orchestrate` | Lập kế hoạch chạy đa Agent 3 đợt và khóa vùng file (`locked_globs`). |
 | `supermemory exp` | `log_experiment` | Ghi kết quả thực nghiệm đơn biến và tự tính chênh lệch với baseline. |
 | `supermemory learn` / `gate` | `record_lesson` / `add_gate` | Lưu bài học sửa lỗi kèm chốt chặn `PreToolUse` (regex, số dòng, AST, SHA-256). |
+| `supermemory checkpoint` | `checkpoint` | Đồng bộ tự động 1 lệnh: lưu `insights` (`OBS`), tạo/tick subtask Kanban và cập nhật `L0`. |
 | `supermemory audit` | `audit_gates` | Quét toàn bộ dự án theo các CodeGates đang bật. |
 | `supermemory ui` | *(Skill: `/supermemory-ui`)* | Mở Web Studio quản lý Kanban, Đồ thị & Nghiên cứu (`127.0.0.1:8765`). |

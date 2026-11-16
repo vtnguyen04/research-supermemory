@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any, Dict
 
@@ -23,6 +22,7 @@ from supermemory.cognitive.tiers import (
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.lifecycle.manager import LifecycleManager
+from supermemory.mcp.checkpoint_sync import execute_atomic_checkpoint
 from supermemory.mcp.research_tools import RESEARCH_TOOL_NAMES, execute_research_mcp_tool
 from supermemory.mcp.tool_schemas import MCP_TOOLS
 from supermemory.models import CodeGate, MemoryEdge, MemoryNode, MemoryTier, NodeType
@@ -240,28 +240,7 @@ def execute_mcp_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             return res
 
         if canon == "checkpoint":
-            captured = None
-            if args.get("insight_title") and args.get("insight_summary"):
-                tier = str(args.get("memory_tier") or MemoryTier.SEMANTIC.value).upper()
-                ntype = NodeType.PROCEDURE.value if tier == "PROCEDURAL" else NodeType.OBSERVATION.value
-                pref = "PROC" if tier == "PROCEDURAL" else "OBS"
-                existing = store.list_nodes(node_types=[ntype], limit=5000)
-                nums = [int(m.group(1)) for x in existing for m in [re.match(rf"^{pref}-(\d+)$", x.id)] if m]
-                nid = f"{pref}-{(max(nums) + 1) if nums else 1:03d}"
-                nd = store.upsert_node(
-                    MemoryNode(
-                        id=nid,
-                        node_type=ntype,
-                        title=str(args["insight_title"]),
-                        summary=str(args["insight_summary"])[:240],
-                        content=str(args["insight_summary"]),
-                        metadata={"memory_tier": tier, "note": str(args.get("note") or "")},
-                    )
-                )
-                captured = nd.to_dict()
-                MarkdownCompiler(store).compile_all()
-            mark_turn_memory_handled(store)
-            return {"status": str(args.get("status") or "CLEAN"), "turn_memory_handled": True, "captured": captured}
+            return execute_atomic_checkpoint(store, args)
 
         if canon == "audit_gates":
             return GateEnforcer(store).audit_workspace()

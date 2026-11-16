@@ -67,13 +67,19 @@ _DIRECTIVE_PATTERNS: List[Tuple[str, str]] = [
 ]
 
 _EXPLAIN_ONLY_GUARD = re.compile(
-    r"^(?:tại sao lại dùng|vì sao lại dùng|giải thích giúp|explain how|why does this use)\b",
+    r"(?:^(?:tại sao|vì sao|sao lại|giải thích|cho hỏi|explain|why does|how does|what is|can i)\b|\b(?:sài được không|dùng được không|là gì\s*\?))",
     flags=re.IGNORECASE | re.UNICODE,
 )
 
 _RESEARCH_INTENT_RE = re.compile(
     r"(?:\b(?:research|literature\s+review|paper\s+search|arxiv|semantic\s*scholar|openalex|sota\s+(?:method|paper|approach|idea)s?|scout\s+sota|diagnose\s+bottleneck|find\s+bottleneck|error\s+slice)\b"
     r"|(?:nghiên\s+cứu|tìm\s+paper|săn\s+paper|bài\s+báo\s+(?:sota|mới|khoa\s+học)|điểm\s+nghẽn|chẩn\s+đoán\s+lỗi|tìm\s+bottleneck|đề\s+xuất\s+(?:phương\s+pháp|hướng|ý\s+tưởng|thuật\s+toán)|tìm\s+hướng\s+cải\s+tiến))",
+    flags=re.IGNORECASE | re.UNICODE,
+)
+
+_TASK_EXECUTION_RE = re.compile(
+    r"(?:\b(?:implement|refactor|build|integrate|optimize|benchmark|ablate|add\s+feature|fix\s+(?:the\s+)?bug)\b"
+    r"|(?:triển\s+khai|thực\s+hiện|xây\s+dựng|tích\s+hợp|tối\s+ưu|nâng\s+cấp|viết\s+thêm|thêm\s+tính\s+năng|làm\s+cho\s+(?:tao|tôi|mình)|chạy\s+(?:thử\s+nghiệm|benchmark|eval)))",
     flags=re.IGNORECASE | re.UNICODE,
 )
 
@@ -159,5 +165,13 @@ class SelfLearningDetector:
                 "   • Candidate Ideas / Dead-Ends / Specs -> `propose_idea` or `manage_proposal` (`memory/05_IDEAS_AND_ALGORITHMS/` & `memory/04_PROPOSALS/`)"
             )
             return UserSignal(False, True, "RESEARCH_CAMPAIGN", "LAW-06", 84, excerpt, guidance)
+
+        if len(text) >= 22 and not _EXPLAIN_ONLY_GUARD.search(text) and not text.endswith("?") and _TASK_EXECUTION_RE.search(text):
+            guidance = (
+                "📋 SUPERMEMORY AUTO-SYNC PROTOCOL (ZERO-REMINDER):\n"
+                "• Track active work on Kanban (`orchestrate` or `checkpoint(new_task=...)`) and auto-sync completed steps, "
+                "discovered insights (`insights=[...]`), and empirical results (`log_experiment`) in this turn WITHOUT waiting to be reminded."
+            )
+            return UserSignal(False, True, "TASK_EXECUTION", "LAW-07", 78, excerpt, guidance)
 
         return UserSignal(False, False, "NONE", "", 0, excerpt, "")

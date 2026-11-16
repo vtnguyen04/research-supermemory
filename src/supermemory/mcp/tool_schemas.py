@@ -217,15 +217,32 @@ MCP_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "checkpoint",
-        "description": "Semantic turn-closing attestation: mark turn CLEAN (no memory delta) or capture a quick Semantic/Procedural insight.",
+        "description": "1-Call Atomic Turn Sync: persist insights (OBS/PROC), create/update Kanban tasks & subtask checkboxes, update L0 next_actions/phase, or attest CLEAN turn.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "status": {"type": "string", "enum": ["CLEAN", "CAPTURED"], "default": "CLEAN"},
+                "status": {"type": "string", "enum": ["CLEAN", "CAPTURED"], "default": "CAPTURED"},
                 "note": {"type": "string"},
+                "insights": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of technical/empirical insights discovered this turn ('Title: detailed finding').",
+                },
                 "insight_title": {"type": "string"},
                 "insight_summary": {"type": "string"},
                 "memory_tier": {"type": "string", "enum": ["SEMANTIC", "PROCEDURAL"], "default": "SEMANTIC"},
+                "new_task": {
+                    "type": "object",
+                    "description": "Optional Kanban task to create: {title, steps: [...], stage: 'IN_PROGRESS'|'READY'|'DONE', role}.",
+                },
+                "task_updates": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "List of Kanban/Proposal updates: [{id: 'DAG-001'|'PROP-001', done_steps: [0,1], add_steps: ['...'], stage: 'IN_PROGRESS'|'DONE'}].",
+                },
+                "current_phase": {"type": "string"},
+                "next_actions": {"type": "string"},
+                "active_goal": {"type": "string"},
                 "scope": _SCOPE_PROP,
                 "workspace": {"type": "string"},
             },

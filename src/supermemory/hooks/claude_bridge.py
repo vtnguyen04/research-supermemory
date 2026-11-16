@@ -43,8 +43,12 @@ def normalize_hook_input(event_name: str, payload: Dict[str, Any]) -> Tuple[str,
         }
         t_out = payload.get("tool_response") or payload.get("tool_output")
         if isinstance(t_out, dict):
+            if t_out.get("stdout") or t_out.get("output"):
+                norm["output"] = str(t_out.get("stdout") or t_out.get("output"))
             if t_out.get("is_error") or (t_out.get("exit_code") not in (None, 0)):
                 norm["error"] = str(t_out.get("stderr") or t_out.get("error") or f"exit_code={t_out.get('exit_code')}")
+        elif isinstance(t_out, str) and t_out:
+            norm["output"] = t_out
 
     if norm_ev == "Stop":
         norm["continuationActive"] = bool(payload.get("stop_hook_active"))

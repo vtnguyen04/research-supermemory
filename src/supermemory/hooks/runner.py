@@ -1,9 +1,8 @@
-"""Antigravity Lifecycle Hook Runner: Zero-Overhead Normal Turns + Event-Driven Gates."""
+"""Antigravity & Claude Code Lifecycle Hook Runner: Zero-Overhead Q&A + Autonomous Closed-Loop Sync."""
 
 from __future__ import annotations
 
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -12,19 +11,11 @@ from supermemory.cognitive.federation import ensure_global_memory, federated_rec
 from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.hooks.claude_bridge import format_hook_output, normalize_hook_input
+from supermemory.hooks.turn_tracker import evaluate_stop_gate, track_post_tool_use
 from supermemory.models import NodeType
 from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
 from supermemory.storage.sqlite_store import GraphStore
-
-_BENCHMARK_CMD_RE = re.compile(
-    r"\b(?:python3?|uv\s+run|bash|sh)\b.*\b(?:train|eval|evaluate|benchmark|ablation|run_submission|run_exp)\w*",
-    flags=re.IGNORECASE,
-)
-_RESEARCH_CMD_RE = re.compile(
-    r"\b(?:export\.arxiv\.org|arxiv\.org|semanticscholar\.org|api\.openalex\.org|huggingface\.co/papers)\b",
-    flags=re.IGNORECASE,
-)
 
 
 def _resolve_supermemory_workspace(payload: Dict[str, Any]) -> Optional[Path]:
@@ -86,9 +77,9 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
         elif ev == "PreToolUse":
             out = _on_pre_tool_use(store, payload)
         elif ev == "PostToolUse":
-            out = _on_post_tool_use(store, conv_id, payload)
+            out = track_post_tool_use(store, conv_id, payload)
         elif ev == "Stop":
-            out = _on_stop(store, conv_id, payload)
+            out = evaluate_stop_gate(store, conv_id, payload)
     return format_hook_output(raw_ev, out, is_claude)
 
 
@@ -131,8 +122,9 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         elif sig.category == "RESEARCH_CAMPAIGN":
             st["research_campaign_active"] = True
             injected_msgs.append(sig.guidance)
+        elif sig.guidance:
+            injected_msgs.append(sig.guidance)
 
-        # Only inject anti-repeat recall if query is substantial and hits a concrete high-BM25 warning
         if len(user_input.strip()) >= 28:
             rec = federated_recall(
                 user_input,
@@ -149,7 +141,6 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
                 )
                 injected_msgs.append(warn_block)
     elif step_idx >= 20 and "/goal" in user_input.lower():
-        # Long-horizon `/goal` heartbeat ONLY for `/goal` campaigns, once per 20-step bucket (never on step_idx=0!)
         cur_bucket = step_idx // 20
         prev_bucket = int(st.get("last_heartbeat_bucket") or 0)
         if cur_bucket > prev_bucket:
@@ -158,7 +149,6 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
             injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT (ANTI-DRIFT & ANTI-REPEAT):\n" + capsule)
 
     st["invocation_num"] = inv_num
-    # CRITICAL FIX: Never reset last_step_idx to 0 when intra-turn tool steps omit initialNumSteps!
     if step_idx > 0:
         st["last_step_idx"] = step_idx
     save_session_state(store, st)
@@ -184,111 +174,8 @@ def _on_pre_tool_use(store: GraphStore, payload: Dict[str, Any]) -> Dict[str, An
     return {"decision": "allow"}
 
 
-def _on_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    st = get_session_state(store, conv_id)
-    tc = payload.get("toolCall") or {}
-    t_name = str(tc.get("name") or "").lower()
-    t_args = tc.get("args") or {}
-    err = str(payload.get("error") or "")
-
-    cmd = str(t_args.get("CommandLine") or t_args.get("command") or "")
-    mcp_srv = str(t_args.get("ServerName") or "").lower()
-    mcp_tool = str(t_args.get("ToolName") or "").lower()
-    is_sm_mcp = "supermemory" in t_name or "supermemory" in mcp_srv or mcp_tool.startswith("supermemory_")
-    norm_mcp = mcp_tool[12:] if mcp_tool.startswith("supermemory_") else mcp_tool
-
-    if (
-        "supermemory learn" in cmd
-        or "supermemory gate" in cmd
-        or (is_sm_mcp and (norm_mcp in ("record_lesson", "add_gate") or "record_lesson" in t_name or "add_gate" in t_name))
-    ) and not err:
-        st["pending_lesson_lock"] = False
-        st["turn_memory_handled"] = True
-
-    sm_cli = ("supermemory sync", "supermemory exp", "supermemory learn", "supermemory idea", "supermemory proposal", "supermemory gate", "supermemory checkpoint", "supermemory consolidate", "supermemory promote", "supermemory bottleneck", "supermemory scout", "supermemory orchestrate")
-    sm_mcp = ("update_state", "log_experiment", "record_lesson", "link_knowledge", "manage_proposal", "propose_idea", "add_gate", "checkpoint", "consolidate", "diagnose_bottleneck")
-    raw_inner = t_args.get("Arguments")
-    inner_args: Dict[str, Any] = raw_inner if isinstance(raw_inner, dict) else t_args
-    scout_persisted = is_sm_mcp and (norm_mcp == "scout_sota" or "scout_sota" in t_name) and (
-        str(inner_args.get("action") or "search").lower() == "register_card" or int(inner_args.get("save_top_k") or 0) > 0
-    )
-    scout_readonly = is_sm_mcp and (norm_mcp == "scout_sota" or "scout_sota" in t_name) and not scout_persisted
-
-    if (any(m in cmd for m in sm_cli) or scout_persisted or (is_sm_mcp and (norm_mcp in sm_mcp or any(m in t_name for m in sm_mcp)))) and not err:
-        st["turn_memory_handled"] = True
-        st["dirty_files"] = []
-        st["pending_sync_reason"] = ""
-    elif t_name in ("run_command", "bash") and _BENCHMARK_CMD_RE.search(cmd):
-        st["pending_sync_reason"] = f"Benchmark/experiment executed (`{cmd[:60]}`)"
-        st["turn_memory_handled"] = False
-    elif not err and not st.get("turn_memory_handled") and (
-        scout_readonly
-        or (t_name in ("search_web", "read_url_content", "websearch", "webfetch") and st.get("research_campaign_active"))
-        or (t_name in ("run_command", "bash") and _RESEARCH_CMD_RE.search(cmd))
-    ):
-        st["pending_sync_reason"] = "Research/literature lookup executed without saving distilled findings to SuperMemory Vault"
-        st["turn_memory_handled"] = False
-
-    if t_name in ("write_file", "edit_file", "write", "edit", "multiedit", "replace_file_content", "multi_replace_file_content") and not err:
-        raw_p = str(t_args.get("Path") or t_args.get("TargetFile") or t_args.get("file_path") or "")
-        if "02_CONSTITUTION_AND_LESSONS.md" in raw_p:
-            st["pending_lesson_lock"] = False
-            st["turn_memory_handled"] = True
-
-    if err:
-        store.log_event("TOOL_ERROR_OBSERVED", t_name, f"Tool {t_name} errored: {err[:140]}")
-
-    save_session_state(store, st)
-    return {}
-
-
-def _on_stop(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Zero-overhead Stop gate: NEVER block normal Q&A/chat! Only enforce pending explicit lessons or unlogged benchmarks."""
-    if payload.get("continuationActive"):
-        return {"decision": "allow"}
-    if str(payload.get("terminationReason") or "") != "NO_TOOL_CALL":
-        return {"decision": "allow"}
-
-    st = get_session_state(store, conv_id)
-    if st.get("pending_lesson_lock"):
-        st["pending_lesson_lock"] = False
-        st["turn_memory_handled"] = True
-        save_session_state(store, st)
-        return {
-            "decision": "continue",
-            "reason": (
-                "🛡️ SUPERMEMORY SELF-LEARNING COMMIT REQUIRED (LAW-08): "
-                "Persist the explicit lesson/rule + CodeGate via `supermemory learn` or MCP `record_lesson` "
-                "before finishing your response."
-            ),
-        }
-
-    if not st.get("turn_memory_handled") and st.get("pending_sync_reason"):
-        reason_txt = str(st.get("pending_sync_reason"))
-        st["turn_memory_handled"] = True
-        st["pending_sync_reason"] = ""
-        save_session_state(store, st)
-        if "Research/literature" in reason_txt:
-            return {
-                "decision": "continue",
-                "reason": (
-                    f"🔬 SUPERMEMORY RESEARCH VAULT COMMIT REQUIRED (LAW-06 / LAW-07): {reason_txt}. "
-                    "Persist distilled findings to `08_BOTTLENECKS` (`diagnose_bottleneck`), `07_METHOD_VAULT` "
-                    "(`scout_sota` with `save_top_k>=1` or `register_card`), or `05_IDEAS_AND_ALGORITHMS` (`propose_idea`) before stopping."
-                ),
-            }
-        return {
-            "decision": "continue",
-            "reason": (
-                f"🧪 SUPERMEMORY EXPERIMENT LOG REQUIRED: {reason_txt} ran this turn without logging. "
-                "Record the experiment result & insights via MCP `log_experiment` (`supermemory exp`) before stopping."
-            ),
-        }
-    return {"decision": "allow"}
-
-
 def main_from_stdin(event_name: str) -> int:
-    """CLI entrypoint reading Antigravity hook JSON from stdin and printing JSON to stdout."""
+    """CLI entrypoint reading Antigravity/Claude Code hook JSON from stdin and printing JSON to stdout."""
     raw = sys.stdin.read().strip()
     payload = json.loads(raw) if raw else {}
     out = dispatch_hook(event_name, payload)
