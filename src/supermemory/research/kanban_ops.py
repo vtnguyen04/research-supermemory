@@ -213,6 +213,7 @@ def toggle_subtask(store: GraphStore, item_kind: str, item_id: str, step_idx: in
         node.metadata["tasks_done"] = flags
         store.upsert_node(node, log_event=False)
         _sync_prop_tasks_md(store, str(node.metadata.get("slug") or ""), node.id, tasks, flags)
+        store.log_event("KANBAN_STEP_TOGGLED", item_id, f"{item_id} step #{step_idx + 1}/{len(tasks)} -> {'DONE' if flags[step_idx] else 'OPEN'}")
         return {"item_id": item_id, "kind": "PROPOSAL", "steps_done": sum(1 for f in flags if f), "steps_total": len(tasks)}
 
     row = store.conn.execute("SELECT * FROM agent_tasks WHERE task_id = ?", (item_id,)).fetchone()
@@ -237,6 +238,7 @@ def toggle_subtask(store: GraphStore, item_kind: str, item_id: str, step_idx: in
         (new_st, claimed, json.dumps(rec, ensure_ascii=False), utc_now_iso(), item_id),
     )
     store.conn.commit()
+    store.log_event("KANBAN_STEP_TOGGLED", item_id, f"{item_id} step #{step_idx + 1}/{len(steps)} -> {'DONE' if steps[step_idx]['done'] else 'OPEN'}")
     return {"item_id": item_id, "kind": "TASK", "status": new_st, "steps": steps}
 
 
@@ -257,6 +259,7 @@ def add_subtask(store: GraphStore, item_kind: str, item_id: str, text: str) -> D
         node.metadata.update({"tasks": tasks, "tasks_done": flags})
         store.upsert_node(node, log_event=False)
         _sync_prop_tasks_md(store, str(node.metadata.get("slug") or ""), node.id, tasks, flags)
+        store.log_event("KANBAN_STEP_ADDED", item_id, f"{item_id} + step: {clean[:85]}")
         return {"item_id": item_id, "kind": "PROPOSAL", "steps_total": len(tasks)}
 
     row = store.conn.execute("SELECT * FROM agent_tasks WHERE task_id = ?", (item_id,)).fetchone()
@@ -273,6 +276,7 @@ def add_subtask(store: GraphStore, item_kind: str, item_id: str, text: str) -> D
         (new_st, json.dumps(rec, ensure_ascii=False), utc_now_iso(), item_id),
     )
     store.conn.commit()
+    store.log_event("KANBAN_STEP_ADDED", item_id, f"{item_id} + step: {clean[:85]}")
     return {"item_id": item_id, "kind": "TASK", "steps": steps}
 
 

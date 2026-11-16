@@ -44,6 +44,7 @@ def export_snapshot(store: GraphStore, target_path: Path | None = None) -> Path:
         "gates": [g.to_dict() for g in store.list_gates()],
         "experiments": [x.to_dict() for x in store.list_experiments()],
         "agent_tasks": tasks_export,
+        "events": store.list_events(limit=100),
     }
     out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return out_path
@@ -147,6 +148,20 @@ def import_snapshot(store: GraphStore, source_path: Path) -> Dict[str, int]:
                 tk.get("created_at", now), tk.get("updated_at", now),
             ),
         )
+    existing_ev_cnt = int(store.conn.execute("SELECT COUNT(*) FROM events").fetchone()[0])
+    if existing_ev_cnt == 0 and raw.get("events"):
+        for ev in reversed(list(raw.get("events") or [])):
+            store.conn.execute(
+                "INSERT INTO events(event_type, actor, entity_id, summary, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    str(ev.get("event_type") or "EVENT"),
+                    str(ev.get("actor") or "supermemory"),
+                    str(ev.get("entity_id") or ""),
+                    str(ev.get("summary") or ""),
+                    str(ev.get("payload_json") or "{}"),
+                    str(ev.get("created_at") or utc_now_iso()),
+                ),
+            )
     store.conn.commit()
     store.log_event("SNAPSHOT_IMPORT", str(source_path.name), f"Hydrated {len(nodes)} nodes, {len(edges)} edges")
     return {"nodes": len(nodes), "edges": len(edges), "gates": len(gates), "experiments": len(exps)}

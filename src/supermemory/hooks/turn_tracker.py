@@ -185,6 +185,7 @@ def evaluate_stop_gate(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         st["pending_lesson_lock"] = False
         st["turn_memory_handled"] = True
         save_session_state(store, st)
+        store.log_event("STOP_GATE_ENFORCED", "LAW-08", "Stop hook required autonomous self-learning lesson + CodeGate commit")
         return {
             "decision": "continue",
             "reason": (
@@ -202,6 +203,7 @@ def evaluate_stop_gate(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         st["pending_sync_reason"] = ""
         st["dirty_files"] = []
         save_session_state(store, st)
+        store.log_event("STOP_GATE_ENFORCED", "LAW-07", f"Stop hook required result/research sync: {reason_txt[:95]}")
         if "Research/literature" in reason_txt:
             return {
                 "decision": "continue",
@@ -225,6 +227,7 @@ def evaluate_stop_gate(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         st["turn_memory_handled"] = True
         st["dirty_files"] = []
         save_session_state(store, st)
+        store.log_event("STOP_GATE_ENFORCED", "LAW-07", f"Stop hook intercepted unsynced workspace edits ({shown[:95]})")
         return {
             "decision": "continue",
             "reason": (

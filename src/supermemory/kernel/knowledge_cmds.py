@@ -67,9 +67,13 @@ def _cmd_recall(args: Dict[str, Any]) -> Dict[str, Any]:
     mutates_memory=True,
 )
 def _cmd_update_state(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
+    changed = []
     for k in ("project_name", "active_goal", "current_phase", "primary_targets", "next_actions", "state_notes"):
         if args.get(k) is not None:
             store.set_meta(k, str(args[k]))
+            changed.append(k)
+    if changed:
+        store.log_event("STATE_UPDATED", "L0_STATE", f"Updated L0 working state ({', '.join(changed)})")
     return MarkdownCompiler(store).compile_all()
 
 
@@ -116,6 +120,7 @@ def _cmd_link_knowledge(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
             relation=str(args.get("relation") or "REFERENCES"),
         )
         store.add_edge(ed)
+        store.log_event("EDGE_LINKED", ed.source_id, f"Linked {ed.source_id} -[{ed.relation}]-> {ed.target_id}")
         created["edge"] = ed.to_dict()
     return created
 

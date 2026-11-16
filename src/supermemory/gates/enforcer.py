@@ -90,6 +90,7 @@ class GateEnforcer:
             log_event=False,
         )
         self.store.add_edge(MemoryEdge(source_id=law_id, target_id=gate_id, relation=EdgeType.ENFORCED_BY.value))
+        self.store.log_event("GATE_FROZEN", gate_id, f"SHA-256 locked {rel} ({law_id})")
         return gate
 
     def evaluate_tool_call(self, tool_name: str, tool_args: Dict[str, Any]) -> GateDecision:
@@ -123,7 +124,7 @@ class GateEnforcer:
 
         return GateDecision(allowed=True)
 
-    def audit_workspace(self) -> Dict[str, Any]:
+    def audit_workspace(self, log_audit: bool = False) -> Dict[str, Any]:
         """Run full-workspace constitutional & memory health checks."""
         gates = self.store.list_gates(enabled_only=True)
         violations: List[str] = []
@@ -158,6 +159,13 @@ class GateEnforcer:
             if s_lines >= 180:
                 violations.append(f"[LAW-07] 01_ACTIVE_STATE.md has {s_lines} lines (>= 180 limit)")
 
+        if log_audit:
+            ev_kind = "GATE_AUDIT_PASSED" if not violations else "GATE_AUDIT_FAILED"
+            self.store.log_event(
+                ev_kind,
+                "WORKSPACE_AUDIT",
+                f"Audited {checked_files} files across {len(gates)} gates: {len(violations)} violations",
+            )
         return {
             "passed": len(violations) == 0,
             "checked_files": checked_files,

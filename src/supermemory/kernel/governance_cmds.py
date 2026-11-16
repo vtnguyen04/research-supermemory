@@ -141,6 +141,7 @@ def _cmd_add_gate(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
                 config=cfg,
             )
         )
+        store.log_event("GATE_UPSERTED", gid, f"[{gtype}] {gate.name} -> {gate.target_glob}")
     return gate.to_dict()
 
 
@@ -151,4 +152,4 @@ def _cmd_add_gate(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
     mutates_memory=False,
 )
 def _cmd_audit_gates(store: GraphStore, _args: Dict[str, Any]) -> Dict[str, Any]:
-    return GateEnforcer(store).audit_workspace()
+    return GateEnforcer(store).audit_workspace(log_audit=True)

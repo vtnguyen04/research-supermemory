@@ -101,3 +101,36 @@ def test_zero_circular_imports_and_inward_kernel_boundary() -> None:
     for stmt in orders:
         res = subprocess.run([sys.executable, "-c", stmt], check=False, capture_output=True, text=True)
         assert res.returncode == 0, f"Failed `{stmt}`: {res.stderr}"
+
+
+def test_immutable_audit_and_system_events_completeness(tmp_path: Path) -> None:
+    """Verify audits, gates, Kanban steps, L0 checkpoints, and Stop hook interceptions emit live events."""
+    from supermemory.hooks.runner import dispatch_hook
+    from supermemory.kernel import execute_command
+    from supermemory.storage.sqlite_store import GraphStore
+
+    ws = tmp_path / "ev_proj"
+    init_workspace(ws, project_name="EvProj")
+    w = str(ws)
+
+    execute_command("add_gate", {"workspace": w, "name": "TestGate", "pattern": "BAD_TOK", "gate_type": "FORBIDDEN_REGEX"})
+    execute_command("audit_gates", {"workspace": w})
+    execute_command(
+        "checkpoint",
+        {
+            "workspace": w,
+            "new_task": {"title": "Verify live events feed", "steps": ["Emit audit event", "Verify UI feed"]},
+            "current_phase": "Phase 1",
+        },
+    )
+    execute_command("orchestrate", {"workspace": w, "action": "toggle_step", "item_id": "DAG-001", "step_idx": 0, "done": True})
+
+    src_f = ws / "app.py"
+    src_f.write_text("x = 1\n", encoding="utf-8")
+    dispatch_hook("PostToolUse", {"cwd": w, "conversationId": "c1", "toolCall": {"name": "write_file", "args": {"Path": str(src_f)}}})
+    stop_res = dispatch_hook("Stop", {"cwd": w, "conversationId": "c1", "terminationReason": "NO_TOOL_CALL"})
+    assert stop_res["decision"] == "continue"
+
+    with GraphStore(ws) as store:
+        ev_types = {e["event_type"] for e in store.list_events(limit=50)}
+    assert {"GATE_UPSERTED", "GATE_AUDIT_PASSED", "DAG_TASK_ENQUEUED", "KANBAN_STEP_TOGGLED", "STOP_GATE_ENFORCED"} <= ev_types

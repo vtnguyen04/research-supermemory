@@ -94,7 +94,7 @@
     setTxt("nav-count-nodes", nodes.length); setTxt("nav-count-kanban", ov.total_items || 0);
     setTxt("nav-count-research", (state.bottlenecks || []).filter((b) => b.status !== "RESOLVED").length + (state.method_cards || []).length);
     setTxt("nav-count-episodic", byTier.EPISODIC || 0); setTxt("nav-count-gates", gates.length);
-    setTxt("nav-count-exps", exps.length); setTxt("nav-count-props", nodes.filter((n) => n.node_type === "PROPOSAL").length);
+    setTxt("nav-count-exps", exps.length); setTxt("nav-count-props", nodes.filter((n) => n.node_type === "PROPOSAL").length); setTxt("nav-count-events", state.events_total ?? (state.events || []).length);
     const lawsCnt = nodes.filter((n) => n.node_type === "LAW").length, insCnt = nodes.filter((n) => ["OBSERVATION", "KNOWLEDGE_NODE", "ALGORITHM"].includes(n.node_type)).length;
     const pills = [
       ["tabbtn-kanban", `${ov.overall_pct ?? 0}% · ${ov.in_progress_count ?? 0}/${ov.total_items ?? 0} ${tr("Tasks", "Tác vụ")}`],
@@ -133,7 +133,7 @@
       if (moveFocus) tab.focus();
     };
     tabs.forEach((tab, idx) => {
-      tab.addEventListener("click", () => { activateTabFn(tab); if (Date.now() - lastFetch > 8000) loadGraph(); });
+      tab.addEventListener("click", () => { activateTabFn(tab); if (tab.dataset.tab === "tab-events" || tab.dataset.tab === "tab-kanban" || Date.now() - lastFetch > 2500) loadGraph(); });
       tab.addEventListener("keydown", (ev) => {
         const map = { ArrowDown: (idx + 1) % tabs.length, ArrowRight: (idx + 1) % tabs.length, ArrowUp: (idx - 1 + tabs.length) % tabs.length, ArrowLeft: (idx - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 };
         if (ev.key in map) { ev.preventDefault(); activateTabFn(tabs[map[ev.key]], true); }
@@ -169,13 +169,13 @@
     const on = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
     on("btn-collapse-rail", "click", () => { const c = document.body.classList.toggle("rail-collapsed"); localStorage.setItem("sm_rail_collapsed", c ? "1" : "0"); requestAnimationFrame(() => graphView.fitView()); });
     on("btn-toggle-l0", "click", () => { const c = document.getElementById("l0-context-strip").classList.toggle("is-compact"); localStorage.setItem("sm_l0_hidden", c ? "1" : "0"); requestAnimationFrame(() => graphView.fitView()); });
-    on("btn-live-sync", "click", (ev) => {
-      const btn = ev.currentTarget, next = !liveTimer; btn.setAttribute("aria-pressed", String(next)); btn.classList.toggle("is-live", next);
-      if (next) {
-        liveTimer = setInterval(() => { if (!document.hidden && !document.getElementById("workbench-dialog").open && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) loadGraph(); }, 4000);
-        toast(tr("Live auto-sync enabled (4s)", "Đã bật cập nhật tiến độ trực tiếp (4s)"));
-      } else { clearInterval(liveTimer); liveTimer = null; toast(tr("Live auto-sync paused", "Đã tắt cập nhật trực tiếp")); }
-    });
+    const setLive = (next, say = false) => {
+      const btn = document.getElementById("btn-live-sync"); if (!btn) return;
+      clearInterval(liveTimer); liveTimer = next ? setInterval(() => { if (!document.hidden && !document.getElementById("workbench-dialog").open && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) loadGraph(); }, 4000) : null;
+      btn.setAttribute("aria-pressed", String(next)); btn.classList.toggle("is-live", next); localStorage.setItem("sm_live_sync", next ? "1" : "0");
+      if (say) toast(next ? tr("Live auto-sync enabled (4s)", "Đã bật cập nhật trực tiếp (4s)") : tr("Live auto-sync paused", "Đã tạm dừng cập nhật trực tiếp"));
+    };
+    on("btn-live-sync", "click", () => setLive(!liveTimer, true)); setLive(localStorage.getItem("sm_live_sync") !== "0", false);
     on("btn-lang-toggle", "click", () => {
       setLang(getLang() === "en" ? "vi" : "en"); rerenderAll();
       if (inspector.currentNodeId?.startsWith("GATE:")) inspector.inspectGate((state.gates || []).find((g) => `GATE:${g.id}` === inspector.currentNodeId));
@@ -183,17 +183,12 @@
       else if (inspector.currentNodeId) inspector.inspect(inspector.currentNodeId, false);
     });
     document.querySelectorAll("[data-gmode]").forEach((b) => b.addEventListener("click", () => setGraphMode(b.dataset.gmode)));
-    on("chk-hide-aux", "change", (ev) => graphView.setHideAux(ev.target.checked));
-    on("workspace-switcher", "change", (ev) => { currentScope = ev.target.value; inspector.resetEmpty(); loadGraph(); });
+    on("chk-hide-aux", "change", (ev) => graphView.setHideAux(ev.target.checked)); on("workspace-switcher", "change", (ev) => { currentScope = ev.target.value; inspector.resetEmpty(); loadGraph(); });
     on("type-filter-select", "change", (ev) => { activeType = ev.target.value; graphView.setFilter(activeTier, activeType); });
     on("btn-refresh", "click", loadGraph); on("btn-zoom-in", "click", () => graphView.zoomBy(1.18)); on("btn-zoom-out", "click", () => graphView.zoomBy(0.85));
     on("btn-reset-zoom", "click", () => graphView.fitView()); on("btn-relayout", "click", () => graphView.relayout()); on("btn-export-png", "click", () => graphView.exportPng(state.project));
-    on("const-filter-input", "input", () => Views.renderConstitution(state, buildViewHandlers()));
-    on("exp-track-filter", "change", () => Views.renderExperiments(state, buildViewHandlers()));
-    on("exp-verdict-filter", "change", () => Views.renderExperiments(state, buildViewHandlers()));
-    on("exp-sort-select", "change", () => Views.renderExperiments(state, buildViewHandlers()));
-    on("lifecycle-filter-input", "input", () => Views.renderLifecycle(state, buildViewHandlers()));
-    on("events-filter-input", "input", () => Views.renderEvents(state, buildViewHandlers()));
-    loadGraph();
+    on("const-filter-input", "input", () => Views.renderConstitution(state, buildViewHandlers())); on("lifecycle-filter-input", "input", () => Views.renderLifecycle(state, buildViewHandlers()));
+    ["exp-track-filter", "exp-verdict-filter", "exp-sort-select"].forEach((id) => on(id, "change", () => Views.renderExperiments(state, buildViewHandlers())));
+    on("events-filter-input", "input", () => Views.renderEvents(state, buildViewHandlers())); loadGraph();
   });
 })();

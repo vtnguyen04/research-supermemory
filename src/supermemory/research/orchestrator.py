@@ -130,6 +130,7 @@ def enqueue_task(
         ),
     )
     store.conn.commit()
+    store.log_event("DAG_TASK_ENQUEUED", task.task_id, f"[W{task.wave}/{task.role}] {task.title[:85]}")
     return task
 
 

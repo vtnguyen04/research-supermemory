@@ -250,8 +250,10 @@ class LifecycleManager:
                     "monotonic_verified": monotonic_verified,
                     "zero_leakage_verified": zero_leakage_verified,
                 },
-            )
+            ),
+            log_event=False,
         )
+        self.store.log_event("AUDIT_VERDICT", target_id, f"{auditor_role} -> {clean_verdict} on {target_id}: {findings[:110]}")
         self.store.add_edge(MemoryEdge(source_id=target_id, target_id=audit_id, relation=EdgeType.AUDITED_BY.value))
         target_node = self.store.get_node(target_id)
         if target_node:

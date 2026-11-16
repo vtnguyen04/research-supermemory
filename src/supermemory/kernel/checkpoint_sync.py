@@ -48,7 +48,7 @@ def _mint_insight_node(
         if ex.title.strip().lower() == t_clean.lower():
             ex.summary = s_clean[:240]
             ex.content = s_clean
-            store.upsert_node(ex, log_event=False)
+            store.upsert_node(ex, log_event=True)
             return ex.to_dict()
 
     nums = [int(m.group(1)) for x in existing for m in [re.match(rf"^{pref}-(\d+)$", x.id)] if m]
@@ -144,11 +144,15 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
         applied_tasks.append({"id": iid, "kind": kind})
         mutated = True
 
+    meta_changed = []
     for meta_key in ("active_goal", "current_phase", "next_actions"):
         if args.get(meta_key) is not None and str(args[meta_key]).strip():
             store.set_meta(meta_key, str(args[meta_key]).strip())
+            meta_changed.append(meta_key)
             mutated = True
 
+    if meta_changed and not (captured_insights or created_task or applied_tasks):
+        store.log_event("CHECKPOINT_SYNCED", "L0_STATE", f"Synced L0 state ({', '.join(meta_changed)}){': ' + note[:80] if note else ''}")
     if mutated:
         MarkdownCompiler(store).compile_all()
     mark_turn_memory_handled(store)

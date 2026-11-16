@@ -82,6 +82,7 @@
         <button type="button" role="tab" id="tabbtn-events" class="nav-item" aria-selected="false" aria-controls="tab-events" tabindex="-1" data-tab="tab-events" title="System Events" data-vi-title="Nhật ký Hệ thống">
           <span class="nav-icon" data-icon="terminal" aria-hidden="true"></span>
           <span class="nav-label" data-vi="Nhật ký Hệ thống">System Events</span>
+          <span id="nav-count-events" class="nav-count">0</span>
         </button>
       </nav>
 
@@ -135,7 +136,7 @@
             </div>
             <div id="search-popover" class="search-popover hidden" role="listbox" aria-label="Search results and quick commands"></div>
           </div>
-          <button type="button" id="btn-live-sync" class="btn btn-secondary live-pill" aria-pressed="false" title="Toggle 4s live auto-refresh" data-vi-title="Bật/tắt tự động cập nhật tiến độ mỗi 4 giây">
+          <button type="button" id="btn-live-sync" class="btn btn-secondary live-pill is-live" aria-pressed="true" title="Toggle 4s live auto-refresh" data-vi-title="Bật/tắt tự động cập nhật tiến độ mỗi 4 giây">
             <span class="live-dot" aria-hidden="true"></span>
             <span data-vi="Trực tiếp">Live</span>
           </button>

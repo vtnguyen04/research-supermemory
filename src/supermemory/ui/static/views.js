@@ -147,20 +147,33 @@
     document.getElementById("ideas-pager").innerHTML = pgIdeas.html; bindInspectTriggers(ideasGrid, h.onInspect); bindPagers(root, () => renderLifecycle(state, h));
   }
 
+  function fmtEvtTime(iso) {
+    const d = new Date(iso || "");
+    if (Number.isNaN(d.getTime())) return String(iso || "").slice(0, 19);
+    const pad = (n) => String(n).padStart(2, "0"), hms = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    const sec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+    if (sec < 60) return `${tr("just now", "vừa xong")} · ${hms}`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}${tr("m ago", "p trước")} · ${hms}`;
+    if (sec < 86400) return `${Math.floor(sec / 3600)}${tr("h ago", "g trước")} · ${hms}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   function renderEvents(state, h) {
     const nodeSet = new Set((state.nodes || []).map((n) => n.id)), box = document.getElementById("events-list"), q = (document.getElementById("events-filter-input")?.value || "").trim().toLowerCase();
-    const catMatch = (t) => activeEvtCat === "ALL" || (activeEvtCat === "LEARNING" && /LEARN|LESSON|CONSOLIDAT/.test(t)) || (activeEvtCat === "GATE" && /GATE|AUDIT/.test(t)) || (activeEvtCat === "ERROR" && /ERROR|BLOCK|FAIL/.test(t)) || (activeEvtCat === "GRAPH" && /NODE|EDGE|EXP|PROP/.test(t));
+    const allEvs = (state.events || []).filter((ev) => matchQ(q, ev.event_type, ev.entity_id, ev.summary));
+    const catOk = (c, t) => c === "ALL" || (c === "LEARNING" && /LEARN|LESSON|CONSOLIDAT/.test(t)) || (c === "GATE" && /GATE|AUDIT|STOP_GATE/.test(t)) || (c === "ERROR" && /ERROR|BLOCK|FAIL|STOP_GATE/.test(t)) || (c === "GRAPH" && /NODE|EDGE|EXP|PROP|DAG|KANBAN|CHECKPOINT|HANDOFF|STATE|SNAPSHOT/.test(t));
     const evBar = document.getElementById("events-cat-bar");
-    evBar.innerHTML = [["ALL", tr("All Events", "Tất cả")], ["LEARNING", tr("Self-Learning", "Tự học")], ["GATE", "CodeGates"], ["GRAPH", tr("Graph & Exps", "Đồ thị & Exp")], ["ERROR", tr("Blocks & Errors", "Chặn & Lỗi")]]
+    evBar.innerHTML = [["ALL", `${tr("All Events", "Tất cả")} (${allEvs.length})`], ["LEARNING", `${tr("Self-Learning", "Tự học")} (${allEvs.filter((x) => catOk("LEARNING", x.event_type)).length})`], ["GATE", `CodeGates & Audits (${allEvs.filter((x) => catOk("GATE", x.event_type)).length})`], ["GRAPH", `${tr("Graph & Kanban", "Đồ thị & Kanban")} (${allEvs.filter((x) => catOk("GRAPH", x.event_type)).length})`], ["ERROR", `${tr("Blocks & Errors", "Chặn & Lỗi")} (${allEvs.filter((x) => catOk("ERROR", x.event_type)).length})`]]
       .map(([k, lbl]) => `<button type="button" class="seg-btn" aria-pressed="${activeEvtCat === k}" data-ecat="${k}">${esc(lbl)}</button>`).join("");
     evBar.querySelectorAll("[data-ecat]").forEach((b) => b.addEventListener("click", () => { activeEvtCat = b.dataset.ecat; renderEvents(state, h); }));
 
-    const evs = (state.events || []).filter((ev) => catMatch(String(ev.event_type || "")) && matchQ(q, ev.event_type, ev.entity_id, ev.summary));
-    const pg = paginate(evs, `ev-${activeEvtCat}`, 8);
+    const evs = allEvs.filter((ev) => catOk(activeEvtCat, String(ev.event_type || "")));
+    const pg = paginate(evs, `ev-${activeEvtCat}`, 10);
+    const toneOf = (t) => (/ERROR|BLOCK|FAIL|STOP_GATE/.test(t) ? "BLOCKED" : /AUDIT_PASSED|AUDIT_VERDICT|LEARN|CONSOLIDAT|CHECKPOINT/.test(t) ? "VERIFIED" : /KANBAN|DAG|GATE|STATE/.test(t) ? "READY" : "LOGGED");
     box.innerHTML = pg.slice.length ? pg.slice.map((ev) => {
-      const cleanSum = cleanText(String(ev.summary || ""), 180).replace(/^([A-Z0-9-]+):\s*(?:\[[A-Z0-9_ -]+\]\s*)?\1:\s*/, "$1: ");
+      const et = String(ev.event_type || "EVENT"), cleanSum = cleanText(String(ev.summary || ""), 180).replace(/^([A-Z0-9-]+):\s*(?:\[[A-Z0-9_ -]+\]\s*)?\1:\s*/, "$1: ");
       return `<div role="listitem" class="ledger-item-static">
-      <div class="row-top"><span class="mono-id">${esc(ev.event_type)}${ev.entity_id ? ` &middot; ${esc(ev.entity_id)}` : ""}</span><span class="mono-id">${esc((ev.created_at || "").slice(0, 19))}</span></div>
+      <div class="row-top"><span class="badge-cluster">${statusTag(toneOf(et), et)}${ev.entity_id ? `<span class="mono-id">${esc(ev.entity_id)}</span>` : ""}</span><span class="mono-id" title="${esc(ev.created_at || "")}">${esc(fmtEvtTime(ev.created_at))}</span></div>
       <div class="row-desc line-clamp-3">${esc(cleanSum)}</div>
       ${ev.entity_id && nodeSet.has(ev.entity_id) ? `<div><button type="button" class="btn btn-secondary btn-xs" data-nid="${esc(ev.entity_id)}">${tr("Open", "Mở")} ${esc(ev.entity_id)}</button></div>` : ""}</div>`;
     }).join("") + pg.html

@@ -62,7 +62,8 @@ def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
         edges = [e.to_dict() for e in store.list_edges()]
         gates = [g.to_dict() for g in store.list_gates()]
         experiments = [x.to_dict() for x in store.list_experiments()]
-        events = store.list_events(limit=100)
+        events = store.list_events(limit=120)
+        events_total = int(store.conn.execute("SELECT COUNT(*) FROM events").fetchone()[0])
         analytics = qe.graph_analytics()
         tiers = compute_tier_telemetry(store)
         meta = store.get_all_meta()
@@ -80,6 +81,7 @@ def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
             "gates": gates,
             "experiments": experiments,
             "events": events,
+            "events_total": events_total,
         }
         return enrich_graph_payload_v3(store, payload)
 
