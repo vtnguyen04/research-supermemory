@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [3.4.0] - 2026-11-17
+
+### Added
+- **Relational Temporal Fact Supersession & Baseline Decay (`METH-002`, `supermemory.graph.supersession`):** Added directional `SUPERSEDES` Personalized PageRank flow (`1.6x` forward to newer truth, `0.25x` backward), `0.42x` score decay on superseded positive observations (`status="SUPERSEDED"`), and `0.72x` decay on baseline experiments beaten via `IMPROVES_OVER` — while preserving `100%` unpenalized strength on `LESSON`, `FAILURE_INSIGHT`, and `REVERT`/`FAILED` dead-ends.
+- **Atomic `supersedes=[...]` Wiring in `checkpoint` & `log_experiment`:** Added optional `supersedes` parameter (`--supersedes` on CLI) to automatically link `SUPERSEDES` edges, tag `superseded_by` in recall cards, and retire outdated positive observations in 1 call.
+- **Zero-Turn Hook Auto-Recall (`PreInvocation` & `UserPromptSubmit`):** Automatically injects up to `3` session-deduplicated, non-superseded domain memories (`BNK`, `METH`, `OBS`, `EXP`, `PROP`) plus anti-repeat warnings in `< 25ms` before the first model turn across both Antigravity CLI and Claude Code (resetting cleanly on context compaction).
+
+### Fixed
+- **Hybrid Recall Hook Score Scale:** Updated `_on_pre_invocation` threshold from legacy v2 BM25 scale (`>= 8.5`) to normalized v3 hybrid scale (`>= 0.22` warnings / `>= 0.26` direct context).
+
+---
+
 ## [3.3.5] - 2026-11-17
 
 ### Added
@@ -124,6 +136,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **Initial Release:** SQLite WAL + FTS5 knowledge graph, `LAW-01`..`LAW-08` Constitutional Markdown compiler, `PreToolUse` CodeGate enforcer (`MAX_LINES`, `FORBIDDEN_REGEX`, `FORBIDDEN_FILENAME`, `FORBIDDEN_CMD_PATTERN`, `FROZEN_SHA256`, `AST_SYNTAX`), OpenSpec proposal state machine, and Antigravity CLI plugin package.
 
+[3.4.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.5...v3.4.0
 [3.3.5]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.4...v3.3.5
 [3.3.4]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.3...v3.3.4
 [3.3.3]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.2...v3.3.3

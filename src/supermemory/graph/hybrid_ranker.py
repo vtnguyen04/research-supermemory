@@ -6,10 +6,12 @@ import math
 import re
 from typing import Any, Dict, List, Set, Tuple
 
+from supermemory.graph.supersession import apply_supersession_decay, resolve_supersession_maps
 from supermemory.models import ExperimentVerdict, MemoryEdge, MemoryNode, NodeType
 from supermemory.storage.sqlite_store import GraphStore
 
 _EDGE_WEIGHT_BOOST: Dict[str, float] = {
+    "SUPERSEDES": 1.45,
     "CANDIDATE_FOR": 1.45,
     "DIAGNOSES": 1.40,
     "IMPROVES_OVER": 1.35,
@@ -142,8 +144,13 @@ def personalized_pagerank(
     adj: Dict[str, List[Tuple[str, float]]] = {}
     for ed in edges:
         rel_w = _EDGE_WEIGHT_BOOST.get(ed.relation, 1.0) * max(0.2, float(ed.weight or 1.0))
-        adj.setdefault(ed.source_id, []).append((ed.target_id, rel_w))
-        adj.setdefault(ed.target_id, []).append((ed.source_id, rel_w * 0.85))
+        if ed.relation == "SUPERSEDES":
+            # Flow activation strongly from superseded old node -> superseding new node
+            adj.setdefault(ed.target_id, []).append((ed.source_id, rel_w * 1.60))
+            adj.setdefault(ed.source_id, []).append((ed.target_id, rel_w * 0.25))
+        else:
+            adj.setdefault(ed.source_id, []).append((ed.target_id, rel_w))
+            adj.setdefault(ed.target_id, []).append((ed.source_id, rel_w * 0.85))
 
     ranks = dict(teleport)
     for _ in range(iterations):
@@ -181,6 +188,7 @@ def rank_hybrid_graph(
 
     sim_map = compute_hybrid_similarity(query, nodes)
     priors = compute_utility_priors(store, nodes, edges)
+    superseded_by, beaten_by = resolve_supersession_maps(store, nodes, edges)
 
     seed_scores: Dict[str, float] = {}
     direct_ids: Set[str] = set()
@@ -226,6 +234,7 @@ def rank_hybrid_graph(
         util_sc = priors.get(nid, 0.0)
         hop = 0 if nid in direct_ids else hop_dist.get(nid, 1)
         final_sc = (0.62 * direct_sc + 0.28 * ppr_sc + 0.10 * max(0.0, util_sc)) / (1.0 + 0.22 * hop)
+        final_sc, sup_target = apply_supersession_decay(nd, final_sc, superseded_by, beaten_by)
         item: Dict[str, Any] = {
             "id": nd.id,
             "type": nd.node_type,
@@ -237,6 +246,8 @@ def rank_hybrid_graph(
             "file_path": nd.file_path,
             "hop": hop,
         }
+        if sup_target:
+            item["superseded_by"] = sup_target
         if hop > 0 and nid in via_rel:
             item["via_relation"] = via_rel[nid]
         scored_items.append(item)

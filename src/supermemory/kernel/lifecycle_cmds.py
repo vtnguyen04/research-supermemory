@@ -122,6 +122,7 @@ def _cmd_manage_proposal(store: GraphStore, args: Dict[str, Any]) -> Dict[str, A
             "verdict": {"type": "string", "default": "KEEP"},
             "post_mortem": {"type": "string"},
             "insights": {"type": "array", "items": {"type": "string"}},
+            "supersedes": {"type": "array", "items": {"type": "string"}, "description": "Optional outdated OBS/EXP IDs superseded by this result."},
             "workspace": {"type": "string"},
         },
         "required": ["title", "hypothesis", "single_var_diff"],
@@ -133,6 +134,8 @@ def _cmd_log_experiment(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
     ts_val = float(args["test_score"]) if args.get("test_score") not in (None, "") else None
     raw_ins = args.get("insights") or []
     ins_list = [s.strip() for s in raw_ins.splitlines() if s.strip()] if isinstance(raw_ins, str) else list(raw_ins)
+    raw_sup = args.get("supersedes") or []
+    sup_list = [s.strip() for s in raw_sup.split(",") if s.strip()] if isinstance(raw_sup, str) else list(raw_sup)
     return LifecycleManager(store).log_experiment(
         track=str(args.get("track") or "main"),
         exp_id=str(args.get("exp_id") or ""),
@@ -150,6 +153,7 @@ def _cmd_log_experiment(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
         verdict=str(args.get("verdict") or "KEEP"),
         post_mortem=str(args.get("post_mortem") or ""),
         insights=ins_list,
+        supersedes=sup_list,
     )
 
 
@@ -168,6 +172,7 @@ def _cmd_log_experiment(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
             },
             "insight_title": {"type": "string"},
             "insight_summary": {"type": "string"},
+            "supersedes": {"type": "array", "items": {"type": "string"}, "description": "Optional outdated OBS/EXP IDs superseded by new insights."},
             "memory_tier": {"type": "string", "enum": ["SEMANTIC", "PROCEDURAL"], "default": "SEMANTIC"},
             "new_task": {"type": "object"},
             "task_updates": {"type": "array", "items": {"type": "object"}},

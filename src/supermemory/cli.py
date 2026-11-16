@@ -158,6 +158,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_chk.add_argument("--note", default="")
     p_chk.add_argument("--insight-title", default="")
     p_chk.add_argument("--insight-summary", default="")
+    p_chk.add_argument("--supersedes", default="", help="Comma-separated outdated node IDs superseded by this insight")
     p_chk.add_argument("--tier", choices=["SEMANTIC", "PROCEDURAL"], default="SEMANTIC")
     p_chk.add_argument("-w", "--workspace", default=".")
     p_chk.add_argument("-g", "--global", dest="use_global", action="store_true")

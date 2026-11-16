@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -16,6 +17,8 @@ from supermemory.models import NodeType
 from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
 from supermemory.storage.sqlite_store import GraphStore
+
+_EXPLICIT_ID_RE = re.compile(r"\b(?:BNK|RQ|METH|EXP|OBS|PROC|PROP|IDEA|ALGO|LESSON|DAG)-\d+\b", re.IGNORECASE)
 
 
 def _resolve_supermemory_workspace(payload: Dict[str, Any]) -> Optional[Path]:
@@ -102,6 +105,8 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
     if prev_step > 20 and 0 < step_idx < (prev_step // 2):
         st["compaction_count"] = st.get("compaction_count", 0) + 1
         st["last_heartbeat_bucket"] = 0
+        st["recalled_node_ids"] = []
+        st["recalled_warnings"] = []
         capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
         injected_msgs.append("♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED:\n" + capsule)
         store.log_event("COMPACTION_RECOVERY", conv_id, f"Restored tiered state at step {step_idx}")
@@ -128,21 +133,45 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         elif sig.guidance:
             injected_msgs.append(sig.guidance)
 
-        if len(user_input.strip()) >= 28:
+        clean_in = user_input.strip()
+        if len(clean_in) >= 28 or _EXPLICIT_ID_RE.search(clean_in):
             rec = federated_recall(
-                user_input,
+                clean_in,
                 local_ws=store.workspace_root,
                 include_global=True,
                 include_siblings=bool(st.get("research_campaign_active")),
-                limit=3,
+                limit=5,
                 hops=1,
+                compact=True,
             )
-            high_hit = any(float(r.get("score") or 0) >= 8.5 for r in rec.get("results") or [])
-            if high_hit and rec["anti_repeat_warnings"]:
-                warn_block = "⚠️ SUPERMEMORY ANTI-REPEAT RECALL:\n" + "\n".join(
-                    f"  • {w}" for w in rec["anti_repeat_warnings"][:3]
+            results = rec.get("results") or []
+            seen_warns = set(st.get("recalled_warnings") or [])
+            if rec.get("anti_repeat_warnings") and any(float(r.get("score") or 0.0) >= 0.22 for r in results):
+                fresh_warns = [w for w in rec["anti_repeat_warnings"] if w not in seen_warns][:3]
+                if fresh_warns:
+                    injected_msgs.append("⚠️ SUPERMEMORY ANTI-REPEAT RECALL:\n" + "\n".join(f"  • {w}" for w in fresh_warns))
+                    st["recalled_warnings"] = list(seen_warns | set(fresh_warns))[-40:]
+
+            seen_ids = set(st.get("recalled_node_ids") or [])
+            fresh_hits = [
+                r
+                for r in results
+                if float(r.get("score") or 0.0) >= 0.26
+                and not r.get("superseded_by")
+                and r.get("status") != "SUPERSEDED"
+                and r.get("type") not in ("LAW", "GATE")
+                and str(r.get("id")) not in seen_ids
+            ][:3]
+            if fresh_hits:
+                lines = [
+                    f"  • [{h['type']}] `{h['id']}` ({h.get('scope', 'LOCAL')}): {h['title']} — {h['summary']}"
+                    for h in fresh_hits
+                ]
+                injected_msgs.append(
+                    "⚡ SUPERMEMORY AUTO-RECALL (0-Turn Context — call `recall(node_id=...)` only if full detail needed):\n"
+                    + "\n".join(lines)
                 )
-                injected_msgs.append(warn_block)
+                st["recalled_node_ids"] = list(seen_ids | {str(h["id"]) for h in fresh_hits})[-80:]
     elif step_idx >= 20 and "/goal" in user_input.lower():
         cur_bucket = step_idx // 20
         prev_bucket = int(st.get("last_heartbeat_bucket") or 0)

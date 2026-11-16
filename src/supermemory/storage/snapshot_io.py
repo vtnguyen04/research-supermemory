@@ -193,6 +193,8 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
             "last_heartbeat_bucket": 0,
             "last_seen_user_input": "",
             "pending_sync_reason": "",
+            "recalled_node_ids": [],
+            "recalled_warnings": [],
             "compaction_count": 0,
         }
     raw_extra = str(row["unlogged_exp_cmds_json"] or "[]").strip()
@@ -211,6 +213,8 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
         "last_heartbeat_bucket": int(extra_obj.get("last_heartbeat_bucket", 0)),
         "last_seen_user_input": str(extra_obj.get("last_seen_user_input") or ""),
         "pending_sync_reason": str(extra_obj.get("pending_sync_reason") or ""),
+        "recalled_node_ids": list(extra_obj.get("recalled_node_ids") or []),
+        "recalled_warnings": list(extra_obj.get("recalled_warnings") or []),
         "compaction_count": int(row["compaction_count"]),
     }
 
@@ -224,6 +228,8 @@ def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
         "last_heartbeat_bucket": int(state.get("last_heartbeat_bucket", 0)),
         "last_seen_user_input": str(state.get("last_seen_user_input") or ""),
         "pending_sync_reason": str(state.get("pending_sync_reason") or ""),
+        "recalled_node_ids": list(state.get("recalled_node_ids") or []),
+        "recalled_warnings": list(state.get("recalled_warnings") or []),
     }
     store.conn.execute(
         """

@@ -51,6 +51,8 @@ class QueryEngine:
                 card["file_path"] = r["file_path"]
             if r.get("via_relation"):
                 card["via_relation"] = r["via_relation"]
+            if r.get("superseded_by"):
+                card["superseded_by"] = r["superseded_by"]
             slim_results.append(card)
 
         slim_edges = [

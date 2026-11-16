@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from supermemory.graph.supersession import apply_supersedes_links
 from supermemory.lifecycle.validators import validate_experiment_schema
 from supermemory.models import (
     EdgeType,
@@ -56,6 +57,7 @@ def record_scientific_experiment(
     leakage_audit: str = "CLEAN",
     post_mortem: str = "",
     insights: Optional[List[str]] = None,
+    supersedes: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Log an experiment, enforce post-mortem on failures, and crystallize OBSERVATION nodes."""
     clean_track = re.sub(r"[^a-zA-Z0-9_-]+", "_", track.strip() or "main").lower()
@@ -193,6 +195,8 @@ def record_scientific_experiment(
         store.add_edge(MemoryEdge(source_id=obs_id, target_id=exp_id, relation=EdgeType.DERIVED_FROM.value))
         observation_ids.append(obs_id)
 
+    superseded_ids = apply_supersedes_links(store, observation_ids or [exp_id], supersedes or [])
+
     # Autonomous REM-sleep consolidation on long-horizon runs (>= 6 unconsolidated episodic runs/track)
     from supermemory.cognitive.tiers import auto_consolidate_episodic
 
@@ -203,6 +207,7 @@ def record_scientific_experiment(
         "delta_vs_baseline": delta,
         "regression_detected": regression_detected,
         "observation_ids": observation_ids,
+        "superseded_ids": superseded_ids,
         "auto_consolidated_nodes": auto_cons.get("created_semantic_nodes", []),
         "log_path": rel_log,
     }

@@ -58,6 +58,7 @@ def handle_checkpoint(args: argparse.Namespace) -> int:
             "note": args.note or "",
             "insight_title": args.insight_title or "",
             "insight_summary": args.insight_summary or "",
+            "supersedes": getattr(args, "supersedes", "") or "",
             "memory_tier": args.tier,
         },
     )

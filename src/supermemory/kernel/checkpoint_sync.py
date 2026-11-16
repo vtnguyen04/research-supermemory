@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
+from supermemory.graph.supersession import apply_supersedes_links
 from supermemory.lifecycle.manager import LifecycleManager
 from supermemory.lifecycle.validators import assert_all_steps_completed, validate_insight_schema
 from supermemory.models import MemoryNode, MemoryTier, NodeType, utc_now_iso
@@ -48,6 +49,8 @@ def _mint_insight_node(
         if ex.title.strip().lower() == t_clean.lower():
             ex.summary = s_clean[:240]
             ex.content = s_clean
+            ex.status = "SCIENTIFIC_INSIGHT" if ntype == NodeType.OBSERVATION.value else "ACTIVE"
+            ex.metadata.pop("superseded_by", None)
             store.upsert_node(ex, log_event=True)
             return ex.to_dict()
 
@@ -95,6 +98,13 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
             continue
         head = txt.split(":", 1)[0].strip() if ":" in txt[:90] else txt[:84]
         captured_insights.append(_mint_insight_node(store, head, txt, tier=tier, note=note))
+        mutated = True
+
+    raw_sup = args.get("supersedes") or []
+    sup_list = [s.strip() for s in raw_sup.split(",") if s.strip()] if isinstance(raw_sup, str) else [str(s).strip() for s in raw_sup if str(s).strip()]
+    superseded_ids: List[str] = []
+    if sup_list and captured_insights:
+        superseded_ids = apply_supersedes_links(store, [str(x["id"]) for x in captured_insights], sup_list)
         mutated = True
 
     created_task = None
@@ -160,6 +170,7 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
         "status": "CAPTURED" if mutated else str(args.get("status") or "CLEAN"),
         "turn_memory_handled": True,
         "captured": captured_insights[0] if len(captured_insights) == 1 else captured_insights or None,
+        "superseded_ids": superseded_ids,
         "created_task": created_task,
         "updated_tasks": applied_tasks,
     }
