@@ -1,6 +1,6 @@
 // Research v3.0.2 Studio: Pareto Bottleneck Ledger, SOTA Method Vault & Multi-Agent Fast-DAG
 (function () {
-  const { esc, statusTag, paginate, bindPagers, inlineMd, tr } = window.SuperMemoryIcons;
+  const { esc, statusTag, paginate, bindPagers, inlineMd, cleanText, tr } = window.SuperMemoryIcons;
   const fld = (n, lbl, ctrl) => `<div class="field-group"><label for="rh-${n}" class="field-label">${lbl}</label>${ctrl}</div>`;
   const inp = (n, val = "", ph = "") => `<input id="rh-${n}" name="${n}" class="control-input" value="${esc(val)}" placeholder="${esc(ph)}" />`;
   const area = (n, val = "", rows = 2, ph = "") => `<textarea id="rh-${n}" name="${n}" class="control-textarea" rows="${rows}" placeholder="${esc(ph)}">${esc(val)}</textarea>`;
@@ -112,10 +112,10 @@
       const bp = paginate(bnks, "bnk", 4);
       bnkBox.innerHTML = (bp.slice.length ? bp.slice.map((b) => `<article class="ledger-item-static ledger-item-clickable" data-inspect-rh="${esc(b.id)}">
         <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(b.id)}</span>${statusTag(b.status)}</span><span class="role-chip">Pareto ${esc(b.pareto_priority)}</span></div>
-        <h4 class="row-title">${esc(b.title)}</h4>
+        <h4 class="row-title" title="${esc(b.title)}">${esc(cleanText(b.title, 82))}</h4>
         <div class="pareto-row"><span>${esc(b.error_share_pct)}% ${tr("error share", "tỷ trọng lỗi")} &middot; +${esc(b.ceiling_gain)} ${esc(b.metric_name)}</span><span>${esc((b.candidate_ids || []).length)} ${tr("candidates", "ứng viên")}</span></div>
         <progress class="pareto-meter" max="100" value="${esc(Math.min(100, Number(b.error_share_pct) || 0))}"></progress>
-        <p class="row-desc line-clamp-3">${inlineMd(b.kill_criterion || b.summary)}</p>
+        <p class="row-desc line-clamp-3">${inlineMd(cleanText(b.kill_criterion || b.summary, 140))}</p>
         <div class="row-actions"><button type="button" class="btn btn-secondary btn-xs" data-inspect-btn="${esc(b.id)}">${tr("Inspect", "Chi tiết")}</button>
         ${b.rq_id ? `<button type="button" class="btn btn-ghost btn-xs" data-inspect-btn="${esc(b.rq_id)}">${esc(b.rq_id)}</button>` : ""}
         ${b.status !== "RESOLVED" ? `<button type="button" class="btn btn-ghost btn-xs" data-resolve-bnk="${esc(b.id)}">${tr("Mark Resolved", "Đánh dấu Xong")}</button>` : ""}</div>
@@ -126,8 +126,8 @@
         const md = m.metadata || {}, venueLbl = `${md.venue || "SOTA"} ${md.year || ""}`.trim();
         return `<article class="ledger-item-static ledger-item-clickable" data-inspect-rh="${esc(m.id)}">
           <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(m.id)}</span><span class="role-chip" title="${esc(venueLbl)}">${esc(venueLbl)}</span></span><span class="mono-tag" title="${esc(md.complexity_cost || "O(N)")}">${esc(md.complexity_cost || "O(N)")}</span></div>
-          <h4 class="row-title">${esc(m.title)}</h4>
-          <p class="row-desc line-clamp-3">${inlineMd(md.core_mechanism || m.summary)}</p>
+          <h4 class="row-title" title="${esc(m.title)}">${esc(cleanText(m.title, 82))}</h4>
+          <p class="row-desc line-clamp-3">${inlineMd(cleanText(md.core_mechanism || m.summary, 140))}</p>
           <div class="dag-meta-row">${md.bottleneck_id ? `<span class="mono-tag">${tr("Targets", "Đích")}: ${esc(md.bottleneck_id)}</span>` : "<span></span>"}<button type="button" class="btn btn-secondary btn-xs" data-inspect-btn="${esc(m.id)}">${tr("Read Card", "Đọc thẻ")}</button></div>
         </article>`;
       }).join("") : `<div class="empty-state"><p class="empty-desc">${tr("Method Vault is empty. Harvest papers from arXiv / Semantic Scholar / OpenAlex or add a curated Method Card.", "Kho phương pháp trống. Hãy săn bài báo từ arXiv / Semantic Scholar / OpenAlex hoặc thêm thẻ mới.")}</p></div>`) + mp.html;
@@ -140,12 +140,12 @@
         const wTasks = tasks.filter((t) => Number(t.wave) === w);
         const body = wTasks.length ? wTasks.map((t) => `<div class="dag-card" data-task-id="${esc(t.task_id)}">
           <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(t.task_id)}</span>${statusTag(t.status)}</span><span class="role-chip">${esc(t.role)}</span></div>
-          <strong class="dag-title">${esc(t.title)}</strong>
-          <p class="row-desc">${inlineMd(t.brief)}</p>
+          <strong class="dag-title" title="${esc(t.title)}">${esc(cleanText(t.title, 72))}</strong>
+          <p class="row-desc">${inlineMd(cleanText(t.brief, 125))}</p>
           <div class="pareto-row"><span>${esc(t.steps_done ?? 0)}/${esc(t.steps_total ?? 3)} ${tr("steps", "bước")}</span><strong>${esc(t.progress_pct ?? 0)}%</strong></div>
           <progress class="pareto-meter kanban-meter" max="100" value="${esc(t.progress_pct ?? 0)}"></progress>
           ${(t.locked_globs || []).length || t.claimed_by ? `<div class="dag-meta-row">${(t.locked_globs || []).length ? `<span class="mono-tag">Lease: ${esc(t.locked_globs.join(", "))}</span>` : ""}${t.claimed_by ? `<span class="mono-tag">Worker: ${esc(t.claimed_by)}</span>` : ""}</div>` : ""}
-          ${t.receipt?.note ? `<p class="mono-id">${esc(t.receipt.note)}</p>` : ""}
+          ${t.receipt?.note ? `<p class="tlist-sub" title="${esc(t.receipt.note)}">${esc(cleanText(t.receipt.note, 80))}</p>` : ""}
           <div class="row-actions"><button type="button" class="btn btn-secondary btn-xs" data-dag-inspect="${esc(t.task_id)}">${tr("Details", "Chi tiết")}</button>
           ${readySet.has(t.task_id) ? `<button type="button" class="btn btn-secondary btn-xs" data-dag-claim="${esc(t.task_id)}">${tr("Claim Task", "Nhận việc")}</button>` : ""}
           ${t.status === "RUNNING" ? `<button type="button" class="btn btn-primary btn-xs" data-dag-done="${esc(t.task_id)}" data-dag-st="DONE">${tr("Complete", "Hoàn tất")}</button><button type="button" class="btn btn-danger btn-xs" data-dag-done="${esc(t.task_id)}" data-dag-st="EARLY_KILLED">${tr("10% Early-Kill", "Dừng sớm 10%")}</button>` : ""}</div>

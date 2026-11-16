@@ -112,13 +112,13 @@
       .replace(/\\([a-zA-Z]+)/g, (__, c) => SYM[c] || BIG[c] || c).replace(/[{}]/g, ""));
     if (stripTag) s = s.replace(/^(?:\[[A-Z0-9_ -]+\]\s*)+/, "");
     s = s.replace(/\s+/g, " ").trim();
-    const unclosedParen = (s.match(/\(/g) || []).length > (s.match(/\)/g) || []).length;
-    if (unclosedParen || (hadTag && s.length >= 68 && !/[.!?)…]$/.test(s))) {
-      const sp = s.lastIndexOf(" "); s = (sp > 24 ? s.slice(0, sp) : s).replace(/[,;:\-(]+$/, "") + "…";
+    const unclosed = (s.match(/\(/g) || []).length > (s.match(/\)/g) || []).length || (s.match(/\[/g) || []).length > (s.match(/\]/g) || []).length;
+    if (unclosed || (hadTag && s.length >= 68 && !/[.!?)…]$/.test(s))) {
+      const sp = s.lastIndexOf(" "); s = (sp > 24 ? s.slice(0, sp) : s).replace(/[,;:\-([ ]+$/, "") + "…";
     }
     if (maxLen > 0 && s.length > maxLen) {
       const cut = s.slice(0, maxLen - 1), sp = cut.lastIndexOf(" ");
-      s = (sp > maxLen * 0.55 ? cut.slice(0, sp) : cut).replace(/[,;:\-(]+$/, "") + "…";
+      s = (sp > maxLen * 0.55 ? cut.slice(0, sp) : cut).replace(/[,;:\-([ ]+$/, "") + "…";
     }
     return s;
   }

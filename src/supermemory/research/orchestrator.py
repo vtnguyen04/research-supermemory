@@ -145,10 +145,19 @@ def plan_research_sprint(
     ids = [f"DAG-{base_n + i:03d}" for i in range(6)]
     globs = target_globs if target_globs is not None else ["src/**"]
     tgt = bottleneck_id.strip()
+    def _clip_goal(txt: str, cap: int = 52) -> str:
+        clean = " ".join((txt or "").split())
+        if len(clean) <= cap:
+            return clean
+        cut = clean[: cap - 1]
+        sp = cut.rfind(" ")
+        return (cut[:sp] if sp > cap // 2 else cut).rstrip(" ,;:-(") + "…"
+
+    g_short = _clip_goal(goal, 52)
     specs = [
-        (ids[0], 1, "bottleneck-profiler", f"Profile Error Slices & Pareto Bottleneck: {goal[:55]}",
+        (ids[0], 1, "bottleneck-profiler", f"Profile Error Slices: {g_short}",
          "Decompose validation errors/regret by slice; register `BNK-XXX` + falsifiable `RQ-XXX`.", [], [], ""),
-        (ids[1], 1, "sota-scout", f"Scout SOTA Method Cards: {goal[:55]}",
+        (ids[1], 1, "sota-scout", f"Scout SOTA Cards: {g_short}",
          "Query arXiv/Semantic Scholar/OpenAlex (SQLite cached) and mint `METH-XXX` cards with integration hooks.", [], [], ""),
         (ids[2], 1, "memory-curator", "Federated + Sibling Vault Recall & Dead-End Check",
          "Run hybrid utility recall (`include_siblings=True`) to surface reusable wins and dead-end fingerprints.", [], [], ""),

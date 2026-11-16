@@ -5,7 +5,7 @@
   const { MergeStudioController } = window.SuperMemoryMergeStudio, { ModalController } = window.SuperMemoryModals;
   const { SearchPaletteController } = window.SuperMemoryPalette, Views = window.SuperMemoryViews;
   const { ResearchHubController } = window.SuperMemoryResearchHub, { KanbanBoardController } = window.SuperMemoryKanbanBoard;
-  const UI_VER = document.querySelector('meta[name="sm-version"]')?.content || "";
+  const rawVer = document.querySelector('meta[name="sm-version"]')?.content || "", UI_VER = rawVer.includes("{{") ? "" : rawVer;
   let state = { nodes: [], edges: [], gates: [], experiments: [], events: [], meta: {}, analytics: {}, cognitive_tiers: {}, workspaces: [] };
   let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, liveTimer = null, lastFetch = 0;
   let graphView = null, inspector = null, mergeStudio = null, modals = null, researchHub = null, kanbanBoard = null, activateTabFn = null;
@@ -83,6 +83,7 @@
     const flat = (s) => String(s || "").replace(/^\s*\[['"]?|['"]?\]\s*$/g, "").replace(/['"],\s*['"]/g, " · ").replace(/\\n|\s+/g, " ").trim();
     const setTxt = (id, v, tip = false) => { const el = document.getElementById(id); if (el) { el.textContent = v; if (tip) el.title = String(v); } };
     setTxt("scope-indicator", state.is_global ? "GLOBAL" : "LOCAL"); setTxt("project-title", state.project || "SuperMemory", true);
+    const vTag = document.querySelector(".version-tag"); if (vTag && state.ui_version) vTag.textContent = `Studio ${state.ui_version}`;
     setTxt("active-goal-line", flat(meta.active_goal) || "4-Tier Cognitive Graph & Constitutional Harness", true);
     setTxt("l0-phase", flat((meta.current_phase || tr("Active Studio", "Đang hoạt động")).split("|")[0].split("(")[0]), true);
     setTxt("l0-next", flat(meta.next_actions || meta.active_goal) || tr("Ready for research & verification.", "Sẵn sàng thực nghiệm & kiểm định."), true);

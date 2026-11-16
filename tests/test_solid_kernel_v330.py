@@ -81,3 +81,23 @@ def test_cli_lazy_imports_isolate_hooks_from_ui_and_mcp() -> None:
     )
     res = subprocess.run([sys.executable, "-c", code], check=False, capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
+
+
+def test_zero_circular_imports_and_inward_kernel_boundary() -> None:
+    """Verify every import order across kernel/mcp/hooks/ui succeeds and kernel never imports adapters."""
+    repo_root = Path(__file__).resolve().parents[1]
+    for py_file in (repo_root / "src" / "supermemory" / "kernel").glob("*.py"):
+        src = py_file.read_text(encoding="utf-8")
+        for outward in ("supermemory.mcp", "supermemory.ui", "supermemory.hooks", "supermemory.cli"):
+            assert outward not in src, f"{py_file.name} violated Hexagonal boundary by importing {outward}"
+
+    orders = [
+        "import supermemory.kernel, supermemory.mcp.tool_defs",
+        "import supermemory.mcp.tool_defs, supermemory.kernel",
+        "import supermemory.mcp.checkpoint_sync, supermemory.kernel",
+        "import supermemory.kernel.lifecycle_cmds, supermemory.mcp.server",
+        "import supermemory.hooks.runner, supermemory.hooks.claude_bridge",
+    ]
+    for stmt in orders:
+        res = subprocess.run([sys.executable, "-c", stmt], check=False, capture_output=True, text=True)
+        assert res.returncode == 0, f"Failed `{stmt}`: {res.stderr}"

@@ -10,9 +10,9 @@
   }
 
   function rowBtnHtml(n, tagLabel = "") {
-    return `<div role="listitem" class="ledger-listitem"><button type="button" class="ledger-row" data-nid="${esc(n.id)}">
+    return `<div role="listitem" class="ledger-listitem"><button type="button" class="ledger-row" data-nid="${esc(n.id)}" title="${esc(n.title)}">
       <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, tagLabel || n.status)}</span>
-      <span class="row-title">${esc(cleanText(n.title, 110))}</span><span class="row-desc">${esc(cleanText(n.summary, 175))}</span></button></div>`;
+      <span class="row-title">${esc(cleanText(n.title, 84))}</span><span class="row-desc">${esc(cleanText(n.summary, 140))}</span></button></div>`;
   }
 
   function bindInspectTriggers(root, onInspect) {
@@ -105,8 +105,8 @@
       const eid = e.exp_id || e.id, delta = e.delta_vs_baseline != null ? (e.delta_vs_baseline >= 0 ? `+${e.delta_vs_baseline.toFixed(4)}` : e.delta_vs_baseline.toFixed(4)) : "—";
       const cvTxt = String(e.cv_summary || (e.cv_score ?? "—")), tsTxt = String(e.test_summary || (e.test_score ?? "—"));
       return `<tr><td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="mono-id">${esc(eid)}</span></button></td><td class="mono-id">${esc(e.track)}</td>
-        <td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="row-title">${esc(cleanText(e.title, 110))}</span><span class="row-desc line-clamp-3">${esc(cleanText(e.single_var_diff || e.hypothesis, 150))}</span></button></td>
-        <td class="metric-cell"><div class="line-clamp-3" title="${esc(cvTxt)}">${esc(cvTxt)}</div></td><td class="metric-cell"><div class="line-clamp-3" title="${esc(tsTxt)}">${esc(tsTxt)}</div></td><td class="num-col">${delta}</td><td>${statusTag(e.verdict)}</td></tr>`;
+        <td><button type="button" class="row-trigger" data-nid="${esc(eid)}" title="${esc(e.title)}"><span class="row-title">${esc(cleanText(e.title, 84))}</span><span class="row-desc line-clamp-3">${esc(cleanText(e.single_var_diff || e.hypothesis, 130))}</span></button></td>
+        <td class="metric-cell"><div class="line-clamp-3" title="${esc(cvTxt)}">${esc(cleanText(cvTxt, 110))}</div></td><td class="metric-cell"><div class="line-clamp-3" title="${esc(tsTxt)}">${esc(cleanText(tsTxt, 110))}</div></td><td class="num-col">${delta}</td><td>${statusTag(e.verdict)}</td></tr>`;
     }).join("");
     pagerBox.innerHTML = pg.html; bindInspectTriggers(tbody, h.onInspect); bindPagers(pagerBox, () => renderExperiments(state, h));
   }
@@ -129,7 +129,7 @@
       if (idx >= 0 && idx < 3) acts += `<button type="button" class="btn btn-secondary btn-xs" data-prop-adv="${esc(p.id)}" data-next="${stages[idx + 1]}">${tr("To", "Sang")} ${stages[idx + 1]}</button>`;
       if (p.status !== "AUDITED" && p.status !== "ARCHIVED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-audit="${esc(p.id)}">${tr("Approve Audit", "Duyệt Audit")}</button>`;
       if (p.status === "AUDITED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-adv="${esc(p.id)}" data-next="ARCHIVED">${tr("Archive", "Lưu trữ")}</button>`;
-      return `<div class="ledger-panel"><div class="ledger-item-static"><button type="button" class="row-trigger" data-nid="${esc(p.id)}"><span class="row-top"><span class="mono-id">${esc(p.id)}</span>${statusTag(p.status)}</span><span class="row-title">${esc(cleanText(p.title, 96))}</span><span class="row-desc line-clamp-3">${esc(cleanText(p.summary, 155))}</span></button>${acts ? `<div class="row-actions">${acts}</div>` : ""}</div></div>`;
+      return `<div class="ledger-panel"><div class="ledger-item-static"><button type="button" class="row-trigger" data-nid="${esc(p.id)}" title="${esc(p.title)}"><span class="row-top"><span class="mono-id">${esc(p.id)}</span>${statusTag(p.status)}</span><span class="row-title">${esc(cleanText(p.title, 78))}</span><span class="row-desc line-clamp-3">${esc(cleanText(p.summary, 135))}</span></button>${acts ? `<div class="row-actions">${acts}</div>` : ""}</div></div>`;
     }).join("") : `<div class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No proposals in this stage", "Không có Proposal ở giai đoạn này")}</p></div></div>`;
     document.getElementById("proposal-pager").innerHTML = pgProps.html; bindInspectTriggers(grid, h.onInspect);
     grid.querySelectorAll("[data-prop-adv]").forEach((b) => b.addEventListener("click", () => h.onAdvanceProposal(b.dataset.propAdv, b.dataset.next)));
@@ -143,7 +143,7 @@
     const ideas = activeVaultType === "ALL" ? allIdeas : activeVaultType === "DEAD_END" ? allIdeas.filter((x) => x.status === "REJECTED") : allIdeas.filter((x) => x.node_type === activeVaultType);
     const shortType = { OBSERVATION: "INSIGHT", KNOWLEDGE_NODE: "KNOWLEDGE", ALGORITHM: "ALGO" };
     const pgIdeas = paginate(ideas, `ideas-${activeVaultType}`, 8), ideasGrid = document.getElementById("ideas-grid");
-    ideasGrid.innerHTML = ideas.length ? pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel"><button type="button" class="ledger-row" data-nid="${esc(n.id)}"><span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, shortType[n.node_type] || n.node_type)}</span><span class="row-title">${esc(cleanText(n.title, 96))}</span><span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 155))}</span></button></div>`).join("") : `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No vault items match filter", "Không có mục nào khớp bộ lọc")}</p></div></div>`;
+    ideasGrid.innerHTML = ideas.length ? pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel"><button type="button" class="ledger-row" data-nid="${esc(n.id)}" title="${esc(n.title)}"><span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, shortType[n.node_type] || n.node_type)}</span><span class="row-title">${esc(cleanText(n.title, 78))}</span><span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 135))}</span></button></div>`).join("") : `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No vault items match filter", "Không có mục nào khớp bộ lọc")}</p></div></div>`;
     document.getElementById("ideas-pager").innerHTML = pgIdeas.html; bindInspectTriggers(ideasGrid, h.onInspect); bindPagers(root, () => renderLifecycle(state, h));
   }
 
@@ -158,7 +158,7 @@
     const evs = (state.events || []).filter((ev) => catMatch(String(ev.event_type || "")) && matchQ(q, ev.event_type, ev.entity_id, ev.summary));
     const pg = paginate(evs, `ev-${activeEvtCat}`, 8);
     box.innerHTML = pg.slice.length ? pg.slice.map((ev) => {
-      const cleanSum = cleanText(String(ev.summary || "").replace(/^([A-Z0-9-]+):\s*\1:\s*/, "$1: "), 220);
+      const cleanSum = cleanText(String(ev.summary || ""), 180).replace(/^([A-Z0-9-]+):\s*(?:\[[A-Z0-9_ -]+\]\s*)?\1:\s*/, "$1: ");
       return `<div role="listitem" class="ledger-item-static">
       <div class="row-top"><span class="mono-id">${esc(ev.event_type)}${ev.entity_id ? ` &middot; ${esc(ev.entity_id)}` : ""}</span><span class="mono-id">${esc((ev.created_at || "").slice(0, 19))}</span></div>
       <div class="row-desc line-clamp-3">${esc(cleanSum)}</div>

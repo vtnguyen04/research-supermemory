@@ -40,10 +40,10 @@
               const checked = this.selectedIds.has(n.id) ? "checked" : "";
               return `<div class="selectable-row">
                 <input type="checkbox" class="merge-chk" data-id="${esc(n.id)}" aria-label="${tr("Select", "Chọn")} ${esc(n.id)}" ${checked} />
-                <button type="button" class="row-trigger" data-inspect="${esc(n.id)}">
+                <button type="button" class="row-trigger" data-inspect="${esc(n.id)}" title="${esc(n.title)}">
                   <span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, shortT[n.node_type] || n.node_type)}</span>
-                  <span class="row-title">${esc(cleanText(n.title, 96))}</span>
-                  <span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 145))}</span>
+                  <span class="row-title">${esc(cleanText(n.title, 76))}</span>
+                  <span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 128))}</span>
                 </button></div>`;
             })
             .join("");
