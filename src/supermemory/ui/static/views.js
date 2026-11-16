@@ -27,14 +27,12 @@
       .sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")) || String(b.id || "").localeCompare(String(a.id || "")));
 
     const pgLaws = paginate(laws, "const-laws", 5), lawsBox = document.getElementById("laws-list");
-    const lawPads = `<div role="listitem" class="ledger-listitem is-pad" aria-hidden="true"><div class="ledger-row"></div></div>`.repeat(pgLaws.pad);
-    lawsBox.innerHTML = (pgLaws.slice.length ? pgLaws.slice.map((l) => rowBtnHtml(l, `${l.node_type} · ${tr("Merged", "Gộp")} ${(l.metadata || {}).recurrence_count || 0}`)).join("") + lawPads : `<div class="empty-state"><p class="empty-desc">${tr("No matching laws.", "Không có luật khớp bộ lọc.")}</p></div>`) + pgLaws.html;
+    lawsBox.innerHTML = (pgLaws.slice.length ? pgLaws.slice.map((l) => rowBtnHtml(l, `${l.node_type} · ${tr("Merged", "Gộp")} ${(l.metadata || {}).recurrence_count || 0}`)).join("") : `<div class="empty-state"><p class="empty-desc">${tr("No matching laws.", "Không có luật khớp bộ lọc.")}</p></div>`) + pgLaws.html;
     bindInspectTriggers(lawsBox, h.onInspect);
 
     const pgGates = paginate(gates, "const-gates", 4), gatesBox = document.getElementById("gates-list");
-    const gatePads = `<div role="listitem" class="ledger-item-static gate-cell is-pad" aria-hidden="true"></div>`.repeat(pgGates.pad);
-    gatesBox.innerHTML = (pgGates.slice.length ? pgGates.slice.map((g) => `<div role="listitem" class="ledger-item-static gate-cell">
-      <button type="button" class="row-trigger" data-gate-inspect="${esc(g.id)}">
+    gatesBox.innerHTML = (pgGates.slice.length ? pgGates.slice.map((g) => `<div role="listitem" class="ledger-item-static">
+      <button type="button" class="row-trigger" data-gate-inspect="${esc(g.id)}" title="${esc(g.name)}">
         <span class="row-top"><span class="mono-id">${esc(g.id)} &middot; ${esc(g.gate_type)}</span>
           ${statusTag(g.enabled ? "ENABLED" : "DISABLED", `${g.enabled ? tr("ENABLED", "ĐANG BẬT") : tr("PAUSED", "TẠM TẮT")} (${g.blocked_count})`)}</span>
         <span class="row-title">${esc(g.name)} (${esc(g.law_id)})</span>
@@ -45,7 +43,7 @@
         <button type="button" class="btn btn-secondary btn-xs" data-edit-gate="${esc(g.id)}">${tr("Edit", "Sửa")}</button>
         <button type="button" class="btn btn-secondary btn-xs" data-toggle-gate="${esc(g.id)}" data-enabled="${!g.enabled}">${g.enabled ? tr("Pause", "Tạm tắt") : tr("Enable", "Bật lại")}</button>
         <span data-gate-del-zone="${esc(g.id)}"><button type="button" class="btn btn-danger btn-xs" data-arm-gate="${esc(g.id)}">${tr("Delete", "Xóa")}</button></span>
-      </div></div>`).join("") + gatePads : `<div class="empty-state"><p class="empty-desc">${tr("No matching CodeGates.", "Không có CodeGate khớp bộ lọc.")}</p></div>`) + pgGates.html;
+      </div></div>`).join("") : `<div class="empty-state"><p class="empty-desc">${tr("No matching CodeGates.", "Không có CodeGate khớp bộ lọc.")}</p></div>`) + pgGates.html;
 
     const gateMap = new Map((state.gates || []).map((g) => [g.id, g]));
     gatesBox.querySelectorAll("[data-gate-inspect]").forEach((b) => b.addEventListener("click", () => h.onInspectGate(gateMap.get(b.dataset.gateInspect))));
@@ -60,8 +58,8 @@
 
     const lessonsBox = document.getElementById("lessons-list");
     if (lessons.length) {
-      const pgLes = paginate(lessons, "const-lessons", 4), lesPads = `<div role="listitem" class="ledger-listitem is-pad" aria-hidden="true"><div class="ledger-row"></div></div>`.repeat(pgLes.pad);
-      lessonsBox.innerHTML = pgLes.slice.map((l) => rowBtnHtml(l, (l.metadata || {}).law_id || "LESSON")).join("") + lesPads + pgLes.html;
+      const pgLes = paginate(lessons, "const-lessons", 4);
+      lessonsBox.innerHTML = pgLes.slice.map((l) => rowBtnHtml(l, (l.metadata || {}).law_id || "LESSON")).join("") + pgLes.html;
       bindInspectTriggers(lessonsBox, h.onInspect);
     } else {
       lessonsBox.innerHTML = `<div class="empty-state"><p class="empty-title">${tr("No lessons matched", "Chưa có bài học khớp")}</p><div><button type="button" id="cta-empty-lesson" class="btn btn-secondary btn-sm">${tr("+ Record Lesson", "+ Ghi bài học")}</button></div></div>`;
@@ -102,15 +100,15 @@
       tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><p class="empty-title">${tr("No experiments match current filter", "Không có thực nghiệm khớp bộ lọc")}</p><div><button type="button" id="cta-empty-exp" class="btn btn-secondary btn-sm">${tr("+ Log Experiment", "+ Ghi thực nghiệm")}</button></div></div></td></tr>`;
       pagerBox.innerHTML = ""; document.getElementById("cta-empty-exp").addEventListener("click", h.onOpenExp); return;
     }
-    const pg = paginate(filtered, "exp-table", 6), expPads = `<tr class="exp-row is-pad" aria-hidden="true"><td colspan="7"></td></tr>`.repeat(pg.pad);
+    const pg = paginate(filtered, "exp-table", 6);
     tbody.innerHTML = pg.slice.map((e) => {
       const eid = e.exp_id || e.id, delta = e.delta_vs_baseline != null ? (e.delta_vs_baseline >= 0 ? `+${e.delta_vs_baseline.toFixed(4)}` : e.delta_vs_baseline.toFixed(4)) : "—";
       const cvTxt = String(e.cv_summary || (e.cv_score ?? "—")), tsTxt = String(e.test_summary || (e.test_score ?? "—"));
       return `<tr class="exp-row"><td><button type="button" class="row-trigger" data-nid="${esc(eid)}"><span class="mono-id">${esc(eid)}</span></button></td><td class="mono-id">${esc(e.track)}</td>
         <td><button type="button" class="row-trigger" data-nid="${esc(eid)}" title="${esc(e.title)}"><span class="row-title">${esc(cleanText(e.title, 84))}</span><span class="row-desc exp-sub">${esc(cleanText(e.single_var_diff || e.hypothesis, 110))}</span></button></td>
         <td class="metric-cell"><div class="line-clamp-3" title="${esc(cvTxt)}">${esc(cleanText(cvTxt, 96))}</div></td><td class="metric-cell"><div class="line-clamp-3" title="${esc(tsTxt)}">${esc(cleanText(tsTxt, 96))}</div></td><td class="num-col">${delta}</td><td>${statusTag(e.verdict)}</td></tr>`;
-    }).join("") + expPads;
-    pagerBox.innerHTML = pg.html; bindInspectTriggers(tbody, h.onInspect); bindPagers(pagerBox, () => renderExperiments(state, h));
+    }).join("");
+    pagerBox.innerHTML = pg.html; bindInspectTriggers(tbody, h.onInspect); bindPagers(document.getElementById("tab-experiments"), () => renderExperiments(state, h));
   }
 
   function renderLifecycle(state, h) {
@@ -126,14 +124,13 @@
 
     const filteredProps = activePropStage === "ALL" ? props : activePropStage === "OPEN" ? props.filter((p) => p.status !== "ARCHIVED") : props.filter((p) => p.status === activePropStage);
     const pgProps = paginate(filteredProps, `prop-${activePropStage}`, 6), grid = document.getElementById("proposal-grid");
-    const propPads = `<div class="ledger-panel prop-card is-pad" aria-hidden="true"></div>`.repeat(pgProps.pad);
     grid.innerHTML = pgProps.slice.length ? pgProps.slice.map((p) => {
       const idx = stages.indexOf(p.status); let acts = `<button type="button" class="btn btn-ghost btn-xs" data-nid="${esc(p.id)}">${tr("Details", "Chi tiết")}</button>`;
       if (idx >= 0 && idx < 3) acts += `<button type="button" class="btn btn-secondary btn-xs" data-prop-adv="${esc(p.id)}" data-next="${stages[idx + 1]}">${tr("To", "Sang")} ${stages[idx + 1]}</button>`;
       if (p.status !== "AUDITED" && p.status !== "ARCHIVED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-audit="${esc(p.id)}">${tr("Approve Audit", "Duyệt Audit")}</button>`;
       if (p.status === "AUDITED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-adv="${esc(p.id)}" data-next="ARCHIVED">${tr("Archive", "Lưu trữ")}</button>`;
       return `<div class="ledger-panel prop-card"><div class="ledger-item-static"><button type="button" class="row-trigger" data-nid="${esc(p.id)}" title="${esc(p.title)}"><span class="row-top"><span class="mono-id">${esc(p.id)}</span>${statusTag(p.status)}</span><span class="row-title">${esc(cleanText(p.title, 78))}</span><span class="row-desc line-clamp-3">${esc(cleanText(p.summary, 135))}</span></button><div class="row-actions">${acts}</div></div></div>`;
-    }).join("") + propPads : `<div class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No proposals in this stage", "Không có Proposal ở giai đoạn này")}</p></div></div>`;
+    }).join("") : `<div class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No proposals in this stage", "Không có Proposal ở giai đoạn này")}</p></div></div>`;
     document.getElementById("proposal-pager").innerHTML = pgProps.html; bindInspectTriggers(grid, h.onInspect);
     grid.querySelectorAll("[data-prop-adv]").forEach((b) => b.addEventListener("click", () => h.onAdvanceProposal(b.dataset.propAdv, b.dataset.next)));
     grid.querySelectorAll("[data-prop-audit]").forEach((b) => b.addEventListener("click", () => h.onAuditProposal(b.dataset.propAudit)));
@@ -146,8 +143,7 @@
     const ideas = activeVaultType === "ALL" ? allIdeas : activeVaultType === "DEAD_END" ? allIdeas.filter((x) => x.status === "REJECTED") : allIdeas.filter((x) => x.node_type === activeVaultType);
     const shortType = { OBSERVATION: "INSIGHT", KNOWLEDGE_NODE: "KNOWLEDGE", ALGORITHM: "ALGO" };
     const pgIdeas = paginate(ideas, `ideas-${activeVaultType}`, 6), ideasGrid = document.getElementById("ideas-grid");
-    const ideaPads = `<div role="listitem" class="ledger-panel idea-card is-pad" aria-hidden="true"></div>`.repeat(pgIdeas.pad);
-    ideasGrid.innerHTML = ideas.length ? pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel idea-card"><button type="button" class="ledger-row" data-nid="${esc(n.id)}" title="${esc(n.title)}"><span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, shortType[n.node_type] || n.node_type)}</span><span class="row-title">${esc(cleanText(n.title, 78))}</span><span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 135))}</span></button></div>`).join("") + ideaPads : `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No vault items match filter", "Không có mục nào khớp bộ lọc")}</p></div></div>`;
+    ideasGrid.innerHTML = ideas.length ? pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel idea-card"><button type="button" class="ledger-row" data-nid="${esc(n.id)}" title="${esc(n.title)}"><span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, shortType[n.node_type] || n.node_type)}</span><span class="row-title">${esc(cleanText(n.title, 78))}</span><span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 135))}</span></button></div>`).join("") : `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No vault items match filter", "Không có mục nào khớp bộ lọc")}</p></div></div>`;
     document.getElementById("ideas-pager").innerHTML = pgIdeas.html; bindInspectTriggers(ideasGrid, h.onInspect); bindPagers(root, () => renderLifecycle(state, h));
   }
 
@@ -163,7 +159,7 @@
   }
 
   function renderEvents(state, h) {
-    const nodeSet = new Set((state.nodes || []).map((n) => n.id)), box = document.getElementById("events-list"), q = (document.getElementById("events-filter-input")?.value || "").trim().toLowerCase();
+    const nodeSet = new Set((state.nodes || []).map((n) => n.id)), box = document.getElementById("events-list"), pagerBox = document.getElementById("events-pager"), q = (document.getElementById("events-filter-input")?.value || "").trim().toLowerCase();
     const allEvs = (state.events || []).filter((ev) => matchQ(q, ev.event_type, ev.entity_id, ev.summary));
     const catOk = (c, t) => c === "ALL" || (c === "LEARNING" && /LEARN|LESSON|CONSOLIDAT/.test(t)) || (c === "GATE" && /GATE|AUDIT|STOP_GATE/.test(t)) || (c === "ERROR" && /ERROR|BLOCK|FAIL|STOP_GATE/.test(t)) || (c === "GRAPH" && /NODE|EDGE|EXP|PROP|DAG|KANBAN|CHECKPOINT|HANDOFF|STATE|SNAPSHOT/.test(t));
     const evBar = document.getElementById("events-cat-bar");
@@ -172,7 +168,7 @@
     evBar.querySelectorAll("[data-ecat]").forEach((b) => b.addEventListener("click", () => { activeEvtCat = b.dataset.ecat; renderEvents(state, h); }));
 
     const evs = allEvs.filter((ev) => catOk(activeEvtCat, String(ev.event_type || "")));
-    const pg = paginate(evs, `ev-${activeEvtCat}`, 8), evPads = `<div role="listitem" class="ledger-item-static event-cell is-pad" aria-hidden="true"></div>`.repeat(pg.pad);
+    const pg = paginate(evs, `ev-${activeEvtCat}`, 8);
     const toneOf = (t) => (/ERROR|BLOCK|FAIL|STOP_GATE/.test(t) ? "BLOCKED" : /AUDIT_PASSED|AUDIT_VERDICT|LEARN|CONSOLIDAT|CHECKPOINT/.test(t) ? "VERIFIED" : /KANBAN|DAG|GATE|STATE/.test(t) ? "READY" : "LOGGED");
     box.innerHTML = pg.slice.length ? pg.slice.map((ev) => {
       const et = String(ev.event_type || "EVENT"), cleanSum = cleanText(String(ev.summary || ""), 180).replace(/^([A-Z0-9-]+):\s*(?:\[[A-Z0-9_ -]+\]\s*)?\1:\s*/, "$1: ");
@@ -180,9 +176,10 @@
       return `<div role="listitem" class="ledger-item-static event-cell">
       <div class="row-top"><span class="badge-cluster">${statusTag(toneOf(et), et)}${ev.entity_id ? `<span class="mono-id">${esc(ev.entity_id)}</span>` : ""}</span><span class="ev-right">${openBtn}<span class="mono-id" title="${esc(ev.created_at || "")}">${esc(fmtEvtTime(ev.created_at))}</span></span></div>
       <div class="row-desc ev-desc">${esc(cleanSum)}</div></div>`;
-    }).join("") + evPads + pg.html
+    }).join("")
       : `<div role="listitem" class="empty-state"><p class="empty-desc">${tr("No telemetry events match current filter.", "Không có sự kiện nào khớp bộ lọc.")}</p></div>`;
-    bindInspectTriggers(box, h.onInspect); bindPagers(box, () => renderEvents(state, h));
+    if (pagerBox) pagerBox.innerHTML = pg.html;
+    bindInspectTriggers(box, h.onInspect); bindPagers(document.getElementById("tab-events"), () => renderEvents(state, h));
   }
 
   window.SuperMemoryViews = { renderSkeletons, renderConstitution, renderExperiments, renderLifecycle, renderEvents };

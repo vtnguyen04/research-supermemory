@@ -109,8 +109,8 @@
       if (!bnkBox || !cardBox || !dagBox) return;
       const readySet = new Set(tel.ready_parallel_task_ids || []);
 
-      const bp = paginate(bnks, "bnk", 4), bPads = `<div class="ledger-item-static bnk-cell is-pad" aria-hidden="true"></div>`.repeat(bp.pad);
-      bnkBox.innerHTML = (bp.slice.length ? bp.slice.map((b) => `<article class="ledger-item-static bnk-cell ledger-item-clickable" data-inspect-rh="${esc(b.id)}">
+      const bp = paginate(bnks, "bnk", 4);
+      bnkBox.innerHTML = (bp.slice.length ? bp.slice.map((b) => `<article class="ledger-item-static ledger-item-clickable" data-inspect-rh="${esc(b.id)}">
         <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(b.id)}</span>${statusTag(b.status)}</span><span class="role-chip">Pareto ${esc(b.pareto_priority)}</span></div>
         <h4 class="row-title" title="${esc(b.title)}">${esc(cleanText(b.title, 82))}</h4>
         <div class="pareto-row"><span>${esc(b.error_share_pct)}% ${tr("error share", "tỷ trọng lỗi")} &middot; +${esc(b.ceiling_gain)} ${esc(b.metric_name)}</span><span>${esc((b.candidate_ids || []).length)} ${tr("candidates", "ứng viên")}</span></div>
@@ -119,26 +119,28 @@
         <div class="row-actions"><button type="button" class="btn btn-secondary btn-xs" data-inspect-btn="${esc(b.id)}">${tr("Inspect", "Chi tiết")}</button>
         ${b.rq_id ? `<button type="button" class="btn btn-ghost btn-xs" data-inspect-btn="${esc(b.rq_id)}">${esc(b.rq_id)}</button>` : ""}
         ${b.status !== "RESOLVED" ? `<button type="button" class="btn btn-ghost btn-xs" data-resolve-bnk="${esc(b.id)}">${tr("Mark Resolved", "Đánh dấu Xong")}</button>` : ""}</div>
-      </article>`).join("") + bPads : `<div class="empty-state"><p class="empty-desc">${tr("No bottlenecks profiled yet. Click '+ Diagnose Bottleneck' to quantify error slices before proposing ideas.", "Chưa có điểm nghẽn nào. Nhấn '+ Chẩn đoán Điểm nghẽn' để định lượng lỗi trước khi đề xuất ý tưởng.")}</p></div>`) + bp.html;
+      </article>`).join("") : `<div class="empty-state"><p class="empty-desc">${tr("No bottlenecks profiled yet. Click '+ Diagnose Bottleneck' to quantify error slices before proposing ideas.", "Chưa có điểm nghẽn nào. Nhấn '+ Chẩn đoán Điểm nghẽn' để định lượng lỗi trước khi đề xuất ý tưởng.")}</p></div>`) + bp.html;
 
-      const mp = paginate(cards, "meth", 4), mPads = `<div class="ledger-item-static meth-cell is-pad" aria-hidden="true"></div>`.repeat(mp.pad);
+      const mp = paginate(cards, "meth", 4);
       cardBox.innerHTML = (mp.slice.length ? mp.slice.map((m) => {
         const md = m.metadata || {}, venueLbl = `${md.venue || "SOTA"} ${md.year || ""}`.trim();
-        return `<article class="ledger-item-static meth-cell ledger-item-clickable" data-inspect-rh="${esc(m.id)}">
+        return `<article class="ledger-item-static ledger-item-clickable" data-inspect-rh="${esc(m.id)}">
           <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(m.id)}</span><span class="role-chip" title="${esc(venueLbl)}">${esc(venueLbl)}</span></span><span class="mono-tag" title="${esc(md.complexity_cost || "O(N)")}">${esc(md.complexity_cost || "O(N)")}</span></div>
           <h4 class="row-title" title="${esc(m.title)}">${esc(cleanText(m.title, 82))}</h4>
           <p class="row-desc line-clamp-3">${inlineMd(cleanText(md.core_mechanism || m.summary, 140))}</p>
           <div class="dag-meta-row">${md.bottleneck_id ? `<span class="mono-tag">${tr("Targets", "Đích")}: ${esc(md.bottleneck_id)}</span>` : "<span></span>"}<button type="button" class="btn btn-secondary btn-xs" data-inspect-btn="${esc(m.id)}">${tr("Read Card", "Đọc thẻ")}</button></div>
         </article>`;
-      }).join("") + mPads : `<div class="empty-state"><p class="empty-desc">${tr("Method Vault is empty. Harvest papers from arXiv / Semantic Scholar / OpenAlex or add a curated Method Card.", "Kho phương pháp trống. Hãy săn bài báo từ arXiv / Semantic Scholar / OpenAlex hoặc thêm thẻ mới.")}</p></div>`) + mp.html;
+      }).join("") : `<div class="empty-state"><p class="empty-desc">${tr("Method Vault is empty. Harvest papers from arXiv / Semantic Scholar / OpenAlex or add a curated Method Card.", "Kho phương pháp trống. Hãy săn bài báo từ arXiv / Semantic Scholar / OpenAlex hoặc thêm thẻ mới.")}</p></div>`) + mp.html;
 
       const pill = document.getElementById("dag-summary-pill");
       if (pill) pill.textContent = `${tasks.length} ${tr("tasks", "tác vụ")} · ${readySet.size} ${tr("parallel ready", "sẵn sàng song song")} · ${(tel.active_glob_leases || []).length} ${tr("glob leases", "khóa file")}`;
 
+      const stRank = (s) => (s === "RUNNING" ? 0 : s === "QUEUED" ? 1 : 2);
       const waves = [[1, tr("Wave 1 · Parallel Discovery", "Đợt 1 · Khám phá Song song")], [2, tr("Wave 2 · Occam & Red-Team Gate", "Đợt 2 · Lọc Occam & Phản biện")], [3, tr("Wave 3 · Locked Slice & 10% Smoke", "Đợt 3 · Thực thi Khóa file & Smoke 10%")]];
       dagBox.innerHTML = waves.map(([w, title]) => {
-        const wTasks = tasks.filter((t) => Number(t.wave) === w);
-        const body = wTasks.length ? wTasks.map((t) => `<div class="dag-card" data-task-id="${esc(t.task_id)}">
+        const wTasks = tasks.filter((t) => Number(t.wave) === w).sort((a, b) => stRank(a.status) - stRank(b.status) || String(b.task_id).localeCompare(String(a.task_id)));
+        const wp = paginate(wTasks, `dag-w-${w}`, 3);
+        const body = wp.slice.length ? wp.slice.map((t) => `<div class="dag-card" data-task-id="${esc(t.task_id)}">
           <div class="row-top"><span class="badge-cluster"><span class="mono-id">${esc(t.task_id)}</span>${statusTag(t.status)}</span><span class="role-chip">${esc(t.role)}</span></div>
           <strong class="dag-title" title="${esc(t.title)}">${esc(cleanText(t.title, 72))}</strong>
           <p class="row-desc">${inlineMd(cleanText(t.brief, 125))}</p>
@@ -150,7 +152,7 @@
           ${readySet.has(t.task_id) ? `<button type="button" class="btn btn-secondary btn-xs" data-dag-claim="${esc(t.task_id)}">${tr("Claim Task", "Nhận việc")}</button>` : ""}
           ${t.status === "RUNNING" ? `<button type="button" class="btn btn-primary btn-xs" data-dag-done="${esc(t.task_id)}" data-dag-st="DONE">${tr("Complete", "Hoàn tất")}</button><button type="button" class="btn btn-danger btn-xs" data-dag-done="${esc(t.task_id)}" data-dag-st="EARLY_KILLED">${tr("10% Early-Kill", "Dừng sớm 10%")}</button>` : ""}</div>
         </div>`).join("") : `<div class="empty-state"><p class="empty-desc">${tr("No tasks in this wave.", "Chưa có tác vụ ở đợt này.")}</p></div>`;
-        return `<div class="ledger-panel"><div class="ledger-header"><h3>${esc(title)}</h3><span class="nav-count">${wTasks.length}</span></div><div class="dag-col-body">${body}</div></div>`;
+        return `<div class="ledger-panel"><div class="ledger-header"><h3>${esc(title)}</h3><span class="nav-count">${wTasks.length}</span></div><div class="dag-col-body">${body}</div>${wp.html}</div>`;
       }).join("");
 
       const root = document.getElementById("tab-research");

@@ -130,7 +130,6 @@
         }).join("")}</div>`;
       } else {
         const pg = paginate(items, `klist-${this.sourceFilter}`, 10);
-        const pads = `<div class="task-list-row is-pad" aria-hidden="true"></div>`.repeat(pg.pad);
         mount.innerHTML = items.length ? `<div class="surface-card task-list-panel">${pg.slice.map((it) => {
           const chipLbl = it.wave ? `W${it.wave} · ${it.badge}` : (it.badge || it.kind), dispTitle = cleanText(it.title, 78);
           const nxt = it.steps.find((s) => !s.done);
@@ -145,7 +144,7 @@
             <div class="tlist-prog"><progress class="pareto-meter kanban-meter" max="100" value="${it.pct}"></progress><span class="mono-id">${it.stepsDone}/${it.stepsTotal}</span></div>
             <div class="tlist-acts">${this._actionBtn(it)}<button type="button" class="btn btn-secondary btn-xs" data-open-id="${esc(it.id)}" data-open-kind="${it.kind}">${tr("Details", "Chi tiết")}</button></div>
           </div>`;
-        }).join("")}${pads}${pg.html}</div>` : `<div class="surface-card empty-state"><p class="empty-desc">${tr("No matching tasks or proposals.", "Không tìm thấy tác vụ phù hợp.")}</p></div>`;
+        }).join("")}${pg.html}</div>` : `<div class="surface-card empty-state"><p class="empty-desc">${tr("No matching tasks or proposals.", "Không tìm thấy tác vụ phù hợp.")}</p></div>`;
       }
       bindPagers(mount, () => this.render(this.ctx.getState()));
       this._bindStageEvents(mount);

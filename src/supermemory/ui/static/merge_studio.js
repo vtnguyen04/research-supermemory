@@ -33,7 +33,7 @@
             if (n.memory_tier !== c.key || (hideCons && n.status === "CONSOLIDATED")) return false;
             return !q || `${n.id} ${n.title} ${n.summary} ${n.node_type}`.toLowerCase().includes(q);
           });
-          const pg = paginate(items, `tier-${c.key}`, 5), pads = `<div class="selectable-row is-pad" aria-hidden="true"></div>`.repeat(pg.pad);
+          const pg = paginate(items, `tier-${c.key}`, 5);
           const shortT = { KNOWLEDGE_NODE: "KNOWLEDGE", OBSERVATION: "INSIGHT", EXPERIMENT: "EXP", ALGORITHM: "ALGO" };
           const rows = pg.slice
             .map((n) => {
@@ -46,7 +46,7 @@
                   <span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 128))}</span>
                 </button></div>`;
             })
-            .join("") + (items.length ? pads : "");
+            .join("");
           const empty = `<div class="empty-state"><p class="empty-title">${tr("Tier is empty", "Tầng này đang trống")}</p><p class="empty-desc">${tr("No entities match the current filter.", "Không có thực thể nào khớp bộ lọc hiện tại.")}</p></div>`;
           return `<div class="ledger-panel">
             <div class="ledger-header"><h3>${esc(c.title)}</h3><span class="mono-id">${items.length}</span></div>

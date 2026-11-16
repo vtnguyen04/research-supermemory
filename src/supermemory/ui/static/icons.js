@@ -1,4 +1,4 @@
-// Crisp 1.5px Icons, EN/VI i18n, Status Badges & Pagination Helpers
+// Crisp 1.5px Icons, EN/VI i18n, Status Badges & Dynamic Zero-Shift Pagination Helpers
 (function () {
   const esc = (val) =>
     String(val ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -81,28 +81,59 @@
     return `<span class="${cls}"><span class="status-icon" aria-hidden="true">${svg(icon, 12)}</span><span>${esc(label)}</span></span>`;
   }
 
-  const pageMap = {};
+  const pageMap = {}, minHMap = {};
+  const resetPagers = (clearPages = false) => {
+    Object.keys(minHMap).forEach((k) => delete minHMap[k]);
+    if (clearPages) Object.keys(pageMap).forEach((k) => delete pageMap[k]);
+    document.querySelectorAll("[data-minh-locked]").forEach((el) => { el.style.minHeight = ""; el.removeAttribute("data-minh-locked"); });
+  };
+  window.addEventListener("resize", () => resetPagers(false));
+
   function paginate(items, key, perPage = 5) {
     const total = items.length, pages = Math.max(1, Math.ceil(total / perPage));
     const cur = Math.min(pages, Math.max(1, pageMap[key] || 1));
     pageMap[key] = cur;
-    const start = (cur - 1) * perPage, slice = items.slice(start, start + perPage), pad = pages > 1 ? Math.max(0, perPage - slice.length) : 0;
-    if (total <= perPage) return { slice, pages, pad: 0, html: "" };
-    const html = `<nav class="pager-bar" aria-label="Pagination ${esc(key)}">
+    const start = (cur - 1) * perPage, slice = items.slice(start, start + perPage);
+    if (total <= perPage) return { slice, pages, cur, html: "" };
+    const html = `<nav class="pager-bar" data-pager-box="${esc(key)}" data-pager-cur="${cur}" aria-label="Pagination ${esc(key)}">
       <span class="pager-info">${start + 1}&ndash;${Math.min(total, start + perPage)} / ${total}</span>
       <div class="pager-btns">
         <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur - 1}" ${cur <= 1 ? "disabled" : ""}>${tr("Prev", "Trước")}</button>
         <span class="pager-num">${tr("Page", "Trang")} ${cur}/${pages}</span>
         <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur + 1}" ${cur >= pages ? "disabled" : ""}>${tr("Next", "Sau")}</button>
       </div></nav>`;
-    return { slice, pages, pad, html };
+    return { slice, pages, cur, html };
+  }
+
+  function syncPagers(root = document) {
+    if (!root) return;
+    root.querySelectorAll("nav[data-pager-box]").forEach((nav) => {
+      const key = nav.dataset.pagerBox, cur = Number(nav.dataset.pagerCur) || 1;
+      const standalone = nav.closest(".standalone-pager");
+      const host = standalone ? standalone.previousElementSibling : (nav.closest(".surface-card, .ledger-panel") || nav.parentElement);
+      if (!host || host.offsetParent === null) return;
+      if (window.innerWidth <= 768) { host.style.minHeight = ""; return; }
+      host.setAttribute("data-minh-locked", "1");
+      if (cur === 1) {
+        host.style.minHeight = "";
+        const h = host.offsetHeight;
+        if (h > 40) { minHMap[key] = h; host.style.minHeight = `${h}px`; }
+      } else if (minHMap[key]) {
+        host.style.minHeight = "";
+        const nat = host.offsetHeight;
+        if (nat > minHMap[key]) minHMap[key] = nat;
+        host.style.minHeight = `${minHMap[key]}px`;
+      }
+    });
   }
 
   function bindPagers(root, onRerender) {
+    if (!root) return;
+    syncPagers(root);
     root.querySelectorAll("[data-page-key]").forEach((btn) => {
       btn.addEventListener("click", () => { pageMap[btn.getAttribute("data-page-key")] = Number(btn.getAttribute("data-page-to")) || 1; onRerender(); });
     });
   }
 
-  window.SuperMemoryIcons = { svg, hydrateIcons, statusTag, esc, paginate, bindPagers, tr, getLang, setLang, applyStaticLang };
+  window.SuperMemoryIcons = { svg, hydrateIcons, statusTag, esc, paginate, bindPagers, syncPagers, resetPagers, tr, getLang, setLang, applyStaticLang };
 })();

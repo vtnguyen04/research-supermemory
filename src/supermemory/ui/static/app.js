@@ -1,6 +1,6 @@
 // Main State Container, Flexible Shell & Accessible Multi-Mode Studio Controller
 (function () {
-  const { hydrateIcons, esc, tr, getLang, setLang, applyStaticLang } = window.SuperMemoryIcons;
+  const { hydrateIcons, esc, tr, getLang, setLang, applyStaticLang, syncPagers, resetPagers } = window.SuperMemoryIcons;
   const { ForceGraphCanvas } = window.SuperMemoryGraph, { InspectorController } = window.SuperMemoryInspector;
   const { MergeStudioController } = window.SuperMemoryMergeStudio, { ModalController } = window.SuperMemoryModals;
   const { SearchPaletteController } = window.SuperMemoryPalette, Views = window.SuperMemoryViews;
@@ -130,6 +130,7 @@
         p.classList.toggle("active", sel); p.hidden = !sel;
       });
       if (tab.dataset.tab === "tab-graph") requestAnimationFrame(() => graphView.fitView());
+      else syncPagers(document.getElementById(tab.dataset.tab));
       if (moveFocus) tab.focus();
     };
     tabs.forEach((tab, idx) => {
@@ -183,7 +184,7 @@
       else if (inspector.currentNodeId) inspector.inspect(inspector.currentNodeId, false);
     });
     document.querySelectorAll("[data-gmode]").forEach((b) => b.addEventListener("click", () => setGraphMode(b.dataset.gmode)));
-    on("chk-hide-aux", "change", (ev) => graphView.setHideAux(ev.target.checked)); on("workspace-switcher", "change", (ev) => { currentScope = ev.target.value; inspector.resetEmpty(); loadGraph(); });
+    on("chk-hide-aux", "change", (ev) => graphView.setHideAux(ev.target.checked)); on("workspace-switcher", "change", (ev) => { currentScope = ev.target.value; resetPagers(true); inspector.resetEmpty(); loadGraph(); });
     on("type-filter-select", "change", (ev) => { activeType = ev.target.value; graphView.setFilter(activeTier, activeType); });
     on("btn-refresh", "click", loadGraph); on("btn-zoom-in", "click", () => graphView.zoomBy(1.18)); on("btn-zoom-out", "click", () => graphView.zoomBy(0.85));
     on("btn-reset-zoom", "click", () => graphView.fitView()); on("btn-relayout", "click", () => graphView.relayout()); on("btn-export-png", "click", () => graphView.exportPng(state.project));

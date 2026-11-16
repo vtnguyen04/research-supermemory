@@ -25,7 +25,7 @@
         </span>
         <div class="brand-text">
           <span class="brand-name">SuperMemory</span>
-          <span class="version-tag">Studio 3.1</span>
+          <span class="version-tag">Studio {{SM_VERSION}}</span>
         </div>
         <div class="rail-head-btns">
           <button type="button" id="btn-lang-toggle" class="btn btn-secondary btn-xs lang-pill" aria-label="Switch language EN / VI">VI</button>
@@ -478,8 +478,9 @@
                 <input id="events-filter-input" type="search" class="control-input filter-inline" placeholder="Filter events..." data-vi-ph="Lọc sự kiện..." />
               </div>
             </div>
-            <div class="surface-card">
+            <div class="surface-card" id="events-card">
               <div id="events-list" class="ledger-list events-grid" role="list"></div>
+              <div id="events-pager"></div>
             </div>
           </div>
         </section>
