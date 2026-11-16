@@ -170,3 +170,102 @@ def test_zero_turn_hook_auto_recall_antigravity_and_claude_code(
     claude_ctx = out_claude["hookSpecificOutput"]["additionalContext"]
     assert "COMPACTION RECOVERY DETECTED" in claude_ctx
     assert new_id in claude_ctx
+
+
+def test_closed_loop_kanban_board_delta_and_stop_gate_enforcement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Prove agents immediately see Web Studio Kanban tasks mid-session and cannot bypass ticking via log_experiment."""
+    monkeypatch.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_kb"))
+    ws = tmp_path / "neurips_sim"
+    init_workspace(ws, project_name="NeuripsSim")
+    w = str(ws)
+
+    # User creates DAG-001 (RUNNING) and later adds DAG-002 (QUEUED) in Web Studio
+    execute_command(
+        "orchestrate",
+        {"workspace": w, "action": "enqueue", "role": "slice-builder", "title": "Execute Vertical Slice"},
+    )
+    execute_command("orchestrate", {"workspace": w, "action": "move", "task_id": "DAG-001", "target_stage": "IN_PROGRESS"})
+    execute_command(
+        "orchestrate",
+        {
+            "workspace": w,
+            "action": "enqueue",
+            "role": "slice-builder",
+            "title": "RQ-19 Cooling Pulse-Coasting Optimization",
+            "steps": ["Profile singapore_5 pulse rejection", "Implement duty-cycle slice & pass smoke gate"],
+        },
+    )
+
+    # 1. 01_ACTIVE_STATE.md renders live Kanban tasks & subtask checkboxes directly
+    active_md = (ws / "memory" / "01_ACTIVE_STATE.md").read_text(encoding="utf-8")
+    assert "DAG-002" in active_md and "DAG-001" in active_md
+    assert "Profile singapore_5 pulse rejection" in active_md
+
+    # 2. Even on a short user message ("sao rồi?"), PreInvocation injects the changed Kanban board immediately!
+    pre = dispatch_hook(
+        "PreInvocation",
+        {"conversationId": "c-kb", "cwd": w, "invocationNum": 5, "initialNumSteps": 40, "lastUserInput": "sao rồi?"},
+    )
+    pre_msg = pre["injectSteps"][0]["systemMessage"]["systemMessage"]
+    assert "LIVE KANBAN BOARD" in pre_msg
+    assert "DAG-002" in pre_msg and "DAG-001" in pre_msg
+
+    # 3. Agent edits code and logs an experiment WITHOUT ticking Kanban -> PostToolUse nudges & Stop BLOCKS!
+    (ws / "src").mkdir()
+    py_f = ws / "src" / "cooling.py"
+    py_f.write_text("duty = 0.72\n", encoding="utf-8")
+    dispatch_hook(
+        "PostToolUse",
+        {"conversationId": "c-kb", "cwd": w, "toolCall": {"name": "write_file", "args": {"Path": str(py_f)}}},
+    )
+    execute_command(
+        "log_experiment",
+        {
+            "workspace": w,
+            "track": "main",
+            "title": "Singapore Cooling Duty Cycle Probe",
+            "hypothesis": "0.72 duty cycle drops chiller electricity",
+            "single_var_diff": "duty=0.72",
+            "cv_score": 0.0038,
+            "verdict": "KEEP",
+        },
+    )
+    post_exp = dispatch_hook(
+        "PostToolUse",
+        {
+            "conversationId": "c-kb",
+            "cwd": w,
+            "toolCall": {"name": "call_mcp_tool", "args": {"ServerName": "supermemory_graph", "ToolName": "log_experiment", "Arguments": {}}},
+        },
+    )
+    assert "SuperMemory Kanban Sync" in post_exp["injectSteps"][0]["systemMessage"]["systemMessage"]
+
+    stop_blocked = dispatch_hook(
+        "Stop",
+        {"conversationId": "c-kb", "cwd": w, "terminationReason": "NO_TOOL_CALL"},
+    )
+    assert stop_blocked["decision"] == "continue"
+    assert "KANBAN SUBTASK SYNC REQUIRED" in stop_blocked["reason"]
+    assert "DAG-002" in stop_blocked["reason"]
+
+    # 4. Agent ticks step #[0] on DAG-002 via checkpoint -> Stop cleanly allows!
+    execute_command(
+        "checkpoint",
+        {"workspace": w, "task_updates": [{"id": "DAG-002", "stage": "IN_PROGRESS", "done_steps": [0]}]},
+    )
+    dispatch_hook(
+        "PostToolUse",
+        {
+            "conversationId": "c-kb",
+            "cwd": w,
+            "toolCall": {
+                "name": "call_mcp_tool",
+                "args": {"ServerName": "supermemory_graph", "ToolName": "checkpoint", "Arguments": {"task_updates": [{"id": "DAG-002", "done_steps": [0]}]}},
+            },
+        },
+    )
+    stop_ok = dispatch_hook("Stop", {"conversationId": "c-kb", "cwd": w, "terminationReason": "NO_TOOL_CALL"})
+    assert stop_ok["decision"] == "allow"
+

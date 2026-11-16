@@ -193,6 +193,9 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
             "last_heartbeat_bucket": 0,
             "last_seen_user_input": "",
             "pending_sync_reason": "",
+            "pending_kanban_sync": False,
+            "last_kanban_fp": "",
+            "last_kanban_inv": 0,
             "recalled_node_ids": [],
             "recalled_warnings": [],
             "compaction_count": 0,
@@ -213,6 +216,9 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
         "last_heartbeat_bucket": int(extra_obj.get("last_heartbeat_bucket", 0)),
         "last_seen_user_input": str(extra_obj.get("last_seen_user_input") or ""),
         "pending_sync_reason": str(extra_obj.get("pending_sync_reason") or ""),
+        "pending_kanban_sync": bool(extra_obj.get("pending_kanban_sync", False)),
+        "last_kanban_fp": str(extra_obj.get("last_kanban_fp") or ""),
+        "last_kanban_inv": int(extra_obj.get("last_kanban_inv", 0)),
         "recalled_node_ids": list(extra_obj.get("recalled_node_ids") or []),
         "recalled_warnings": list(extra_obj.get("recalled_warnings") or []),
         "compaction_count": int(row["compaction_count"]),
@@ -228,6 +234,9 @@ def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
         "last_heartbeat_bucket": int(state.get("last_heartbeat_bucket", 0)),
         "last_seen_user_input": str(state.get("last_seen_user_input") or ""),
         "pending_sync_reason": str(state.get("pending_sync_reason") or ""),
+        "pending_kanban_sync": bool(state.get("pending_kanban_sync", False)),
+        "last_kanban_fp": str(state.get("last_kanban_fp") or ""),
+        "last_kanban_inv": int(state.get("last_kanban_inv", 0)),
         "recalled_node_ids": list(state.get("recalled_node_ids") or []),
         "recalled_warnings": list(state.get("recalled_warnings") or []),
     }
@@ -262,7 +271,9 @@ def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
     store.conn.commit()
 
 
-def mark_turn_memory_handled(store: GraphStore, clear_lesson_lock: bool = False) -> None:
+def mark_turn_memory_handled(
+    store: GraphStore, clear_lesson_lock: bool = False, clear_kanban_sync: bool = False
+) -> None:
     """Mark all active conversation sessions in this store as having persisted/attested memory."""
     rows = store.conn.execute("SELECT conversation_id FROM session_state").fetchall()
     for r in rows:
@@ -272,4 +283,6 @@ def mark_turn_memory_handled(store: GraphStore, clear_lesson_lock: bool = False)
         st["pending_sync_reason"] = ""
         if clear_lesson_lock:
             st["pending_lesson_lock"] = False
+        if clear_kanban_sync:
+            st["pending_kanban_sync"] = False
         save_session_state(store, st)

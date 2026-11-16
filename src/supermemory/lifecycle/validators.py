@@ -106,23 +106,34 @@ def assert_all_steps_completed(item_id: str, steps_text: List[str], steps_done: 
 
 
 def summarize_active_task_focus(proposals: List[Dict[str, Any]], tasks: List[Dict[str, Any]]) -> str:
-    """Build a 1-line active Task-List pointer showing the exact next unchecked step `[idx]`."""
-    running = [t for t in tasks if str(t.get("status") or "").upper() == "RUNNING"]
-    queued = [t for t in tasks if str(t.get("status") or "").upper() == "QUEUED"]
-    for t in running + queued:
+    """Build a multi-item active Kanban pointer (newest first) showing exact next `[idx]` steps."""
+    import re
+
+    def _num(raw_id: str) -> int:
+        m = re.search(r"(\d+)$", raw_id or "")
+        return int(m.group(1)) if m else 0
+
+    running = sorted([t for t in tasks if str(t.get("status") or "").upper() == "RUNNING"], key=lambda x: -_num(str(x.get("task_id", ""))))
+    queued = sorted([t for t in tasks if str(t.get("status") or "").upper() == "QUEUED"], key=lambda x: -_num(str(x.get("task_id", ""))))
+    parts: List[str] = []
+    for t in (running + queued)[:2]:
         steps = t.get("steps") or []
         done_cnt = sum(1 for s in steps if s.get("done"))
         nxt = next(((i, s.get("text", "")) for i, s in enumerate(steps) if not s.get("done")), None)
-        step_hint = f" -> Next step #[{nxt[0]}]: \"{str(nxt[1])[:75]}\"" if nxt else ""
-        return f"`{t['task_id']}` [{t['status']} {done_cnt}/{len(steps)}] {str(t.get('title', ''))[:45]}{step_hint}"
+        step_hint = f' -> #[{nxt[0]}]: "{str(nxt[1])[:55]}"' if nxt else ""
+        parts.append(f"`{t['task_id']}`[{t['status']} {done_cnt}/{len(steps)}] {str(t.get('title', ''))[:36]}{step_hint}")
 
-    open_props = [p for p in proposals if str(p.get("status") or "").upper() in ("IMPLEMENTING", "DESIGNED", "PROPOSED")]
-    for p in open_props:
+    stage_rank = {"IMPLEMENTING": 0, "CHALLENGED": 1, "DESIGNED": 2, "PROPOSED": 3}
+    open_props = sorted(
+        [p for p in proposals if str(p.get("status") or "").upper() in stage_rank],
+        key=lambda p: (stage_rank.get(str(p.get("status") or "").upper(), 9), -_num(str(p.get("id", "")))),
+    )
+    for p in open_props[: (1 if parts else 2)]:
         meta = p.get("metadata") or {}
         p_tasks = [str(x).strip() for x in (meta.get("tasks") or []) if str(x).strip()]
         p_done = [bool(x) for x in (meta.get("tasks_done") or [])]
         done_cnt = sum(1 for i in range(len(p_tasks)) if i < len(p_done) and p_done[i])
         nxt_p = next(((i, txt) for i, txt in enumerate(p_tasks) if not (i < len(p_done) and p_done[i])), None)
-        step_hint = f" -> Next step #[{nxt_p[0]}]: \"{nxt_p[1][:75]}\"" if nxt_p else ""
-        return f"`{p['id']}` [{p['status']} {done_cnt}/{len(p_tasks)}] {str(p.get('title', ''))[:45]}{step_hint}"
-    return ""
+        step_hint = f' -> #[{nxt_p[0]}]: "{nxt_p[1][:55]}"' if nxt_p else ""
+        parts.append(f"`{p['id']}`[{p['status']} {done_cnt}/{len(p_tasks)}] {str(p.get('title', ''))[:36]}{step_hint}")
+    return " | ".join(parts)

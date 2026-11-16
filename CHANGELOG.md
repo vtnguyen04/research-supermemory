@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [3.4.1] - 2026-11-17
+
+### Added
+- **Closed-Loop Kanban Autopilot (`kanban_digest.py`, `GATE-032`):**
+  - Rendered live `RUNNING`/`QUEUED` Kanban tasks and `IMPLEMENTING`/`DESIGNED` proposals with `[x]`/`[ ]` subtask indices directly into `memory/01_ACTIVE_STATE.md`.
+  - Added SHA-1 Kanban board revision fingerprinting in `PreInvocation` / `UserPromptSubmit` so newly added or edited Web Studio Kanban tasks (e.g., `DAG-025`) are injected into the agent's prompt immediately on the next turn without user reminders.
+  - Tracked `pending_kanban_sync` separately from `log_experiment` and insight-only `checkpoint` calls so `PostToolUse` and `Stop` require ticking completed Kanban subtasks (or explicit `status="CLEAN"` attestation when midway).
+
+### Fixed
+- **Newest-First Proposal & Experiment Slicing:** Fixed `01_ACTIVE_STATE.md` and `SessionStart` capsule slicing (`list_experiments()[:6]` and `limit=100` newest-first active proposals) so recent experiments and high-numbered proposals (e.g., `PROP-018`, `EXP-MAIN-040`) are never truncated behind early Day-1 entries, and upgraded `summarize_active_task_focus` to surface multiple newest active items.
+
+---
+
 ## [3.4.0] - 2026-11-17
 
 ### Added
@@ -136,6 +149,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **Initial Release:** SQLite WAL + FTS5 knowledge graph, `LAW-01`..`LAW-08` Constitutional Markdown compiler, `PreToolUse` CodeGate enforcer (`MAX_LINES`, `FORBIDDEN_REGEX`, `FORBIDDEN_FILENAME`, `FORBIDDEN_CMD_PATTERN`, `FROZEN_SHA256`, `AST_SYNTAX`), OpenSpec proposal state machine, and Antigravity CLI plugin package.
 
+[3.4.1]: https://github.com/vtnguyen04/research-supermemory/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.5...v3.4.0
 [3.3.5]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.4...v3.3.5
 [3.3.4]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.3...v3.3.4

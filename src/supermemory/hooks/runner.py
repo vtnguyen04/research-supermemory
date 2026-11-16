@@ -14,6 +14,7 @@ from supermemory.gates.enforcer import GateEnforcer
 from supermemory.hooks.claude_bridge import format_hook_output, normalize_hook_input
 from supermemory.hooks.turn_tracker import evaluate_stop_gate, track_post_tool_use
 from supermemory.models import NodeType
+from supermemory.research.kanban_digest import build_kanban_board_digest
 from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
 from supermemory.storage.sqlite_store import GraphStore
@@ -107,6 +108,8 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         st["last_heartbeat_bucket"] = 0
         st["recalled_node_ids"] = []
         st["recalled_warnings"] = []
+        st["last_kanban_fp"] = ""
+        st["last_kanban_inv"] = 0
         capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
         injected_msgs.append("♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED:\n" + capsule)
         store.log_event("COMPACTION_RECOVERY", conv_id, f"Restored tiered state at step {step_idx}")
@@ -114,12 +117,19 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
     if user_input and user_input != st.get("last_seen_user_input"):
         st["last_seen_user_input"] = user_input
         st["turn_memory_handled"] = False
+        st["pending_kanban_sync"] = False
         st["research_campaign_active"] = False
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
         st["notified_edit"] = False
         st["notified_exec"] = False
         st["notified_research"] = False
+
+        kb_digest, kb_fp = build_kanban_board_digest(store)
+        if kb_digest and (kb_fp != st.get("last_kanban_fp") or (inv_num - int(st.get("last_kanban_inv") or 0)) >= 4):
+            injected_msgs.append(kb_digest)
+            st["last_kanban_fp"] = kb_fp
+            st["last_kanban_inv"] = inv_num
 
         sig = SelfLearningDetector.analyze(user_input)
         if sig.requires_lesson:

@@ -126,15 +126,13 @@ class MarkdownCompiler:
         next_act = meta.get("next_actions") or "1. Check recall before proposing changes.\n2. Log experiments & lessons atomically."
         notes = meta.get("state_notes") or ""
 
-        proposals = [
-            p for p in self.store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=8)
-            if p.status not in ("ARCHIVED", "REJECTED")
-        ]
-        open_bnks = [
-            b for b in self.store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=6)
-            if b.status not in ("RESOLVED", "ARCHIVED")
-        ]
-        exps = self.store.list_experiments()[-8:]
+        proposals = sorted(
+            [p for p in self.store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=100) if p.status not in ("ARCHIVED", "REJECTED", "AUDITED")],
+            key=lambda p: p.id,
+            reverse=True,
+        )
+        open_bnks = [b for b in self.store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=100) if b.status not in ("RESOLVED", "ARCHIVED")]
+        exps = self.store.list_experiments()[:6]
         gates = self.store.list_gates(enabled_only=True)
         total_blocks = sum(g.blocked_count for g in gates)
 
@@ -157,7 +155,10 @@ class MarkdownCompiler:
                 lines.append(clean if clean.startswith(("-", "*", "1.", "2.", "3.")) else f"- {clean}")
 
         if notes.strip():
-            lines.extend(["", "## 🧭 3. Architecture & Operational Context", notes.strip()[:1800]])
+            lines.extend(["", "## 🧭 3. Architecture & Operational Context", notes.strip()[:1200]])
+        from supermemory.research.kanban_digest import render_active_state_kanban_md
+
+        lines.extend(render_active_state_kanban_md(self.store))
 
         if open_bnks:
             lines.extend(["", "## 🎯 3B. Open Pareto Bottlenecks", ""])
@@ -181,7 +182,7 @@ class MarkdownCompiler:
 
         if exps:
             lines.extend(["", "## 🧪 5. Latest Experiments Snapshot", ""])
-            for ex in reversed(exps):
+            for ex in exps:
                 delta_str = f" (Δ={ex.delta_vs_baseline:+g})" if ex.delta_vs_baseline is not None else ""
                 lines.append(
                     f"- **`{ex.exp_id}`** [`{ex.track}` | `{ex.verdict}`]: {ex.title} — "

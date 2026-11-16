@@ -94,7 +94,7 @@ class QueryEngine:
             for p in self.store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=10)
             if p.status not in ("ARCHIVED", "REJECTED")
         ]
-        exps = self.store.list_experiments()[-5:]
+        exps = self.store.list_experiments()[:5]
 
         lines: List[str] = [
             f"🧠 SUPERMEMORY CONSTITUTIONAL HARNESS ACTIVE — Project: `{proj_name}`",
@@ -116,7 +116,7 @@ class QueryEngine:
 
         if exps:
             lines.append("• Recent Scientific Experiments:")
-            for ex in exps[-3:]:
+            for ex in exps[:3]:
                 sc = f"CV={ex.cv_score}" if ex.cv_score is not None else ex.cv_summary
                 lines.append(f"  - `{ex.exp_id}` ({ex.track}) [{ex.verdict}]: {ex.title} ({sc})")
 

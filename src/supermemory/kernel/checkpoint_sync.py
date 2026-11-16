@@ -165,7 +165,8 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
         store.log_event("CHECKPOINT_SYNCED", "L0_STATE", f"Synced L0 state ({', '.join(meta_changed)}){': ' + note[:80] if note else ''}")
     if mutated:
         MarkdownCompiler(store).compile_all()
-    mark_turn_memory_handled(store)
+    kanban_touched = bool(created_task or applied_tasks or str(args.get("status") or "").upper() == "CLEAN")
+    mark_turn_memory_handled(store, clear_kanban_sync=kanban_touched)
     return {
         "status": "CAPTURED" if mutated else str(args.get("status") or "CLEAN"),
         "turn_memory_handled": True,

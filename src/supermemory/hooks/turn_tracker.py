@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 from supermemory.kernel import classify_mcp_call
 from supermemory.lifecycle.validators import summarize_active_task_focus
 from supermemory.models import NodeType
+from supermemory.research.kanban_digest import has_unchecked_kanban_items
 from supermemory.research.kanban_ops import extract_task_steps
 from supermemory.research.orchestrator import list_tasks
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
@@ -70,13 +71,27 @@ def _classify_shell_command(cmd: str) -> str:
 
 
 def _active_task_focus_line(store: GraphStore) -> str:
-    props = [n.to_dict() for n in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=10)]
+    props = [n.to_dict() for n in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=80)]
     tasks = []
     for t in list_tasks(store):
         td = t.to_dict()
         td["steps"] = extract_task_steps(td)
         tasks.append(td)
     return summarize_active_task_focus(props, tasks)
+
+
+def _is_kanban_sync_action(t_name: str, norm_mcp: str, inner_args: Dict[str, Any], cmd: str) -> bool:
+    """Return True if this tool call updated Kanban tasks/subtasks or explicitly attested CLEAN."""
+    if norm_mcp in ("orchestrate", "manage_proposal") or any(t_name.endswith(s) for s in ("orchestrate", "manage_proposal")):
+        return True
+    if norm_mcp == "checkpoint" or t_name.endswith("checkpoint"):
+        if inner_args.get("task_updates") or inner_args.get("new_task"):
+            return True
+        if str(inner_args.get("status") or "").upper() == "CLEAN" and not inner_args.get("insights") and not inner_args.get("insight_title"):
+            return True
+    if "supermemory orchestrate" in cmd or "supermemory proposal" in cmd:
+        return True
+    return "supermemory checkpoint" in cmd and "--status CLEAN" in cmd
 
 
 def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -110,9 +125,20 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
         st["turn_memory_handled"] = True
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
+        if _is_kanban_sync_action(t_name, norm_mcp, inner_args, cmd) or not has_unchecked_kanban_items(store):
+            st["pending_kanban_sync"] = False
+        elif st.get("pending_kanban_sync"):
+            focus = _active_task_focus_line(store)
+            notifications.append(
+                f"📋 [SuperMemory Kanban Sync] Memory saved, while active Kanban subtasks remain unticked ({focus}). "
+                "Tick completed step(s) or move QUEUED task via `checkpoint(task_updates=[{'id': '...', 'stage': 'IN_PROGRESS', 'done_steps': [...]}])` "
+                "(or pass `checkpoint(status='CLEAN')` if current step is still midway)."
+            )
     elif not err and cmd_kind == "SUBSTANTIVE_EXEC":
         st["pending_sync_reason"] = f"Substantive execution `{cmd[:55]}` completed"
         st["turn_memory_handled"] = False
+        if has_unchecked_kanban_items(store):
+            st["pending_kanban_sync"] = True
         if not st.get("notified_exec"):
             st["notified_exec"] = True
             focus = _active_task_focus_line(store)
@@ -153,6 +179,8 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
                         dirty.append(rel)
                     st["dirty_files"] = dirty
                     st["turn_memory_handled"] = False
+                    if has_unchecked_kanban_items(store):
+                        st["pending_kanban_sync"] = True
                     if not st.get("notified_edit"):
                         st["notified_edit"] = True
                         focus = _active_task_focus_line(store)
@@ -234,6 +262,19 @@ def evaluate_stop_gate(store: GraphStore, conv_id: str, payload: Dict[str, Any])
                 f"⚡ SUPERMEMORY AUTO-SYNC REQUIRED (LAW-07): Workspace files modified (`{shown}`) without updating memory/tasks.{focus_suffix} "
                 "Call MCP `checkpoint` in 1 atomic call (`insights=[...]`, `task_updates=[...]`, `new_task={...}`, `next_actions='...'`) "
                 "or `log_experiment` / `manage_proposal` (pass `status='CLEAN'` only if purely cosmetic)."
+            ),
+        }
+
+    if st.get("pending_kanban_sync") and has_unchecked_kanban_items(store):
+        st["pending_kanban_sync"] = False
+        save_session_state(store, st)
+        store.log_event("STOP_GATE_ENFORCED", "LAW-07", "Stop hook required Kanban subtask sync after work execution")
+        return {
+            "decision": "continue",
+            "reason": (
+                f"📋 SUPERMEMORY KANBAN SUBTASK SYNC REQUIRED (LAW-07): Work executed without syncing active Kanban steps ({focus}). "
+                "Tick completed step(s) or claim QUEUED task via `checkpoint(task_updates=[{'id': '...', 'stage': 'IN_PROGRESS', 'done_steps': [...]}])` "
+                "(or attest `checkpoint(status='CLEAN')` if no checklist step completed yet)."
             ),
         }
     return {"decision": "allow"}

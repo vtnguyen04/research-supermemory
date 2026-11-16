@@ -107,11 +107,16 @@ def build_tiered_capsule(
     laws = sorted(store.list_nodes(node_types=[NodeType.LAW.value], limit=16), key=lambda x: x.id)
     procs = store.list_nodes(node_types=[NodeType.PROCEDURE.value], limit=6)
     gates = store.list_gates(enabled_only=True)
-    proposals = [p for p in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=6) if p.status not in ("ARCHIVED", "REJECTED", "CONSOLIDATED")]
-    bottlenecks = [b for b in store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=6) if b.status not in ("RESOLVED", "ARCHIVED", "CONSOLIDATED")]
+    proposals = [
+        p
+        for p in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=100)
+        if p.status not in ("ARCHIVED", "REJECTED", "AUDITED", "CONSOLIDATED")
+    ]
+    proposals.sort(key=lambda p: p.id, reverse=True)
+    bottlenecks = [b for b in store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=100) if b.status not in ("RESOLVED", "ARCHIVED", "CONSOLIDATED")]
     bottlenecks.sort(key=lambda b: float(b.metadata.get("error_share_pct") or 0.0) * float(b.metadata.get("ceiling_gain") or 0.1), reverse=True)
     exps_all = store.list_experiments()
-    exps = exps_all[-2:]
+    exps = exps_all[:2]
     scored_exps = [e for e in exps_all if e.verdict not in ("REVERT", "FAILED", "REJECTED") and (e.test_score is not None or e.cv_score is not None)]
     sota = max(scored_exps, key=lambda x: float(x.test_score if x.test_score is not None else (x.cv_score or 0.0))) if scored_exps else None
     dead_end_count = sum(1 for n in store.list_nodes(limit=2000) if n.status in ("REJECTED", "REVERT", "FAILED"))
@@ -143,7 +148,7 @@ def build_tiered_capsule(
             p_parts.append(f"`{p.id}`[{p.status}{prog}] {p.title[:42]}")
         blocks.append((2, "• [L0 WORKING] Active Proposals: " + " | ".join(p_parts)))
     dag_rows = store.conn.execute(
-        "SELECT task_id, status, title FROM agent_tasks WHERE status IN ('RUNNING', 'QUEUED') ORDER BY status DESC, task_id LIMIT 4"
+        "SELECT task_id, status, title FROM agent_tasks WHERE status IN ('RUNNING', 'QUEUED') ORDER BY status DESC, task_id DESC LIMIT 4"
     ).fetchall()
     if dag_rows:
         blocks.append((2, "• [L0 KANBAN TASKS]: " + " | ".join(f"`{r['task_id']}`[{r['status']}] {str(r['title'])[:38]}" for r in dag_rows)))
