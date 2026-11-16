@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "research-supermemory"
-version = "3.3.2"
+version = "3.3.3"
 description = "Research SuperMemory: Zero-Amnesia 4-Tier Cognitive Graph, Self-Learning Constitutional CodeGates, Single-Variable Scientific Experiment Registry, and Daylight Architectural Studio for Antigravity & Multi-Agent R&D."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -129,22 +129,23 @@
           return `<section class="kanban-col" data-kcol="${cKey}" aria-label="${esc(cTitle)}"><header class="kanban-col-head"><h3>${esc(cTitle)}</h3><span class="nav-count">${cItems.length}</span></header><div class="kanban-col-body">${cards}</div></section>`;
         }).join("")}</div>`;
       } else {
-        const pg = paginate(items, `klist-${this.sourceFilter}`, 12);
+        const pg = paginate(items, `klist-${this.sourceFilter}`, 10);
+        const pads = `<div class="task-list-row is-pad" aria-hidden="true"></div>`.repeat(pg.pad);
         mount.innerHTML = items.length ? `<div class="surface-card task-list-panel">${pg.slice.map((it) => {
           const chipLbl = it.wave ? `W${it.wave} · ${it.badge}` : (it.badge || it.kind), dispTitle = cleanText(it.title, 78);
           const nxt = it.steps.find((s) => !s.done);
-          const subLine = nxt ? `${tr("Next", "Tiếp")}: ${cleanText(nxt.text, 88)}` : cleanText(it.summary, 92);
+          const subLine = (nxt ? `${tr("Next", "Tiếp")}: ${cleanText(nxt.text, 88)}` : cleanText(it.summary, 92)) || "—";
           return `<div class="task-list-row" data-task-id="${esc(it.id)}">
             <div class="tlist-id"><span class="mono-id">${esc(it.id)}</span>${statusTag(it.status)}</div>
             <button type="button" class="tlist-main" data-open-id="${esc(it.id)}" data-open-kind="${it.kind}" title="${esc(it.title)}">
               <span class="tlist-title">${esc(dispTitle)}</span>
-              ${subLine ? `<span class="tlist-sub">${esc(subLine)}</span>` : ""}
+              <span class="tlist-sub">${esc(subLine)}</span>
             </button>
             <span class="role-chip tlist-chip" title="${esc(chipLbl)}">${esc(chipLbl)}</span>
             <div class="tlist-prog"><progress class="pareto-meter kanban-meter" max="100" value="${it.pct}"></progress><span class="mono-id">${it.stepsDone}/${it.stepsTotal}</span></div>
             <div class="tlist-acts">${this._actionBtn(it)}<button type="button" class="btn btn-secondary btn-xs" data-open-id="${esc(it.id)}" data-open-kind="${it.kind}">${tr("Details", "Chi tiết")}</button></div>
           </div>`;
-        }).join("")}${pg.html}</div>` : `<div class="surface-card empty-state"><p class="empty-desc">${tr("No matching tasks or proposals.", "Không tìm thấy tác vụ phù hợp.")}</p></div>`;
+        }).join("")}${pads}${pg.html}</div>` : `<div class="surface-card empty-state"><p class="empty-desc">${tr("No matching tasks or proposals.", "Không tìm thấy tác vụ phù hợp.")}</p></div>`;
       }
       bindPagers(mount, () => this.render(this.ctx.getState()));
       this._bindStageEvents(mount);

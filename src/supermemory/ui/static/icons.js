@@ -86,8 +86,8 @@
     const total = items.length, pages = Math.max(1, Math.ceil(total / perPage));
     const cur = Math.min(pages, Math.max(1, pageMap[key] || 1));
     pageMap[key] = cur;
-    const start = (cur - 1) * perPage, slice = items.slice(start, start + perPage);
-    if (total <= perPage) return { slice, html: "" };
+    const start = (cur - 1) * perPage, slice = items.slice(start, start + perPage), pad = pages > 1 ? Math.max(0, perPage - slice.length) : 0;
+    if (total <= perPage) return { slice, pages, pad: 0, html: "" };
     const html = `<nav class="pager-bar" aria-label="Pagination ${esc(key)}">
       <span class="pager-info">${start + 1}&ndash;${Math.min(total, start + perPage)} / ${total}</span>
       <div class="pager-btns">
@@ -95,7 +95,7 @@
         <span class="pager-num">${tr("Page", "Trang")} ${cur}/${pages}</span>
         <button type="button" class="btn btn-secondary btn-xs" data-page-key="${esc(key)}" data-page-to="${cur + 1}" ${cur >= pages ? "disabled" : ""}>${tr("Next", "Sau")}</button>
       </div></nav>`;
-    return { slice, html };
+    return { slice, pages, pad, html };
   }
 
   function bindPagers(root, onRerender) {
