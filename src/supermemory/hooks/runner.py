@@ -112,6 +112,9 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         st["research_campaign_active"] = False
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
+        st["notified_edit"] = False
+        st["notified_exec"] = False
+        st["notified_research"] = False
 
         sig = SelfLearningDetector.analyze(user_input)
         if sig.requires_lesson:

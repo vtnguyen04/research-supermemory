@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from supermemory.lifecycle.validators import validate_experiment_schema
 from supermemory.models import (
     EdgeType,
     ExperimentRecord,
@@ -59,6 +60,7 @@ def record_scientific_experiment(
     """Log an experiment, enforce post-mortem on failures, and crystallize OBSERVATION nodes."""
     clean_track = re.sub(r"[^a-zA-Z0-9_-]+", "_", track.strip() or "main").lower()
     clean_verdict = verdict.strip().upper() or ExperimentVerdict.KEEP.value
+    validate_experiment_schema(title, hypothesis, single_var_diff, clean_verdict, cv_score, cv_summary, test_score, test_summary)
     if not exp_id.strip():
         exps = store.list_experiments(track=clean_track)
         exp_id = f"EXP-{clean_track.upper()[:6]}-{len(exps) + 1:03d}"

@@ -63,7 +63,7 @@ def format_hook_output(raw_event: str, out: Dict[str, Any], is_claude: bool) -> 
         return out
 
     ev_name = (raw_event or "").strip()
-    if ev_name in ("SessionStart", "UserPromptSubmit", "PreInvocation"):
+    if ev_name in ("SessionStart", "UserPromptSubmit", "PreInvocation", "PostToolUse"):
         steps = out.get("injectSteps") or []
         msgs = []
         for s in steps:
@@ -73,7 +73,7 @@ def format_hook_output(raw_event: str, out: Dict[str, Any], is_claude: bool) -> 
                     msgs.append(str(sm["systemMessage"]))
         if not msgs:
             return {}
-        hook_label = "UserPromptSubmit" if ev_name in ("UserPromptSubmit", "PreInvocation") else "SessionStart"
+        hook_label = "UserPromptSubmit" if ev_name in ("UserPromptSubmit", "PreInvocation") else ev_name
         return {
             "hookSpecificOutput": {
                 "hookEventName": hook_label,

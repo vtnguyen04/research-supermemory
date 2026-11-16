@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from supermemory.cognitive.novelty_guard import enforce_novelty_against_history, extract_mechanism_signature
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.lifecycle.experiments import record_scientific_experiment
+from supermemory.lifecycle.validators import assert_all_steps_completed, validate_proposal_schema
 from supermemory.models import (
     EdgeType,
     ExperimentVerdict,
@@ -136,6 +137,7 @@ class LifecycleManager:
         coupled_vars: int = 1,
         strict_occam: bool = False,
     ) -> Dict[str, Any]:
+        task_items = validate_proposal_schema(title, why, what_changes, tasks)
         enforce_novelty_against_history(
             self.store, title, f"{why} {what_changes}", novelty_diff=novelty_diff, bottleneck_id=bottleneck_id
         )
@@ -160,7 +162,6 @@ class LifecycleManager:
             (prop_dir / "design.md").write_text(
                 f"# Technical Design — {pid}: {title}\n\n{design_notes}\n", encoding="utf-8"
             )
-        task_items = tasks or ["Implement core vertical slice with unit tests", "Run Challenger & Victory Audit"]
         tasks_md = f"# Implementation Tasks — {pid}\n\n" + "\n".join(f"- [ ] {t}" for t in task_items) + "\n"
         (prop_dir / "tasks.md").write_text(tasks_md, encoding="utf-8")
 
@@ -204,6 +205,10 @@ class LifecycleManager:
         st = new_stage.upper()
         if st not in valid_stages:
             raise ValueError(f"Invalid stage '{new_stage}'. Valid: {sorted(valid_stages)}")
+        if st == ProposalStage.AUDITED.value and not node.metadata.get("audits"):
+            p_tasks = [str(x).strip() for x in (node.metadata.get("tasks") or []) if str(x).strip()]
+            p_done = [bool(x) for x in (node.metadata.get("tasks_done") or [])]
+            assert_all_steps_completed(proposal_id, p_tasks, p_done)
         if st == ProposalStage.ARCHIVED.value and not node.metadata.get("audits"):
             raise ValueError(
                 f"LAW-06 Gate: Cannot ARCHIVE {proposal_id} without at least one Challenger/Victory Audit verdict."

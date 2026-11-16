@@ -6,9 +6,16 @@ import re
 from typing import Any, Dict, List
 
 from supermemory.lifecycle.manager import LifecycleManager
+from supermemory.lifecycle.validators import assert_all_steps_completed, validate_insight_schema
 from supermemory.models import MemoryNode, MemoryTier, NodeType, utc_now_iso
-from supermemory.research.kanban_ops import add_subtask, delete_task, move_task_stage, toggle_subtask
-from supermemory.research.orchestrator import enqueue_task
+from supermemory.research.kanban_ops import (
+    add_subtask,
+    delete_task,
+    extract_task_steps,
+    move_task_stage,
+    toggle_subtask,
+)
+from supermemory.research.orchestrator import _row_to_task, enqueue_task
 from supermemory.storage.snapshot_io import mark_turn_memory_handled
 from supermemory.storage.sqlite_store import GraphStore
 from supermemory.sync.markdown_compiler import MarkdownCompiler
@@ -31,6 +38,7 @@ def _mint_insight_node(
 ) -> Dict[str, Any]:
     t_clean = title.strip()[:160]
     s_clean = (summary or title).strip()
+    validate_insight_schema(t_clean, s_clean)
     tier_up = "PROCEDURAL" if tier.strip().upper() == "PROCEDURAL" else MemoryTier.SEMANTIC.value
     ntype = NodeType.PROCEDURE.value if tier_up == "PROCEDURAL" else NodeType.OBSERVATION.value
     pref = "PROC" if tier_up == "PROCEDURAL" else "OBS"
@@ -127,6 +135,11 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
                 mapped = _PROP_STAGE_ALIAS.get(raw_st, raw_st)
                 LifecycleManager(store).advance_proposal(iid, mapped, note)
             else:
+                if raw_st == "DONE":
+                    row = store.conn.execute("SELECT * FROM agent_tasks WHERE task_id = ?", (iid,)).fetchone()
+                    if row:
+                        t_steps = extract_task_steps(_row_to_task(row).to_dict())
+                        assert_all_steps_completed(iid, [s["text"] for s in t_steps], [bool(s["done"]) for s in t_steps])
                 move_task_stage(store, iid, raw_st, agent_name="agent")
         applied_tasks.append({"id": iid, "kind": kind})
         mutated = True

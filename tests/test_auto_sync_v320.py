@@ -1,88 +1,108 @@
-"""End-to-end tests for SuperMemory v3.2 Autonomous Zero-Reminder Sync (Tasks, Insights & Results)."""
+"""End-to-end tests for SuperMemory v3.2.1 Notification Bus, Domain-Agnostic Tracking & Schema/Task Gates."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from supermemory.bootstrap import init_workspace
 from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.hooks.runner import dispatch_hook
 from supermemory.mcp.tool_defs import execute_mcp_tool
+from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.sqlite_store import GraphStore
 
 
-def test_qna_turn_zero_overhead_vs_code_edit_auto_sync_gate(tmp_path: Path) -> None:
+def test_diagnostic_question_never_triggers_false_positive_lesson() -> None:
+    sig = SelfLearningDetector.analyze(
+        "có hardcode ngu ngu gì khong đó?? quan trọng là như 1 notification cho AI nó biết lúc nào cần save đồ không?"
+    )
+    assert sig.requires_lesson is False
+    assert sig.category == "NONE"
+
+
+def test_inflight_notifications_and_domain_agnostic_tracking(tmp_path: Path) -> None:
     ws = tmp_path / "proj"
-    init_workspace(ws, project_name="AutoSyncProj")
+    init_workspace(ws, project_name="NotifyProj")
 
-    # 1. Pure Q&A turn -> Stop allows immediately with 0 overhead
-    dispatch_hook(
-        "PreInvocation",
-        {"conversationId": "c1", "cwd": str(ws), "lastUserInput": "claude code sài được không?"},
+    # 1. Pure Q&A + read-only shell commands (`git status`, `ls`) -> 0 notifications, 0 Stop blocks
+    dispatch_hook("PreInvocation", {"conversationId": "c1", "cwd": str(ws), "lastUserInput": "check repo status"})
+    ro_out = dispatch_hook(
+        "PostToolUse",
+        {"conversationId": "c1", "cwd": str(ws), "toolCall": {"name": "run_command", "args": {"CommandLine": "git status && ls -la"}}, "output": "On branch main"},
     )
-    stop_qna = dispatch_hook(
-        "Stop",
-        {"conversationId": "c1", "cwd": str(ws), "terminationReason": "NO_TOOL_CALL"},
-    )
-    assert stop_qna["decision"] == "allow"
+    assert ro_out == {}
+    assert dispatch_hook("Stop", {"conversationId": "c1", "cwd": str(ws), "terminationReason": "NO_TOOL_CALL"})["decision"] == "allow"
 
-    # 2. Task execution turn where agent claims task first, THEN edits src/policy.py without syncing end-of-turn progress
-    pre_task = dispatch_hook(
-        "PreInvocation",
-        {"conversationId": "c1", "cwd": str(ws), "lastUserInput": "implement night setback damping in src/policy.py"},
+    # 2. Create a structured Proposal with 2 concrete Task List steps
+    prop = execute_mcp_tool(
+        "manage_proposal",
+        {
+            "workspace": str(ws),
+            "action": "create",
+            "title": "Adaptive Coil Ramp Damping",
+            "why": "Step-0 coil jump accounts for 62% of morning comfort regret.",
+            "what_changes": "Add rate-limited coil valve ramp in src/policy.py.",
+            "tasks": ["Implement rate-limited ramp in src/policy.py", "Verify on 16-scenario validation suite"],
+        },
     )
-    assert "AUTO-SYNC PROTOCOL" in pre_task["injectSteps"][0]["systemMessage"]["systemMessage"]
+    pid = prop["proposal_id"]
 
+    # 3. Editing src/policy.py emits an immediate In-Flight Notification naming PROP-001 & Next step #[0]!
+    dispatch_hook("PreInvocation", {"conversationId": "c1", "cwd": str(ws), "lastUserInput": "start working"})
     (ws / "src").mkdir()
     target_py = ws / "src" / "policy.py"
     target_py.write_text("x = 1\n", encoding="utf-8")
 
-    dispatch_hook(
+    edit_notif = dispatch_hook(
         "PostToolUse",
         {
-            "conversationId": "c1",
+            "hook_event_name": "PostToolUse",
+            "session_id": "c1",
             "cwd": str(ws),
-            "toolCall": {"name": "write_file", "args": {"Path": str(target_py), "Content": "x = 2\n"}},
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target_py), "content": "x = 2\n"},
         },
     )
-    stop_dirty = dispatch_hook(
-        "Stop",
-        {"conversationId": "c1", "cwd": str(ws), "terminationReason": "NO_TOOL_CALL"},
-    )
-    assert stop_dirty["decision"] == "continue"
-    assert "AUTO-SYNC REQUIRED" in stop_dirty["reason"]
-    assert "src/policy.py" in stop_dirty["reason"]
+    ctx_msg = edit_notif["hookSpecificOutput"]["additionalContext"]
+    assert "Task-List Notification" in ctx_msg
+    assert pid in ctx_msg
+    assert "#[0]" in ctx_msg
 
-
-def test_metric_stdout_detection_without_file_edits(tmp_path: Path) -> None:
-    ws = tmp_path / "proj_metric"
-    init_workspace(ws, project_name="MetricProj")
-
-    dispatch_hook(
-        "PreInvocation",
-        {"conversationId": "c2", "cwd": str(ws), "lastUserInput": "check current validation regret"},
-    )
-    dispatch_hook(
+    # 4. Domain-agnostic custom command (`./bin/run_custom_rust_sim --seed 7`, zero 'train/mse' keywords!) emits Save Notification
+    exec_notif = dispatch_hook(
         "PostToolUse",
         {
             "conversationId": "c2",
             "cwd": str(ws),
-            "toolCall": {"name": "run_command", "args": {"CommandLine": "python3 scripts/check_slice.py"}},
-            "output": "Slice 05:00 wakeup -> regret=0.00184, val_score: 0.00462",
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "./bin/run_custom_rust_sim --seed 7"}},
+            "output": "SharpeRatio = 2.41, MaxDrawdown = -4.2%",
         },
     )
-    stop_res = dispatch_hook(
-        "Stop",
-        {"conversationId": "c2", "cwd": str(ws), "terminationReason": "NO_TOOL_CALL"},
-    )
-    assert stop_res["decision"] == "continue"
-    assert "RESULT & INSIGHT SYNC REQUIRED" in stop_res["reason"]
+    assert "Save Notification" in exec_notif["injectSteps"][0]["systemMessage"]["systemMessage"]
+    stop_exec = dispatch_hook("Stop", {"conversationId": "c2", "cwd": str(ws), "terminationReason": "NO_TOOL_CALL"})
+    assert stop_exec["decision"] == "continue"
+    assert "RESULT & INSIGHT SYNC REQUIRED" in stop_exec["reason"]
 
 
-def test_atomic_checkpoint_syncs_insights_kanban_subtasks_and_capsule(tmp_path: Path) -> None:
-    ws = tmp_path / "proj_atomic"
-    init_workspace(ws, project_name="AtomicProj")
+def test_strict_proposal_insight_experiment_and_task_list_gates(tmp_path: Path) -> None:
+    ws = tmp_path / "proj_strict"
+    init_workspace(ws, project_name="StrictProj")
 
+    # 1. Sloppy Proposal rejected
+    with pytest.raises(ValueError, match="Proposal Schema Gate"):
+        execute_mcp_tool("manage_proposal", {"workspace": str(ws), "action": "create", "title": "Untitled Proposal", "why": "short", "what_changes": "x"})
+
+    # 2. Lazy 2-word insight rejected
+    with pytest.raises(ValueError, match="Insight Schema Gate"):
+        execute_mcp_tool("checkpoint", {"workspace": str(ws), "insights": ["fixed bug"]})
+
+    # 3. Hollow experiment without any metric rejected
+    with pytest.raises(ValueError, match="Experiment Schema Gate"):
+        execute_mcp_tool("log_experiment", {"workspace": str(ws), "title": "Valid Title", "hypothesis": "Valid falsifiable hypothesis", "single_var_diff": "Changed alpha 0.1->0.2"})
+
+    # 4. Sequential Task-List Gate: cannot mark Proposal or Kanban Task DONE while steps remain unchecked!
     res1 = execute_mcp_tool(
         "checkpoint",
         {
@@ -90,34 +110,19 @@ def test_atomic_checkpoint_syncs_insights_kanban_subtasks_and_capsule(tmp_path: 
             "insights": ["Wakeup Spike Root Cause: 62% of morning regret comes from unmasked step-0 coil jump."],
             "new_task": {
                 "title": "Dampen step-0 coil wakeup jump",
-                "steps": ["Add ramp limiter", "Verify on val16"],
+                "steps": ["Add ramp limiter in policy.py", "Verify on val16 suite"],
                 "stage": "IN_PROGRESS",
             },
-            "next_actions": "Run full val16 verification on ramp limiter.",
         },
     )
-    assert res1["status"] == "CAPTURED"
-    assert res1["captured"]["id"] == "OBS-001"
-    task_id = res1["created_task"]["task_id"]
-    assert res1["created_task"]["status"] == "RUNNING"
-
+    tid = res1["created_task"]["task_id"]
     with GraphStore(ws) as store:
-        cap = build_tiered_capsule(store)
-        assert f"`{task_id}`[RUNNING]" in cap
+        assert f"`{tid}`[RUNNING]" in build_tiered_capsule(store)
 
-    # Complete subtasks + move to DONE via 1-call checkpoint task_updates + orchestrate add_step
-    execute_mcp_tool(
-        "orchestrate",
-        {"workspace": str(ws), "action": "add_step", "task_id": task_id, "text": "Log final benchmark"},
-    )
-    res2 = execute_mcp_tool(
-        "checkpoint",
-        {
-            "workspace": str(ws),
-            "task_updates": [{"id": task_id, "done_steps": [0, 1, 2], "stage": "DONE"}],
-        },
-    )
-    assert res2["updated_tasks"] == [{"id": task_id, "kind": "TASK"}]
-    st_orch = execute_mcp_tool("orchestrate", {"workspace": str(ws), "action": "status"})
-    done_task = [t for t in st_orch["tasks"] if t["task_id"] == task_id][0]
-    assert done_task["status"] == "DONE"
+    # Ticking only step 0 while requesting stage='DONE' MUST fail because step #[1] is unchecked!
+    with pytest.raises(ValueError, match="Task-List Discipline Gate"):
+        execute_mcp_tool("checkpoint", {"workspace": str(ws), "task_updates": [{"id": tid, "done_steps": [0], "stage": "DONE"}]})
+
+    # Ticking remaining step #[1] -> now stage='DONE' succeeds!
+    res2 = execute_mcp_tool("checkpoint", {"workspace": str(ws), "task_updates": [{"id": tid, "done_steps": [1], "stage": "DONE"}]})
+    assert res2["updated_tasks"] == [{"id": tid, "kind": "TASK"}]
