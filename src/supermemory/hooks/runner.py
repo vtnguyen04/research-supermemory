@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 from supermemory.cognitive.federation import ensure_global_memory, federated_recall, set_active_workspace
 from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.gates.enforcer import GateEnforcer
+from supermemory.hooks.claude_bridge import format_hook_output, normalize_hook_input
 from supermemory.models import NodeType
 from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
@@ -54,9 +55,10 @@ def _global_rule_titles() -> List[str]:
         return [f"{p.id}: {p.title}" for p in procs]
 
 
-def dispatch_hook(event_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute Antigravity hook contract across Local + Global Federated SuperMemory."""
-    ev = (event_name or payload.get("hookEventName") or "").strip()
+def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute Antigravity & Claude Code hook contracts across Local + Global SuperMemory."""
+    raw_ev = (event_name or raw_payload.get("hookEventName") or raw_payload.get("hook_event_name") or "").strip()
+    ev, payload, is_claude = normalize_hook_input(raw_ev, raw_payload)
     ws = _resolve_supermemory_workspace(payload)
     conv_id = str(payload.get("conversationId") or "default-session")
 
@@ -69,24 +71,25 @@ def dispatch_hook(event_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 f"{extra}\n• Normal Q&A requires ZERO memory calls. Only call `record_lesson` "
                 "(`scope='global'`) for genuine cross-project rules, or `supermemory init` when requested."
             )
-            return {"injectSteps": [{"systemMessage": {"systemMessage": msg}}]}
+            return format_hook_output(raw_ev, {"injectSteps": [{"systemMessage": {"systemMessage": msg}}]}, is_claude)
         if ev == "PreToolUse":
-            return {"decision": "allow"}
+            return format_hook_output(raw_ev, {"decision": "allow"}, is_claude)
         return {}
 
+    out: Dict[str, Any] = {}
     with GraphStore(ws) as store:
         set_active_workspace(ws)
         if ev == "SessionStart":
-            return _on_session_start(store, conv_id)
-        if ev == "PreInvocation":
-            return _on_pre_invocation(store, conv_id, payload)
-        if ev == "PreToolUse":
-            return _on_pre_tool_use(store, payload)
-        if ev == "PostToolUse":
-            return _on_post_tool_use(store, conv_id, payload)
-        if ev == "Stop":
-            return _on_stop(store, conv_id, payload)
-    return {}
+            out = _on_session_start(store, conv_id)
+        elif ev == "PreInvocation":
+            out = _on_pre_invocation(store, conv_id, payload)
+        elif ev == "PreToolUse":
+            out = _on_pre_tool_use(store, payload)
+        elif ev == "PostToolUse":
+            out = _on_post_tool_use(store, conv_id, payload)
+        elif ev == "Stop":
+            out = _on_stop(store, conv_id, payload)
+    return format_hook_output(raw_ev, out, is_claude)
 
 
 def _on_session_start(store: GraphStore, conv_id: str) -> Dict[str, Any]:
@@ -220,14 +223,14 @@ def _on_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]) 
         st["turn_memory_handled"] = False
     elif not err and not st.get("turn_memory_handled") and (
         scout_readonly
-        or (t_name in ("search_web", "read_url_content") and st.get("research_campaign_active"))
+        or (t_name in ("search_web", "read_url_content", "websearch", "webfetch") and st.get("research_campaign_active"))
         or (t_name in ("run_command", "bash") and _RESEARCH_CMD_RE.search(cmd))
     ):
         st["pending_sync_reason"] = "Research/literature lookup executed without saving distilled findings to SuperMemory Vault"
         st["turn_memory_handled"] = False
 
-    if t_name in ("write_file", "edit_file", "replace_file_content", "multi_replace_file_content") and not err:
-        raw_p = str(t_args.get("Path") or t_args.get("TargetFile") or "")
+    if t_name in ("write_file", "edit_file", "write", "edit", "multiedit", "replace_file_content", "multi_replace_file_content") and not err:
+        raw_p = str(t_args.get("Path") or t_args.get("TargetFile") or t_args.get("file_path") or "")
         if "02_CONSTITUTION_AND_LESSONS.md" in raw_p:
             st["pending_lesson_lock"] = False
             st["turn_memory_handled"] = True

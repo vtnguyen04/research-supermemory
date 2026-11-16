@@ -23,7 +23,8 @@
     const root = document.getElementById("tab-constitution"), q = (document.getElementById("const-filter-input")?.value || "").trim().toLowerCase();
     const laws = (state.nodes || []).filter((n) => (n.node_type === "LAW" || n.node_type === "PROCEDURE") && matchQ(q, n.id, n.title, n.summary));
     const gates = (state.gates || []).filter((g) => matchQ(q, g.id, g.name, g.law_id, g.gate_type, g.target_glob, g.pattern));
-    const lessons = (state.nodes || []).filter((n) => n.node_type === "LESSON" && matchQ(q, n.id, n.title, n.summary));
+    const lessons = (state.nodes || []).filter((n) => n.node_type === "LESSON" && matchQ(q, n.id, n.title, n.summary))
+      .sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")) || String(b.id || "").localeCompare(String(a.id || "")));
 
     const pgLaws = paginate(laws, "const-laws", 5), lawsBox = document.getElementById("laws-list");
     lawsBox.innerHTML = (pgLaws.slice.length ? pgLaws.slice.map((l) => rowBtnHtml(l, `${l.node_type} · ${tr("Merged", "Gộp")} ${(l.metadata || {}).recurrence_count || 0}`)).join("") : `<div class="empty-state"><p class="empty-desc">${tr("No matching laws.", "Không có luật khớp bộ lọc.")}</p></div>`) + pgLaws.html;
@@ -75,8 +76,9 @@
     const vMode = vSel?.value || "ALL", sMode = sSel?.value || "NEWEST";
     const numScore = (e) => (typeof e.test_score === "number" ? e.test_score : typeof e.cv_score === "number" ? e.cv_score : -Infinity);
     let filtered = exps.filter((e) => (sel.value === "ALL" || e.track === sel.value) &&
-      (vMode === "ALL" || (vMode === "WINNERS" ? ["VICTORY_CONFIRMED", "KEEP"].includes(e.verdict) : ["REVERT", "FAILED"].includes(e.verdict))));
-    if (sMode === "SCORE") filtered = [...filtered].sort((a, b) => numScore(b) - numScore(a));
+      (vMode === "ALL" || (vMode === "WINNERS" ? ["VICTORY_CONFIRMED", "KEEP"].includes(e.verdict) : ["REVERT", "FAILED", "DISCARD"].includes(e.verdict))));
+    if (sMode === "NEWEST") filtered = [...filtered].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")) || String(b.exp_id || "").localeCompare(String(a.exp_id || "")));
+    else if (sMode === "SCORE") filtered = [...filtered].sort((a, b) => numScore(b) - numScore(a));
     else if (sMode === "DELTA") filtered = [...filtered].sort((a, b) => (b.delta_vs_baseline ?? -Infinity) - (a.delta_vs_baseline ?? -Infinity));
 
     const chart = document.getElementById("exp-chart-box"), scored = [...filtered].reverse().filter((e) => Number.isFinite(numScore(e)));
@@ -112,7 +114,8 @@
   function renderLifecycle(state, h) {
     const root = document.getElementById("tab-lifecycle"), q = (document.getElementById("lifecycle-filter-input")?.value || "").trim().toLowerCase();
     const stages = ["PROPOSED", "DESIGNED", "IMPLEMENTING", "CHALLENGED", "AUDITED", "ARCHIVED"];
-    const props = (state.nodes || []).filter((n) => n.node_type === "PROPOSAL" && matchQ(q, n.id, n.title, n.summary));
+    const sortNewest = (a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")) || String(b.id || "").localeCompare(String(a.id || ""));
+    const props = (state.nodes || []).filter((n) => n.node_type === "PROPOSAL" && matchQ(q, n.id, n.title, n.summary)).sort(sortNewest);
     const openCnt = props.filter((p) => p.status !== "ARCHIVED").length;
     const bar = document.getElementById("proposal-stage-bar");
     bar.innerHTML = [["ALL", `${tr("All", "Tất cả")} (${props.length})`], ["OPEN", `${tr("Open", "Đang mở")} (${openCnt})`], ...stages.map((s) => [s, `${s} (${props.filter((p) => p.status === s).length})`])]
@@ -132,7 +135,7 @@
     grid.querySelectorAll("[data-prop-adv]").forEach((b) => b.addEventListener("click", () => h.onAdvanceProposal(b.dataset.propAdv, b.dataset.next)));
     grid.querySelectorAll("[data-prop-audit]").forEach((b) => b.addEventListener("click", () => h.onAuditProposal(b.dataset.propAudit)));
 
-    const allIdeas = (state.nodes || []).filter((n) => ["IDEA", "ALGORITHM", "OBSERVATION", "KNOWLEDGE_NODE"].includes(n.node_type) && matchQ(q, n.id, n.title, n.summary));
+    const allIdeas = (state.nodes || []).filter((n) => ["IDEA", "ALGORITHM", "OBSERVATION", "KNOWLEDGE_NODE"].includes(n.node_type) && matchQ(q, n.id, n.title, n.summary)).sort(sortNewest);
     const vBar = document.getElementById("vault-type-bar");
     const vOpts = [["ALL", `${tr("All", "Tất cả")} (${allIdeas.length})`], ["OBSERVATION", `${tr("Insights", "Insights")} (${allIdeas.filter((x) => x.node_type === "OBSERVATION").length})`], ["ALGORITHM", `${tr("Algorithms", "Thuật toán")} (${allIdeas.filter((x) => x.node_type === "ALGORITHM").length})`], ["IDEA", `Ideas (${allIdeas.filter((x) => x.node_type === "IDEA").length})`], ["DEAD_END", `Dead-Ends (${allIdeas.filter((x) => x.status === "REJECTED").length})`]];
     vBar.innerHTML = vOpts.map(([k, lbl]) => `<button type="button" class="seg-btn" aria-pressed="${activeVaultType === k}" data-vtype="${k}">${esc(lbl)}</button>`).join("");

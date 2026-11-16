@@ -137,7 +137,9 @@ def test_kanban_transitions_subtask_progress_and_proposal_sync(
         md_txt = tasks_md_files[0].read_text(encoding="utf-8")
         assert "- [x] Write unit test" in md_txt
         assert f"- [ ] {long_step}" in md_txt
-        assert g3["ui_version"] == "3.1.2"
+        from supermemory import __version__
+
+        assert g3["ui_version"] == __version__
     finally:
         srv.shutdown()
         srv.server_close()

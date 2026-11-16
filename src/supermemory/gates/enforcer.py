@@ -110,7 +110,7 @@ class GateEnforcer:
                         self.store.record_gate_block(g.id, f"{msg}: {cmd[:120]}")
             return GateDecision(allowed=not violations, violations=violations, triggered_gate_ids=triggered)
 
-        if t_low in ("write_file", "edit_file", "replace_file_content", "multi_replace_file_content"):
+        if t_low in ("write_file", "edit_file", "write", "edit", "multiedit", "replace_file_content", "multi_replace_file_content"):
             raw_path = str(tool_args.get("Path") or tool_args.get("TargetFile") or tool_args.get("file_path") or "")
             if not raw_path:
                 return GateDecision(allowed=True)
@@ -236,11 +236,20 @@ class GateEnforcer:
     @staticmethod
     def _simulate_file_text(tool_low: str, abs_p: Path, args: Dict[str, Any]) -> str:
         existing = abs_p.read_text(encoding="utf-8") if abs_p.is_file() else ""
-        if tool_low == "write_file":
+        if tool_low in ("write_file", "write"):
             content = str(args.get("Content") or args.get("content") or "")
             return (existing + content) if args.get("Append") else content
-        if tool_low == "edit_file":
-            target = str(args.get("Target") or "")
-            repl = str(args.get("Replacement") or "")
+        if tool_low in ("edit_file", "edit"):
+            target = str(args.get("Target") or args.get("old_string") or "")
+            repl = str(args.get("Replacement") or args.get("new_string") or "")
             return existing.replace(target, repl) if (target and target in existing) else existing
+        if tool_low == "multiedit":
+            cur = existing
+            for ed in args.get("edits") or []:
+                if isinstance(ed, dict):
+                    t = str(ed.get("old_string") or "")
+                    r = str(ed.get("new_string") or "")
+                    if t and t in cur:
+                        cur = cur.replace(t, r)
+            return cur
         return existing

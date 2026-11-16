@@ -127,9 +127,9 @@ def upsert_experiment_row(conn: sqlite3.Connection, exp: ExperimentRecord) -> Ex
 
 def list_experiment_rows(conn: sqlite3.Connection, track: Optional[str] = None) -> List[ExperimentRecord]:
     rows = (
-        conn.execute("SELECT * FROM experiments WHERE track = ? ORDER BY exp_id", (track,)).fetchall()
+        conn.execute("SELECT * FROM experiments WHERE track = ? ORDER BY created_at DESC, exp_id DESC", (track,)).fetchall()
         if track
-        else conn.execute("SELECT * FROM experiments ORDER BY track, exp_id").fetchall()
+        else conn.execute("SELECT * FROM experiments ORDER BY created_at DESC, exp_id DESC").fetchall()
     )
     return [
         ExperimentRecord(

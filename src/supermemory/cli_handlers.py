@@ -20,6 +20,7 @@ from supermemory.self_learning.consolidator import LessonConsolidator
 from supermemory.storage.snapshot_io import mark_turn_memory_handled
 from supermemory.storage.sqlite_store import GraphStore
 from supermemory.sync.agent_adapters import generate_agent_files, generate_handoff_briefing
+from supermemory.sync.claude_installer import install_claude_code_integration
 from supermemory.sync.markdown_compiler import MarkdownCompiler
 from supermemory.sync.zaloai_importer import import_zaloai_workspace
 from supermemory.ui.server import run_ui_server
@@ -242,6 +243,11 @@ def handle_install_plugin(args: argparse.Namespace) -> int:
         print(f"❌ Plugin bundle directory not found: {plugin_src}")
         return 1
 
+    if getattr(args, "claude_only", False):
+        c_res = install_claude_code_integration(plugin_src)
+        print(f"  [ok]    claude-code (MCP={c_res['mcp_server']}, skills={len(c_res['skills'])}, agents={len(c_res['agents'])}, hooks={len(c_res['hooks'])})")
+        return 0
+
     agy_bin = shutil.which("agy") or str(Path.home() / ".local" / "bin" / "agy")
     if not Path(agy_bin).is_file():
         print("❌ Could not find `agy` binary in PATH or ~/.local/bin/agy")
@@ -264,6 +270,9 @@ def handle_install_plugin(args: argparse.Namespace) -> int:
         inst_res = subprocess.run([agy_bin, "plugin", "install", str(staged_plugin)], check=False)
         if inst_res.returncode == 0:
             subprocess.run([agy_bin, "plugin", "enable", "supermemory"], check=False)
+            if (Path.home() / ".claude").is_dir() or shutil.which("claude"):
+                c_res = install_claude_code_integration(plugin_src)
+                print(f"  [ok]    claude-code : MCP ({c_res['mcp_server']}) · {len(c_res['skills'])} skills · {len(c_res['agents'])} agents · {len(c_res['hooks'])} hooks -> {c_res['settings_path']}")
         return inst_res.returncode
 
 

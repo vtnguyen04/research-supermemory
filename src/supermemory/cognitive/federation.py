@@ -271,20 +271,23 @@ def set_active_workspace(workspace_root: Path) -> None:
 
 
 def resolve_default_workspace(explicit_ws: str = "") -> Path:
-    """Resolve target workspace cleanly, avoiding plugin install directories when `workspace` is omitted."""
+    """Resolve target workspace cleanly, avoiding plugin install and $HOME directories when `workspace` is omitted."""
     if explicit_ws and explicit_ws.strip():
         return Path(explicit_ws.strip()).expanduser().resolve()
     cwd = Path.cwd().resolve()
-    if "plugins/supermemory" not in cwd.as_posix() and (
-        (cwd / ".supermemory").is_dir() or (cwd / "memory" / "graph_snapshot.json").is_file()
+    home = Path.home().resolve()
+    if (
+        cwd != home
+        and "plugins/supermemory" not in cwd.as_posix()
+        and ((cwd / ".supermemory" / "supermemory.db").is_file() or (cwd / "memory" / "graph_snapshot.json").is_file())
     ):
         return cwd
     act_file = get_global_root() / "active_workspace.json"
     if act_file.is_file():
         try:
             cand = Path(str(json.loads(act_file.read_text(encoding="utf-8")).get("path") or "")).resolve()
-            if cand.is_dir() and "plugins/supermemory" not in cand.as_posix():
+            if cand.is_dir() and cand != home and "plugins/supermemory" not in cand.as_posix():
                 return cand
         except (ValueError, OSError):
             pass
-    return ensure_global_memory() if "plugins/supermemory" in cwd.as_posix() else cwd
+    return ensure_global_memory() if (cwd == home or "plugins/supermemory" in cwd.as_posix()) else cwd

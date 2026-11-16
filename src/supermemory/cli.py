@@ -177,8 +177,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_imp.add_argument("--target", default=".")
     p_imp.add_argument("--name", default="")
 
-    p_plug = sub.add_parser("install-plugin", help="Validate (--strict) and install into Antigravity CLI")
+    p_plug = sub.add_parser("install-plugin", help="Validate (--strict) and install into Antigravity CLI & Claude Code")
     p_plug.add_argument("--validate-only", action="store_true")
+    p_plug.add_argument("--claude-only", action="store_true", help="Install only into Claude Code (~/.claude)")
 
     p_ui = sub.add_parser("ui", help="Launch Multi-Project & Tiered Knowledge Graph Web Observatory")
     p_ui.add_argument("-w", "--workspace", default=".")
@@ -186,8 +187,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_ui.add_argument("--host", default="127.0.0.1")
     p_ui.add_argument("--port", type=int, default=8765)
 
-    p_hook = sub.add_parser("hook", help="Internal Antigravity lifecycle hook stdin/stdout handler")
-    p_hook.add_argument("event", choices=["SessionStart", "PreInvocation", "PreToolUse", "PostToolUse", "Stop"])
+    p_hook = sub.add_parser("hook", help="Internal Antigravity & Claude Code lifecycle hook stdin/stdout handler")
+    p_hook.add_argument("event", choices=["SessionStart", "PreInvocation", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"])
 
     p_mcp = sub.add_parser("mcp", help="Run SuperMemory Stdio MCP Server")
     p_mcp.add_argument("-w", "--workspace", default="")
