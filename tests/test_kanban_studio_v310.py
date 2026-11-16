@@ -147,15 +147,14 @@ def test_kanban_transitions_subtask_progress_and_proposal_sync(
 
 def test_all_pages_fluid_layout_and_version_sync() -> None:
     """Ensure every Studio tab uses full-width fluid layout (no 86rem/88rem tunnel) and version sync."""
-    from supermemory import __version__
 
     static_dir = Path(__file__).resolve().parents[1] / "src" / "supermemory" / "ui" / "static"
     css = (static_dir / "styles.css").read_text(encoding="utf-8")
     html = (static_dir / "index.html").read_text(encoding="utf-8")
     app_js = (static_dir / "app.js").read_text(encoding="utf-8")
 
-    assert f'<meta name="sm-version" content="{__version__}" />' in html
-    assert f'/styles.css?v={__version__}"' in html
+    assert '<meta name="sm-version" content="{{SM_VERSION}}" />' in html
+    assert '/styles.css?v={{SM_VERSION}}"' in html
     assert "cmpVer(state.ui_version, UI_VER) > 0" in app_js
     assert "sessionStorage" in app_js
     assert "state.ui_version !== UI_VER" not in app_js

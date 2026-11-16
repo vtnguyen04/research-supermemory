@@ -22,6 +22,15 @@ def _purge_duplicate_rule_files(root: Path) -> List[str]:
         if rules_dir.is_dir() and not any(rules_dir.iterdir()):
             rules_dir.rmdir()
 
+    hooks_dup = root / ".agents" / "hooks.json"
+    if hooks_dup.is_file() and (Path.home() / ".gemini" / "config" / "plugins" / "supermemory").is_dir():
+        try:
+            if "supermemory hook PreToolUse" in hooks_dup.read_text(encoding="utf-8"):
+                hooks_dup.unlink()
+                removed.append(".agents/hooks.json")
+        except OSError:
+            pass
+
     gemini_dup = root / "GEMINI.md"
     if gemini_dup.is_file():
         try:

@@ -1,4 +1,4 @@
-"""CLI Subparsers & Handlers for Research v3.0 (`bottleneck`, `scout`, `orchestrate`)."""
+"""Thin CLI Subparsers & Handlers for Research (`bottleneck`, `scout`, `orchestrate`) via `kernel`."""
 
 from __future__ import annotations
 
@@ -7,22 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from supermemory.research.bottleneck_engine import (
-    diagnose_bottleneck,
-    rank_bottlenecks,
-    resolve_bottleneck,
-)
-from supermemory.research.orchestrator import (
-    claim_next_task,
-    complete_task,
-    dag_telemetry,
-    list_tasks,
-    plan_research_sprint,
-)
-from supermemory.research.sota_scout import register_method_card, scout_sota_papers
-from supermemory.storage.snapshot_io import mark_turn_memory_handled
-from supermemory.storage.sqlite_store import GraphStore
-from supermemory.sync.markdown_compiler import MarkdownCompiler
+from supermemory.kernel import execute_command
 
 
 def register_research_cli_parsers(sub: Any) -> None:
@@ -85,102 +70,84 @@ def register_research_cli_parsers(sub: Any) -> None:
 
 
 def handle_bottleneck(args: argparse.Namespace) -> int:
-    ws = Path(args.workspace).resolve()
-    with GraphStore(ws) as store:
-        if args.bnk_cmd == "list":
-            items = rank_bottlenecks(store, include_resolved=True)
-            print(f"🎯 Pareto Bottlenecks ({len(items)}):")
-            for it in items:
-                print(
-                    f"  [{it['status']}] {it['id']} (Pareto={it['pareto_priority']}, "
-                    f"Share={it['error_share_pct']}%, Ceiling=+{it['ceiling_gain']}): {it['title']}"
-                )
-            return 0
-        if args.bnk_cmd == "resolve":
-            out = resolve_bottleneck(store, args.id, resolution_exp_id=args.exp_id, note=args.note)
-            mark_turn_memory_handled(store)
-            MarkdownCompiler(store).compile_all()
-            print(f"✅ Resolved {out['id']}")
-            return 0
-        res = diagnose_bottleneck(
-            store,
-            title=args.title,
-            evidence_slice=args.slice,
-            error_share_pct=args.share,
-            ceiling_gain=args.ceiling,
-            falsifiable_rq=args.rq,
-            metric_name=args.metric,
-            kill_criterion=args.kill,
-            smoke_eval_cmd=args.smoke_cmd,
-        )
-        mark_turn_memory_handled(store)
-        MarkdownCompiler(store).compile_all()
-        print(
-            f"✅ Diagnosed {res['bottleneck']['id']} + {res['research_question']['id']} "
-            f"(Pareto Priority={res['pareto_priority']})"
-        )
+    ws = str(Path(args.workspace).resolve())
+    if args.bnk_cmd == "list":
+        items = execute_command("diagnose_bottleneck", {"workspace": ws, "action": "rank", "include_resolved": True})["bottlenecks"]
+        print(f"🎯 Pareto Bottlenecks ({len(items)}):")
+        for it in items:
+            print(f"  [{it['status']}] {it['id']} (Pareto={it['pareto_priority']}, Share={it['error_share_pct']}%, Ceiling=+{it['ceiling_gain']}): {it['title']}")
+        return 0
+    if args.bnk_cmd == "resolve":
+        out = execute_command("diagnose_bottleneck", {"workspace": ws, "action": "resolve", "bottleneck_id": args.id, "resolution_exp_id": args.exp_id, "note": args.note})["resolved"]
+        print(f"✅ Resolved {out['id']}")
+        return 0
+    res = execute_command(
+        "diagnose_bottleneck",
+        {
+            "workspace": ws,
+            "action": "diagnose",
+            "title": args.title,
+            "evidence_slice": args.slice,
+            "error_share_pct": args.share,
+            "ceiling_gain": args.ceiling,
+            "falsifiable_rq": args.rq,
+            "metric_name": args.metric,
+            "kill_criterion": args.kill,
+            "smoke_eval_cmd": args.smoke_cmd,
+        },
+    )
+    print(f"✅ Diagnosed {res['bottleneck']['id']} + {res['research_question']['id']} (Pareto Priority={res['pareto_priority']})")
     return 0
 
 
 def handle_scout(args: argparse.Namespace) -> int:
-    ws = Path(args.workspace).resolve()
-    with GraphStore(ws) as store:
-        if args.scout_cmd == "card":
-            card = register_method_card(
-                store,
-                title=args.title,
-                bottleneck_addressed=args.addressed or args.bottleneck or "Target slice",
-                core_mechanism=args.mechanism,
-                assumptions_and_limits=args.limits or "Validate empirically on slice.",
-                complexity_cost=args.cost,
-                minimal_integration_hook=args.hook,
-                source_url=args.url,
-                venue=args.venue,
-                year=args.year,
-                bottleneck_id=args.bottleneck,
-            )
-            mark_turn_memory_handled(store)
-            MarkdownCompiler(store).compile_all()
-            print(f"✅ Registered Method Card {card['id']}: {card['title']}")
-            return 0
-        res = scout_sota_papers(
-            store,
-            query=args.query,
-            limit=args.limit,
-            min_year=args.min_year,
-            bottleneck_id=args.bottleneck,
-            save_top_k=args.save_top,
-        )
-        if res["saved_method_cards"]:
-            mark_turn_memory_handled(store)
-            MarkdownCompiler(store).compile_all()
-        print(f"🔭 Scouted {len(res['papers'])} papers (cache_hits={res['cache_hits']}, saved={len(res['saved_method_cards'])}):")
-        for p in res["papers"]:
-            print(f"  • [{p.get('venue')} {p.get('year')} | score={p.get('relevance_score')}] {p.get('title')}")
+    ws = str(Path(args.workspace).resolve())
+    if args.scout_cmd == "card":
+        card = execute_command(
+            "scout_sota",
+            {
+                "workspace": ws,
+                "action": "register_card",
+                "title": args.title,
+                "bottleneck_addressed": args.addressed or args.bottleneck or "Target slice",
+                "core_mechanism": args.mechanism,
+                "assumptions_and_limits": args.limits or "Validate empirically on slice.",
+                "complexity_cost": args.cost,
+                "minimal_integration_hook": args.hook,
+                "source_url": args.url,
+                "venue": args.venue,
+                "year": args.year,
+                "bottleneck_id": args.bottleneck,
+            },
+        )["method_card"]
+        print(f"✅ Registered Method Card {card['id']}: {card['title']}")
+        return 0
+    res = execute_command(
+        "scout_sota",
+        {"workspace": ws, "action": "search", "query": args.query, "limit": args.limit, "min_year": args.min_year, "bottleneck_id": args.bottleneck, "save_top_k": args.save_top},
+    )
+    print(f"🔭 Scouted {len(res['papers'])} papers (cache_hits={res['cache_hits']}, saved={len(res['saved_method_cards'])}):")
+    for p in res["papers"]:
+        print(f"  • [{p.get('venue')} {p.get('year')} | score={p.get('relevance_score')}] {p.get('title')}")
     return 0
 
 
 def handle_orchestrate(args: argparse.Namespace) -> int:
-    ws = Path(args.workspace).resolve()
-    with GraphStore(ws) as store:
-        if args.orch_cmd == "plan":
-            globs = [g.strip() for g in args.globs.split(",") if g.strip()]
-            res = plan_research_sprint(store, goal=args.goal, bottleneck_id=args.bottleneck, smoke_cmd=args.smoke_cmd, target_globs=globs)
-            MarkdownCompiler(store).compile_all()
-            print(f"⚡ Planned 3-Wave Sprint ({len(res['tasks'])} tasks). Parallel Wave-1: {res['parallel_wave1_ids']}")
-            return 0
-        if args.orch_cmd == "claim":
-            claimed = claim_next_task(store, agent_name=args.agent, role=args.role)
-            print(json.dumps({"claimed": claimed}, ensure_ascii=False, indent=2))
-            return 0
-        if args.orch_cmd == "complete":
-            res = complete_task(store, task_id=args.task_id, status=args.status, receipt={"summary": args.summary} if args.summary else {})
-            mark_turn_memory_handled(store)
-            MarkdownCompiler(store).compile_all()
-            print(json.dumps(res, ensure_ascii=False, indent=2))
-            return 0
-        tel = dag_telemetry(store)
-        print("🕸️ Fast-DAG Telemetry:", json.dumps(tel, ensure_ascii=False))
-        for t in list_tasks(store):
-            print(f"  [W{t.wave} | {t.status}] {t.task_id} ({t.role}): {t.title}")
+    ws = str(Path(args.workspace).resolve())
+    if args.orch_cmd == "plan":
+        globs = [g.strip() for g in args.globs.split(",") if g.strip()]
+        res = execute_command("orchestrate", {"workspace": ws, "action": "plan_sprint", "goal": args.goal, "bottleneck_id": args.bottleneck, "smoke_cmd": args.smoke_cmd, "target_globs": globs})
+        print(f"⚡ Planned 3-Wave Sprint ({len(res['tasks'])} tasks). Parallel Wave-1: {res['parallel_wave1_ids']}")
+        return 0
+    if args.orch_cmd == "claim":
+        print(json.dumps(execute_command("orchestrate", {"workspace": ws, "action": "claim", "agent_name": args.agent, "role": args.role}), ensure_ascii=False, indent=2))
+        return 0
+    if args.orch_cmd == "complete":
+        res = execute_command("orchestrate", {"workspace": ws, "action": "complete", "task_id": args.task_id, "status": args.status, "receipt": {"summary": args.summary} if args.summary else {}})
+        print(json.dumps(res, ensure_ascii=False, indent=2))
+        return 0
+    st = execute_command("orchestrate", {"workspace": ws, "action": "status"})
+    print("🕸️ Fast-DAG Telemetry:", json.dumps(st["telemetry"], ensure_ascii=False))
+    for t in st["tasks"]:
+        print(f"  [W{t['wave']} | {t['status']}] {t['task_id']} ({t['role']}): {t['title']}")
     return 0

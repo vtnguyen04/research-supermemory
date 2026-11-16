@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import json
-import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, Tuple
 from urllib.parse import parse_qs, unquote, urlparse
 
-from supermemory import __version__
+from supermemory import __version__, resolve_live_version
 from supermemory.cognitive.federation import (
     ensure_global_memory,
     federated_recall,
@@ -23,18 +22,12 @@ from supermemory.ui.api_actions import dispatch_store_mutation, handle_workspace
 from supermemory.ui.api_research import enrich_graph_payload_v3
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-_META_VER_RE = re.compile(r'<meta\s+name="sm-version"\s+content="([^"]+)"')
 
 
 def _live_ui_version() -> str:
-    """Read live sm-version from disk index.html so editable upgrades never drift from RAM __version__."""
-    try:
-        m = _META_VER_RE.search((STATIC_DIR / "index.html").read_text(encoding="utf-8"))
-        if m:
-            return m.group(1)
-    except OSError:
-        pass
-    return __version__
+    """Read live version from single source of truth (`pyproject.toml` / package metadata)."""
+    return resolve_live_version()
+
 
 _MIME_TYPES: Dict[str, str] = {
     ".html": "text/html; charset=utf-8",
@@ -137,7 +130,10 @@ def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
                 self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
                 return
             mime = _MIME_TYPES.get(target.suffix.lower(), "application/octet-stream")
-            body = target.read_bytes()
+            if target.name == "index.html":
+                body = target.read_text(encoding="utf-8").replace("{{SM_VERSION}}", _live_ui_version()).encode("utf-8")
+            else:
+                body = target.read_bytes()
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", mime)
             self.send_header("Content-Length", str(len(body)))

@@ -6,6 +6,7 @@ import shlex
 from pathlib import Path
 from typing import Any, Dict, List
 
+from supermemory.kernel import classify_mcp_call
 from supermemory.lifecycle.validators import summarize_active_task_focus
 from supermemory.models import NodeType
 from supermemory.research.kanban_ops import extract_task_steps
@@ -27,13 +28,9 @@ _SM_CLI_MUTATIONS = (
     "supermemory sync", "supermemory exp", "supermemory learn", "supermemory idea",
     "supermemory proposal", "supermemory gate add", "supermemory gate freeze",
     "supermemory checkpoint", "supermemory consolidate", "supermemory promote",
-    "supermemory bottleneck diagnose", "supermemory bottleneck resolve",
+    "supermemory bottleneck add", "supermemory bottleneck resolve",
     "supermemory scout", "supermemory orchestrate plan", "supermemory orchestrate complete",
 )
-_SM_MCP_ALWAYS_MUTATING = {
-    "update_state", "log_experiment", "record_lesson", "link_knowledge", "manage_proposal",
-    "propose_idea", "add_gate", "checkpoint", "consolidate", "record_audit",
-}
 _EXTERNAL_DOMAINS = ("arxiv.org", "semanticscholar.org", "openalex.org", "huggingface.co/papers")
 _IGNORED_DIR_PARTS = {".supermemory", "memory", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 
@@ -48,7 +45,6 @@ def _classify_shell_command(cmd: str) -> str:
     if any(m in raw for m in _SM_CLI_MUTATIONS):
         return "SM_MUTATION"
 
-    # Split compound pipelines/chains (`&&`, `;`) and inspect each segment structurally
     segments = [seg.strip() for part in raw.split("&&") for seg in part.split(";") if seg.strip()]
     has_substantive = False
     for seg in segments:
@@ -71,23 +67,6 @@ def _classify_shell_command(cmd: str) -> str:
             continue
         has_substantive = True
     return "SUBSTANTIVE_EXEC" if has_substantive else "READONLY"
-
-
-def _is_sm_mcp_mutation(t_name: str, mcp_srv: str, norm_mcp: str, inner_args: Dict[str, Any]) -> tuple[bool, bool]:
-    is_sm = "supermemory" in t_name or "supermemory" in mcp_srv or bool(norm_mcp)
-    if not is_sm:
-        return False, False
-    tool_key = norm_mcp or t_name.split("__")[-1]
-    if tool_key in _SM_MCP_ALWAYS_MUTATING or any(m in t_name for m in _SM_MCP_ALWAYS_MUTATING):
-        return True, False
-    if tool_key == "diagnose_bottleneck" or "diagnose_bottleneck" in t_name:
-        return str(inner_args.get("action") or "diagnose").lower() not in ("rank", "score_occam"), False
-    if tool_key == "scout_sota" or "scout_sota" in t_name:
-        saved = str(inner_args.get("action") or "search").lower() == "register_card" or int(inner_args.get("save_top_k") or 0) > 0
-        return saved, not saved
-    if tool_key == "orchestrate" or "orchestrate" in t_name:
-        return str(inner_args.get("action") or "status").lower() in ("plan_sprint", "enqueue", "move", "toggle_step", "add_step", "complete"), False
-    return False, False
 
 
 def _active_task_focus_line(store: GraphStore) -> str:
@@ -124,7 +103,7 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
         st["pending_lesson_lock"] = False
         st["turn_memory_handled"] = True
 
-    sm_mutated, scout_readonly = _is_sm_mcp_mutation(t_name, mcp_srv, norm_mcp, inner_args)
+    sm_mutated, scout_readonly = classify_mcp_call(t_name, mcp_srv, norm_mcp, inner_args)
     cmd_kind = _classify_shell_command(cmd) if t_name in ("run_command", "bash") else "NONE"
 
     if not err and (sm_mutated or cmd_kind == "SM_MUTATION"):

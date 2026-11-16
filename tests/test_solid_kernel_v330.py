@@ -1,0 +1,83 @@
+"""SOLID Clean Architecture Invariant Tests: OCP Registry, Single-Source Version & Lazy CLI Isolation."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+from urllib.request import urlopen
+
+from supermemory import __version__, resolve_live_version
+from supermemory.bootstrap import init_workspace
+from supermemory.kernel import REGISTRY, CommandRegistry
+from supermemory.ui.server import create_http_server
+
+
+def test_ocp_single_registration_drives_schema_uow_and_hook_classifier(tmp_path: Path) -> None:
+    """Prove adding a brand-new command requires 1 decorated function and 0 edits to MCP/Hook/UI."""
+    ws = tmp_path / "ocp_proj"
+    init_workspace(ws, project_name="OCPProj")
+
+    reg = CommandRegistry()
+
+    @reg.register(
+        name="custom_domain_probe",
+        description="Single-file extensible command test.",
+        input_schema={"type": "object", "properties": {"tag": {"type": "string"}}},
+        mutates_memory=True,
+    )
+    def _handle_probe(store: object, args: dict[str, object]) -> dict[str, object]:
+        store.set_meta("probe_tag", str(args.get("tag") or "ok"))  # type: ignore[attr-defined]
+        return {"recorded": True, "tag": args.get("tag")}
+
+    # 1. MCP schema auto-generated
+    schemas = reg.mcp_tool_schemas()
+    assert len(schemas) == 1 and schemas[0]["name"] == "custom_domain_probe"
+
+    # 2. Hook mutation classifier auto-recognizes it without any hardcoded string set
+    mutated, ro_res = reg.classify_mcp_call("mcp__supermemory_graph__custom_domain_probe", "", "", {"tag": "v1"})
+    assert mutated is True and ro_res is False
+
+    # 3. Unit-of-Work executes handler + compiles Markdown automatically
+    out = reg.execute("custom_domain_probe", {"workspace": str(ws), "tag": "solid"})
+    assert out == {"recorded": True, "tag": "solid"}
+    assert (ws / "memory" / "01_ACTIVE_STATE.md").is_file()
+    assert len(REGISTRY.list_specs()) == 17
+
+
+def test_single_source_version_and_dynamic_html_stamping(tmp_path: Path) -> None:
+    """Ensure version lives only in pyproject.toml and stamps dynamically into index.html."""
+    repo_root = Path(__file__).resolve().parents[1]
+    init_py = (repo_root / "src" / "supermemory" / "__init__.py").read_text(encoding="utf-8")
+    html_tpl = (repo_root / "src" / "supermemory" / "ui" / "static" / "index.html").read_text(encoding="utf-8")
+
+    assert "__version__ = resolve_live_version()" in init_py
+    assert "{{SM_VERSION}}" in html_tpl
+    assert __version__ == resolve_live_version()
+
+    ws = tmp_path / "ver_proj"
+    init_workspace(ws, project_name="VerProj")
+    srv, port = create_http_server(ws, host="127.0.0.1", port=0)
+    import threading
+
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    try:
+        rendered = urlopen(f"http://127.0.0.1:{port}/").read().decode("utf-8")
+        assert "{{SM_VERSION}}" not in rendered
+        assert f'content="{__version__}"' in rendered
+        assert f"?v={__version__}" in rendered
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_cli_lazy_imports_isolate_hooks_from_ui_and_mcp() -> None:
+    """Ensure importing `supermemory.cli` does not eagerly import UI server or MCP server."""
+    code = (
+        "import sys, supermemory.cli; "
+        "assert 'supermemory.ui.server' not in sys.modules; "
+        "assert 'supermemory.mcp.server' not in sys.modules"
+    )
+    res = subprocess.run([sys.executable, "-c", code], check=False, capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr

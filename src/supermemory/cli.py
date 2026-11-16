@@ -1,47 +1,45 @@
-"""Universal CLI entrypoint for SuperMemory (`supermemory`)."""
+"""Universal CLI entrypoint for SuperMemory (`supermemory`) with lazy subcommand loading."""
 
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from supermemory import __version__
-from supermemory.cli_cognitive import (
-    handle_checkpoint,
-    handle_consolidate,
-    handle_promote,
-    handle_workspaces,
-)
-from supermemory.cli_handlers import (
-    handle_audit_and_sync,
-    handle_exp,
-    handle_gate,
-    handle_idea,
-    handle_import_zaloai,
-    handle_init,
-    handle_install_plugin,
-    handle_learn,
-    handle_proposal,
-    handle_recall,
-    handle_status,
-    handle_ui,
-)
-from supermemory.cli_research import (
-    handle_bottleneck,
-    handle_orchestrate,
-    handle_scout,
-    register_research_cli_parsers,
-)
-from supermemory.hooks.runner import main_from_stdin
-from supermemory.mcp.server import run_mcp_stdio_server
+from supermemory.cli_research import register_research_cli_parsers
+
+_LAZY_DISPATCH: Dict[str, Tuple[str, str]] = {
+    "init": ("supermemory.cli_handlers", "handle_init"),
+    "status": ("supermemory.cli_handlers", "handle_status"),
+    "recall": ("supermemory.cli_handlers", "handle_recall"),
+    "learn": ("supermemory.cli_handlers", "handle_learn"),
+    "gate": ("supermemory.cli_handlers", "handle_gate"),
+    "idea": ("supermemory.cli_handlers", "handle_idea"),
+    "proposal": ("supermemory.cli_handlers", "handle_proposal"),
+    "exp": ("supermemory.cli_handlers", "handle_exp"),
+    "workspaces": ("supermemory.cli_cognitive", "handle_workspaces"),
+    "consolidate": ("supermemory.cli_cognitive", "handle_consolidate"),
+    "promote": ("supermemory.cli_cognitive", "handle_promote"),
+    "checkpoint": ("supermemory.cli_cognitive", "handle_checkpoint"),
+    "audit": ("supermemory.cli_handlers", "handle_audit_and_sync"),
+    "sync": ("supermemory.cli_handlers", "handle_audit_and_sync"),
+    "handoff": ("supermemory.cli_handlers", "handle_audit_and_sync"),
+    "import-zaloai": ("supermemory.cli_handlers", "handle_import_zaloai"),
+    "install-plugin": ("supermemory.cli_handlers", "handle_install_plugin"),
+    "ui": ("supermemory.cli_handlers", "handle_ui"),
+    "bottleneck": ("supermemory.cli_research", "handle_bottleneck"),
+    "scout": ("supermemory.cli_research", "handle_scout"),
+    "orchestrate": ("supermemory.cli_research", "handle_orchestrate"),
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="supermemory",
-        description="SuperMemory v2.0: Tiered Cognitive Graph, Federated Local/Global Memory & Antigravity Extension",
+        description="SuperMemory v3.3: Tiered Cognitive Graph, Federated Memory & Dual-Harness Extension",
     )
     parser.add_argument("--version", action="version", version=f"supermemory {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -199,36 +197,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
-    dispatch = {
-        "init": handle_init,
-        "status": handle_status,
-        "recall": handle_recall,
-        "learn": handle_learn,
-        "gate": handle_gate,
-        "idea": handle_idea,
-        "proposal": handle_proposal,
-        "exp": handle_exp,
-        "workspaces": handle_workspaces,
-        "consolidate": handle_consolidate,
-        "promote": handle_promote,
-        "checkpoint": handle_checkpoint,
-        "audit": handle_audit_and_sync,
-        "sync": handle_audit_and_sync,
-        "handoff": handle_audit_and_sync,
-        "import-zaloai": handle_import_zaloai,
-        "install-plugin": handle_install_plugin,
-        "ui": handle_ui,
-        "bottleneck": handle_bottleneck,
-        "scout": handle_scout,
-        "orchestrate": handle_orchestrate,
-    }
-    if args.command in dispatch:
-        return dispatch[args.command](args)
     if args.command == "hook":
+        from supermemory.hooks.runner import main_from_stdin
+
         return main_from_stdin(args.event)
     if args.command == "mcp":
+        from supermemory.mcp.server import run_mcp_stdio_server
+
         default_ws = Path(args.workspace).resolve() if args.workspace else None
         return run_mcp_stdio_server(default_ws=default_ws)
+    if args.command in _LAZY_DISPATCH:
+        mod_name, fn_name = _LAZY_DISPATCH[args.command]
+        handler: Callable[[argparse.Namespace], int] = getattr(importlib.import_module(mod_name), fn_name)
+        return handler(args)
     return 1
 
 
