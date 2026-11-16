@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,6 +23,18 @@ from supermemory.ui.api_actions import dispatch_store_mutation, handle_workspace
 from supermemory.ui.api_research import enrich_graph_payload_v3
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+_META_VER_RE = re.compile(r'<meta\s+name="sm-version"\s+content="([^"]+)"')
+
+
+def _live_ui_version() -> str:
+    """Read live sm-version from disk index.html so editable upgrades never drift from RAM __version__."""
+    try:
+        m = _META_VER_RE.search((STATIC_DIR / "index.html").read_text(encoding="utf-8"))
+        if m:
+            return m.group(1)
+    except OSError:
+        pass
+    return __version__
 
 _MIME_TYPES: Dict[str, str] = {
     ".html": "text/html; charset=utf-8",
@@ -61,7 +74,7 @@ def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
         tiers = compute_tier_telemetry(store)
         meta = store.get_all_meta()
         payload = {
-            "ui_version": __version__,
+            "ui_version": _live_ui_version(),
             "workspace_path": str(workspace_root),
             "is_global": workspace_root == ensure_global_memory(),
             "project": meta.get("project_name") or workspace_root.name,

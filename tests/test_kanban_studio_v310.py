@@ -152,9 +152,13 @@ def test_all_pages_fluid_layout_and_version_sync() -> None:
     static_dir = Path(__file__).resolve().parents[1] / "src" / "supermemory" / "ui" / "static"
     css = (static_dir / "styles.css").read_text(encoding="utf-8")
     html = (static_dir / "index.html").read_text(encoding="utf-8")
+    app_js = (static_dir / "app.js").read_text(encoding="utf-8")
 
     assert f'<meta name="sm-version" content="{__version__}" />' in html
     assert f'/styles.css?v={__version__}"' in html
+    assert "cmpVer(state.ui_version, UI_VER) > 0" in app_js
+    assert "sessionStorage" in app_js
+    assert "state.ui_version !== UI_VER" not in app_js
     assert "max-width: 88rem" not in css
     assert "max-width: 86rem" not in css
     assert "min(calc(100dvh - 17.5rem), 45rem)" in css

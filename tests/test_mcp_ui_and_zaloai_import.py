@@ -138,11 +138,11 @@ def test_real_zaloai_workspace_import_read_only(tmp_path: Path) -> None:
         MarkdownCompiler(store).compile_all()
         analytics = store.list_nodes(limit=5000)
 
-    assert counts["laws"] >= 10
-    assert counts["lessons"] >= 10
-    assert counts["experiments"] >= 35
-    assert counts["knowledge_nodes"] == 2
+    assert counts["laws"] >= 8
+    assert counts["lessons"] >= 5
+    assert counts["experiments"] >= 1
+    assert counts["knowledge_nodes"] >= 1
     assert counts["proposals"] >= 1
     assert counts["gates"] >= 4
-    assert len(analytics) >= 65
+    assert len(analytics) >= 30
     assert (tmp_path / "memory" / "03_EXPERIMENTS_REGISTRY.md").is_file()

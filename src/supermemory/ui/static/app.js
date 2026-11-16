@@ -49,13 +49,14 @@
     if (inspector.currentNodeId?.startsWith("TASK:") && !document.activeElement?.closest("#insp-body input")) kanbanBoard.inspectTask(inspector.currentNodeId.slice(5));
   }
 
+  const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
   async function loadGraph() {
     const errStrip = document.getElementById("error-banner"); errStrip.classList.add("hidden");
     try {
       const res = await fetch(`/api/graph?scope=${encodeURIComponent(currentScope)}`);
       if (!res.ok) throw new Error(tr(`Failed to load graph (HTTP ${res.status})`, `Không thể tải dữ liệu đồ thị (HTTP ${res.status})`));
       state = await res.json(); lastFetch = Date.now();
-      if (state.ui_version && UI_VER && state.ui_version !== UI_VER) { location.reload(); return; }
+      if (state.ui_version && UI_VER && cmpVer(state.ui_version, UI_VER) > 0 && !sessionStorage.getItem(`sm_rl_${state.ui_version}`)) { sessionStorage.setItem(`sm_rl_${state.ui_version}`, "1"); location.reload(); return; }
       graphView.setData(state.nodes, state.edges); rerenderAll();
       const qs = new URLSearchParams(window.location.search), qMode = qs.get("mode"), qInspect = qs.get("inspect");
       if (qMode && ["FORCE", "RADIAL", "HIERARCHY", "LANES"].includes(qMode.toUpperCase())) setGraphMode(qMode.toUpperCase());
