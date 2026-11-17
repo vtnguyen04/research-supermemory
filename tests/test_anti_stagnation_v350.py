@@ -16,54 +16,85 @@ from supermemory.storage.sqlite_store import GraphStore
 def test_anti_hallucination_citation_gate_blocks_fake_internal_papers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Ensure agents cannot disguise internal heuristics or local files as METH-XXX SOTA papers."""
+    """Ensure structural URI parsing classifies provenance with zero phrase regexes and preserves dead-ends across consolidation."""
+    from supermemory.cognitive.tiers import build_tiered_capsule
+
     monkeypatch.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_cit"))
     ws = tmp_path / "cit_proj"
     init_workspace(ws, project_name="CitationProj")
     w = str(ws)
 
-    # 1. Exact self-fabricated venue pattern observed in live NeurIPS runs -> HARD BLOCKED
-    with pytest.raises(ValueError, match="Anti-Hallucination Citation Gate"):
+    # 1. Card without scholarly URL is structurally tagged UNVERIFIED_MANUAL regardless of venue wording (0 phrase regex!)
+    unv = execute_command(
+        "scout_sota",
+        {
+            "workspace": w, "action": "register_card",
+            "title": "Wide-Band Schmitt-Trigger Reservoir Hysteresis",
+            "core_mechanism": "Local deadband heuristic",
+            "venue": "Any Custom Venue Text", "year": 2026,
+        },
+    )
+    assert unv["method_card"]["metadata"]["provenance"] == "UNVERIFIED_MANUAL"
+
+    # 2. Local file path or non-http URI disguised as source_url -> HARD BLOCKED structurally by urlparse
+    with pytest.raises(ValueError, match="Structural Citation Gate"):
         execute_command(
             "scout_sota",
             {
-                "workspace": w,
-                "action": "register_card",
-                "title": "Wide-Band Schmitt-Trigger Reservoir Hysteresis",
-                "core_mechanism": "Local deadband heuristic",
-                "venue": "NeurIPS 2026 Smart Buildings Forensic & Control Synthesis",
-                "year": 2026,
+                "workspace": w, "action": "register_card",
+                "title": "Local Controller Notes", "core_mechanism": "Valve clamp",
+                "venue": "ICML", "source_url": "file:///home/user/notes.md",
             },
         )
 
-    # 2. Local file path disguised as source_url -> HARD BLOCKED
-    with pytest.raises(ValueError, match="Anti-Hallucination Citation Gate"):
-        execute_command(
-            "scout_sota",
-            {
-                "workspace": w,
-                "action": "register_card",
-                "title": "Local Controller Notes",
-                "core_mechanism": "Valve clamp",
-                "venue": "ICML",
-                "source_url": "file:///home/user/notes.md",
-            },
-        )
-
-    # 3. Real arXiv URL -> ALLOWED & tagged VERIFIED_EXTERNAL
+    # 3. Real arXiv URL -> VERIFIED_EXTERNAL
     ok = execute_command(
         "scout_sota",
         {
-            "workspace": w,
-            "action": "register_card",
+            "workspace": w, "action": "register_card",
             "title": "Economic Tube Model Predictive Control for Commercial HVAC",
             "core_mechanism": "Tightens polytopic disturbance invariant tubes around electricity prices.",
-            "venue": "arXiv",
-            "year": 2025,
-            "source_url": "https://arxiv.org/abs/2502.04321",
+            "venue": "arXiv", "year": 2025, "source_url": "https://arxiv.org/abs/2502.04321",
         },
     )
     assert ok["method_card"]["metadata"]["provenance"] == "VERIFIED_EXTERNAL"
+
+    # 4. Multi-run REM-sleep consolidation splits PASSED vs FAILED and NEVER erases REVERT dead-ends!
+    execute_command(
+        "log_experiment",
+        {
+            "workspace": w, "track": "gbdt", "title": "CatBoost Quantile Loss alpha=0.95",
+            "hypothesis": "Asymmetric quantile loss improves tail calibration",
+            "single_var_diff": "loss=Quantile:alpha=0.95", "cv_score": 0.612, "verdict": "REVERT",
+            "post_mortem": "Severe median bias degraded overall RMSE by +14%.",
+        },
+    )
+    for idx in range(2, 7):
+        execute_command(
+            "log_experiment",
+            {
+                "workspace": w, "track": "gbdt", "title": f"CatBoost Symmetric Depth={idx + 3} Ensemble",
+                "hypothesis": f"Depth {idx + 3} improves feature interactions",
+                "single_var_diff": f"depth={idx + 3}", "cv_score": 0.80 + idx * 0.01, "verdict": "KEEP",
+            },
+        )
+
+    sem_detail = execute_command("recall", {"workspace": w, "node_id": "SEM-001"})
+    assert "Verified Wins" in sem_detail["node"]["content"] and "Falsified Dead-Ends" in sem_detail["node"]["content"]
+    # Even AFTER consolidation into SEM-001, repeating the REVERTED CatBoost Quantile Loss is STILL HARD-BLOCKED (0 keyword lists)!
+    with pytest.raises(ValueError, match="Anti-Repeat Gate"):
+        execute_command(
+            "manage_proposal",
+            {
+                "workspace": w, "action": "create",
+                "title": "CatBoost Quantile Loss alpha=0.95 Tail Calibration",
+                "why": "Try asymmetric quantile loss alpha=0.95 on CatBoost",
+                "what_changes": "Switch CatBoost objective to Quantile:alpha=0.95",
+            },
+        )
+    with GraphStore(ws) as store:
+        cap = build_tiered_capsule(store)
+        assert "PROVEN WINS" in cap and "FALSIFIED DEAD-ENDS" in cap
 
 
 def test_consecutive_failure_plateau_locks_proposals_until_verified_external_scout(

@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [3.5.1] - 2026-11-17
+
+### Changed
+- **Zero-Regex Structural Provenance & Domain-Agnostic Subword TF-IDF Novelty (`LAW-01`, `GATE-034`):** Removed static keyword buckets (`_MECHANISM_FAMILIES`) and phrase regexes (`_SELF_FABRICATED_PATTERNS`), replacing them with pure URI scheme/host parsing (`urlparse`) for `07_METHOD_VAULT` provenance and IDF-weighted subword 3/4-gram cosine + graph module/bottleneck overlap in `novelty_guard.py`.
+- **Lossless Pass/Fail Scaling Across 100+ Experiments (`outcome_ledger.py`, `tiers.py`):** Preserved negative `REVERT`/`FAILED`/`DISCARD`/`REJECTED` verdicts across REM-sleep episodic consolidation (never overwritten by `CONSOLIDATED`), split `SEM-XXX` consolidated nodes into structured `Verified Wins` vs `Falsified Dead-Ends` ledgers from typed SQLite columns, and surfaced `L0 PROVEN WINS` + `L0 FALSIFIED DEAD-ENDS` directly in session capsules.
+
+---
+
 ## [3.5.0] - 2026-11-17
 
 ### Added
@@ -158,6 +166,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **Initial Release:** SQLite WAL + FTS5 knowledge graph, `LAW-01`..`LAW-08` Constitutional Markdown compiler, `PreToolUse` CodeGate enforcer (`MAX_LINES`, `FORBIDDEN_REGEX`, `FORBIDDEN_FILENAME`, `FORBIDDEN_CMD_PATTERN`, `FROZEN_SHA256`, `AST_SYNTAX`), OpenSpec proposal state machine, and Antigravity CLI plugin package.
 
+[3.5.1]: https://github.com/vtnguyen04/research-supermemory/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/vtnguyen04/research-supermemory/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.5...v3.4.0

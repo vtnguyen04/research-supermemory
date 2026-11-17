@@ -1,15 +1,14 @@
-"""Anti-Stagnation Research Circuit-Breaker & Verified External Citation Provenance Gate."""
+"""Anti-Stagnation Research Circuit-Breaker & Structural URL Provenance Gate (Zero Phrase Regex)."""
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List, Set
 from urllib.parse import urlparse
 
 from supermemory.models import EdgeType, NodeType
 from supermemory.storage.sqlite_store import GraphStore
 
-_VERIFIED_SCHOLARLY_DOMAINS: tuple[str, ...] = (
+_SCHOLARLY_AND_CODE_HOSTS: tuple[str, ...] = (
     "arxiv.org", "doi.org", "semanticscholar.org", "openalex.org", "openreview.net",
     "aclanthology.org", "proceedings.mlr.press", "neurips.cc", "papers.nips.cc",
     "icml.cc", "iclr.cc", "thecvf.com", "ieee.org", "acm.org", "dl.acm.org",
@@ -17,43 +16,32 @@ _VERIFIED_SCHOLARLY_DOMAINS: tuple[str, ...] = (
     "aaai.org", "ijcai.org", "kaggle.com", "github.com", "huggingface.co",
 )
 
-_SELF_FABRICATED_PATTERNS = re.compile(
-    r"\b(?:forensic(?:\s+&\s+control)?\s+synthesis|self[- ]synthesis|internal\s+(?:ablation|note|heuristic|synthesis)|"
-    r"local\s+heuristic|in[- ]house\s+synthesis|our\s+ablation)\b",
-    re.IGNORECASE,
-)
-
 _FAIL_VERDICTS: Set[str] = {"REVERT", "FAILED", "REJECTED", "DISCARD", "EARLY_KILLED"}
 
 
 def is_verified_external_url(source_url: str) -> bool:
-    """Return True only when `source_url` is an http(s) link on a recognized scholarly or code host."""
+    """Return True only when `source_url` parses as an http(s) URI on a scholarly or open-source host."""
     raw = (source_url or "").strip()
-    if not raw.startswith(("https://", "http://")):
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
         return False
-    host = (urlparse(raw).hostname or "").lower().removeprefix("www.")
-    return any(host == dom or host.endswith("." + dom) for dom in _VERIFIED_SCHOLARLY_DOMAINS)
+    host = parsed.hostname.lower().removeprefix("www.")
+    return any(host == dom or host.endswith("." + dom) for dom in _SCHOLARLY_AND_CODE_HOSTS)
 
 
 def validate_method_card_provenance(
-    title: str,
-    venue: str,
     source_url: str,
     fetched_from_api: bool = False,
 ) -> str:
-    """Block self-fabricated fake 'papers' and classify provenance (`VERIFIED_EXTERNAL` vs `UNVERIFIED_MANUAL`)."""
+    """Classify provenance structurally from URI scheme/host or API fetch (`0` text/title regexes)."""
     raw_url = (source_url or "").strip()
-    if raw_url.startswith(("file://", "./", "../", "/home/", "/media/", "/Users/")):
-        raise ValueError(
-            "LAW-01 Anti-Hallucination Citation Gate: `07_METHOD_VAULT` (`METH-XXX`) forbids local file paths as `source_url`. "
-            "Log internal code/heuristics via `propose_idea(is_algorithm=True)` or fetch real literature via `scout_sota(action='search', save_top_k=2)`."
-        )
-    if _SELF_FABRICATED_PATTERNS.search(f"{venue} {title}") and not is_verified_external_url(raw_url):
-        raise ValueError(
-            f"LAW-01 Anti-Hallucination Citation Gate: Rejected self-fabricated venue/card `{venue or title}` without a verified scholarly URL. "
-            "Never disguise internal forensic notes or local heuristics as `METH-XXX` SOTA papers! "
-            "Use `propose_idea(is_algorithm=True)` for internal designs, or run `scout_sota(action='search', save_top_k=2)` for real papers."
-        )
+    if raw_url:
+        parsed = urlparse(raw_url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or "." not in parsed.hostname:
+            raise ValueError(
+                "LAW-01 Structural Citation Gate: `source_url` in `07_METHOD_VAULT` (`METH-XXX`) must be a valid "
+                "`https://` external URL (not a local file path). Use `propose_idea(is_algorithm=True)` for internal designs."
+            )
     if fetched_from_api or is_verified_external_url(raw_url):
         return "VERIFIED_EXTERNAL"
     return "UNVERIFIED_MANUAL"
@@ -95,7 +83,7 @@ def evaluate_stagnation_state(
     track: str = "",
     bottleneck_id: str = "",
 ) -> Dict[str, Any]:
-    """Detect local hill-climbing plateaus (`>=2` consecutive fails, `>=3` flat deltas, or `>=2` failed BNK attempts)."""
+    """Detect local hill-climbing plateaus from typed SQLite `verdict` & `delta_vs_baseline` columns (`0` regexes)."""
     all_exps = store.list_experiments()
     cursor_exp = store.get_meta("last_scout_exp_cursor")
     exps = store.list_experiments(track=track) if track else all_exps
@@ -121,7 +109,7 @@ def evaluate_stagnation_state(
 
     open_bnks = [
         b for b in store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=100)
-        if b.status not in ("RESOLVED", "ARCHIVED", "CONSOLIDATED")
+        if b.status not in ("RESOLVED", "ARCHIVED")
     ]
     unresearched_bnks = [b.id for b in open_bnks if not _verified_cards_for_bnk(store, b.id)]
 

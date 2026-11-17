@@ -5,23 +5,17 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
+from supermemory.cognitive.outcome_ledger import (
+    build_split_consolidation_digest,
+    format_capsule_outcome_blocks,
+)
 from supermemory.models import EdgeType, MemoryEdge, MemoryNode, MemoryTier, NodeType, utc_now_iso
 from supermemory.storage.sqlite_store import GraphStore
 
-_PROCEDURAL_TYPES = {
-    NodeType.LAW.value,
-    NodeType.PROCEDURE.value,
-    NodeType.GATE.value,
-    NodeType.ALGORITHM.value,
-}
+_PROCEDURAL_TYPES = {NodeType.LAW.value, NodeType.PROCEDURE.value, NodeType.GATE.value, NodeType.ALGORITHM.value}
 _SEMANTIC_TYPES = {
-    NodeType.KNOWLEDGE_NODE.value,
-    NodeType.OBSERVATION.value,
-    NodeType.IDEA.value,
-    NodeType.DECISION.value,
-    NodeType.BOTTLENECK.value,
-    NodeType.RESEARCH_QUESTION.value,
-    NodeType.METHOD_CARD.value,
+    NodeType.KNOWLEDGE_NODE.value, NodeType.OBSERVATION.value, NodeType.IDEA.value,
+    NodeType.DECISION.value, NodeType.BOTTLENECK.value, NodeType.RESEARCH_QUESTION.value, NodeType.METHOD_CARD.value,
 }
 
 
@@ -54,7 +48,7 @@ def compute_tier_telemetry(store: GraphStore) -> Dict[str, Any]:
         tier = classify_tier(n)
         counts[tier] = counts.get(tier, 0) + 1
         raw_tokens_by_tier[tier] += _est_tokens(f"{n.title} {n.summary} {n.content}")
-        if n.status == "CONSOLIDATED":
+        if n.status == "CONSOLIDATED" or (n.metadata or {}).get("consolidated"):
             consolidated_count += 1
 
     capsule = build_tiered_capsule(store)
@@ -133,6 +127,7 @@ def build_tiered_capsule(
             else "🏆 Best SOTA: None yet"
         )
         blocks.append((0, f"• [L0 SCOREBOARD] {sota_txt} | Falsified Dead-Ends (Never Repeat): {dead_end_count}"))
+        blocks.extend(format_capsule_outcome_blocks(store))
     if bottlenecks:
         bnk_txt = " | ".join(
             f"`{b.id}`({b.metadata.get('error_share_pct', 0)}% err, +{b.metadata.get('ceiling_gain', 0)} ceil) {b.title[:40]}"
@@ -255,8 +250,10 @@ def consolidate_nodes(
     for src in sources:
         store.add_edge(MemoryEdge(source_id=src.id, target_id=new_id, relation=EdgeType.CONSOLIDATED_INTO.value))
         if classify_tier(src) == MemoryTier.EPISODIC.value and src.node_type != NodeType.LAW.value:
-            src.status = "CONSOLIDATED"
+            src.metadata["consolidated"] = True
             src.metadata["consolidated_into"] = new_id
+            if src.status.upper() not in ("REVERT", "FAILED", "REJECTED", "DISCARD", "EARLY_KILLED"):
+                src.status = "CONSOLIDATED"
             store.upsert_node(src, log_event=False)
             archived_ids.append(src.id)
 
@@ -265,27 +262,27 @@ def consolidate_nodes(
 
 
 def auto_consolidate_episodic(store: GraphStore, min_cluster_size: int = 3) -> Dict[str, Any]:
-    """Automatically group unconsolidated Episodic experiments by track into Semantic summaries."""
+    """Automatically group unconsolidated Episodic experiments by track into split Pass/Fail Semantic digests."""
     exps = [
         n for n in store.list_nodes(node_types=[NodeType.EXPERIMENT.value], limit=2000)
-        if n.status not in ("CONSOLIDATED", "VICTORY_CONFIRMED")
+        if n.status not in ("CONSOLIDATED", "VICTORY_CONFIRMED") and not (n.metadata or {}).get("consolidated")
     ]
     by_track: Dict[str, List[MemoryNode]] = {}
     for n in exps:
-        tr = str(n.metadata.get("track") or "main")
-        by_track.setdefault(tr, []).append(n)
+        by_track.setdefault(str(n.metadata.get("track") or "main"), []).append(n)
 
     created = []
     for tr, items in by_track.items():
         if len(items) >= min_cluster_size:
             batch = items[:-1] if len(items) > min_cluster_size else items
-            bullets = "; ".join(f"{b.id}[{b.status}]: {b.title[:45]}" for b in batch[:8])
+            summary, split_body = build_split_consolidation_digest(store, tr, batch)
             res = consolidate_nodes(
                 store,
                 source_ids=[b.id for b in batch],
                 target_tier=MemoryTier.SEMANTIC.value,
-                title=f"Distilled Track Insights: {tr.upper()} ({len(batch)} runs)",
-                summary=f"Synthesized {len(batch)} episodic runs on `{tr}`: {bullets[:180]}",
+                title=f"Distilled Track Ledger: {tr.upper()} ({len(batch)} runs)",
+                summary=summary,
+                content=split_body,
             )
             created.append(res["created_node"]["id"])
     return {"created_semantic_nodes": created, "count": len(created)}

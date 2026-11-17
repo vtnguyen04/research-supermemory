@@ -218,9 +218,10 @@ def evaluate_occam_gate(
     full_txt = f"{title} {body}"
     sig = extract_mechanism_signature(full_txt, bottleneck_id=bottleneck_id)
     fams = list(sig.get("families") or [])
-    low_txt = full_txt.lower()
+    low_txt = full_txt.lower().replace("-", " ")
     phrase_hits = [p for p in _BLOAT_PHRASES if p in low_txt]
-    inferred_vars = max(int(coupled_vars), len(fams) if len(fams) >= 3 else 1, 2 if phrase_hits else 1)
+    plus_components = (1 + title.count("+")) if title.count("+") >= 2 else 1
+    inferred_vars = max(int(coupled_vars), plus_components, len(fams) if len(fams) >= 3 else 1, 2 if phrase_hits else 1)
 
     warnings: List[str] = []
     if inferred_vars > 1:

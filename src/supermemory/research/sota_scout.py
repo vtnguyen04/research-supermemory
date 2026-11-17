@@ -140,7 +140,7 @@ def register_method_card(
     fetched_from_api: bool = False,
 ) -> Dict[str, Any]:
     """Save a structured SOTA METHOD_CARD into memory/07_METHOD_VAULT and link to Bottleneck."""
-    provenance = validate_method_card_provenance(title, venue, source_url, fetched_from_api=fetched_from_api)
+    provenance = validate_method_card_provenance(source_url, fetched_from_api=fetched_from_api)
     mid = _next_method_id(store)
     vault_dir = store.mem_dir / "07_METHOD_VAULT"
     vault_dir.mkdir(parents=True, exist_ok=True)
