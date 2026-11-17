@@ -7,8 +7,11 @@ from typing import Any, Dict, List
 
 from supermemory.cognitive.outcome_ledger import (
     build_split_consolidation_digest,
+    collect_observation_consolidation_batches,
     format_capsule_outcome_blocks,
+    select_best_sota_experiment,
 )
+from supermemory.graph.auto_linker import repair_orphan_nodes, wire_contextual_edges
 from supermemory.models import EdgeType, MemoryEdge, MemoryNode, MemoryTier, NodeType, utc_now_iso
 from supermemory.storage.sqlite_store import GraphStore
 
@@ -109,10 +112,8 @@ def build_tiered_capsule(
     proposals.sort(key=lambda p: p.id, reverse=True)
     bottlenecks = [b for b in store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=100) if b.status not in ("RESOLVED", "ARCHIVED", "CONSOLIDATED")]
     bottlenecks.sort(key=lambda b: float(b.metadata.get("error_share_pct") or 0.0) * float(b.metadata.get("ceiling_gain") or 0.1), reverse=True)
-    exps_all = store.list_experiments()
-    exps = exps_all[:2]
-    scored_exps = [e for e in exps_all if e.verdict not in ("REVERT", "FAILED", "REJECTED") and (e.test_score is not None or e.cv_score is not None)]
-    sota = max(scored_exps, key=lambda x: float(x.test_score if x.test_score is not None else (x.cv_score or 0.0))) if scored_exps else None
+    exps = store.list_experiments()[:2]
+    sota = select_best_sota_experiment(store)
     dead_end_count = sum(1 for n in store.list_nodes(limit=2000) if n.status in ("REJECTED", "REVERT", "FAILED"))
 
     blocks: List[tuple[int, str]] = [
@@ -249,20 +250,22 @@ def consolidate_nodes(
     archived_ids: List[str] = []
     for src in sources:
         store.add_edge(MemoryEdge(source_id=src.id, target_id=new_id, relation=EdgeType.CONSOLIDATED_INTO.value))
-        if classify_tier(src) == MemoryTier.EPISODIC.value and src.node_type != NodeType.LAW.value:
+        can_archive = classify_tier(src) == MemoryTier.EPISODIC.value or src.node_type == NodeType.OBSERVATION.value
+        if can_archive and src.node_type != NodeType.LAW.value:
             src.metadata["consolidated"] = True
             src.metadata["consolidated_into"] = new_id
-            if src.status.upper() not in ("REVERT", "FAILED", "REJECTED", "DISCARD", "EARLY_KILLED"):
+            if src.status.upper() not in ("REVERT", "FAILED", "REJECTED", "DISCARD", "EARLY_KILLED", "FAILURE_INSIGHT"):
                 src.status = "CONSOLIDATED"
             store.upsert_node(src, log_event=False)
             archived_ids.append(src.id)
-
+    wire_contextual_edges(store, new_id, f"{title} {summary}")
     store.log_event("MEMORY_CONSOLIDATION", new_id, f"Consolidated {[s.id for s in sources]} -> {new_id} ({tier_up})")
     return {"created_node": distilled.to_dict(), "consolidated_sources": archived_ids}
 
 
-def auto_consolidate_episodic(store: GraphStore, min_cluster_size: int = 3) -> Dict[str, Any]:
-    """Automatically group unconsolidated Episodic experiments by track into split Pass/Fail Semantic digests."""
+def auto_consolidate_episodic(store: GraphStore, min_cluster_size: int = 3, repair_fallback: bool = True) -> Dict[str, Any]:
+    """Repair orphans and compact overflow L3 experiments + L2 observations into Semantic syntheses."""
+    orph = repair_orphan_nodes(store, allow_fallback=repair_fallback)
     exps = [
         n for n in store.list_nodes(node_types=[NodeType.EXPERIMENT.value], limit=2000)
         if n.status not in ("CONSOLIDATED", "VICTORY_CONFIRMED") and not (n.metadata or {}).get("consolidated")
@@ -277,12 +280,12 @@ def auto_consolidate_episodic(store: GraphStore, min_cluster_size: int = 3) -> D
             batch = items[:-1] if len(items) > min_cluster_size else items
             summary, split_body = build_split_consolidation_digest(store, tr, batch)
             res = consolidate_nodes(
-                store,
-                source_ids=[b.id for b in batch],
-                target_tier=MemoryTier.SEMANTIC.value,
-                title=f"Distilled Track Ledger: {tr.upper()} ({len(batch)} runs)",
-                summary=summary,
-                content=split_body,
+                store, [b.id for b in batch], MemoryTier.SEMANTIC.value,
+                f"Distilled Track Ledger: {tr.upper()} ({len(batch)} runs)", summary, split_body,
             )
             created.append(res["created_node"]["id"])
-    return {"created_semantic_nodes": created, "count": len(created)}
+
+    for ttl, summ, body, obs_ids in collect_observation_consolidation_batches(store, min_cluster_size=max(3, min_cluster_size)):
+        res = consolidate_nodes(store, obs_ids, MemoryTier.SEMANTIC.value, ttl, summ, body)
+        created.append(res["created_node"]["id"])
+    return {"created_semantic_nodes": created, "count": len(created), "repaired_orphans": orph["repaired_count"]}

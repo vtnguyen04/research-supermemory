@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List, Optional
 
+from supermemory.graph.auto_linker import find_near_duplicate_insights, wire_contextual_edges
 from supermemory.graph.supersession import apply_supersedes_links
 from supermemory.lifecycle.manager import LifecycleManager
 from supermemory.lifecycle.validators import assert_all_steps_completed, validate_insight_schema
@@ -36,6 +37,7 @@ def _mint_insight_node(
     summary: str,
     tier: str = "SEMANTIC",
     note: str = "",
+    context_ids: Optional[Iterable[str]] = None,
 ) -> Dict[str, Any]:
     t_clean = title.strip()[:160]
     s_clean = (summary or title).strip()
@@ -52,8 +54,14 @@ def _mint_insight_node(
             ex.status = "SCIENTIFIC_INSIGHT" if ntype == NodeType.OBSERVATION.value else "ACTIVE"
             ex.metadata.pop("superseded_by", None)
             store.upsert_node(ex, log_event=True)
+            wire_contextual_edges(store, ex.id, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
             return ex.to_dict()
 
+    auto_dups = (
+        find_near_duplicate_insights(store, t_clean, s_clean)
+        if ntype == NodeType.OBSERVATION.value
+        else []
+    )
     nums = [int(m.group(1)) for x in existing for m in [re.match(rf"^{pref}-(\d+)$", x.id)] if m]
     nid = f"{pref}-{(max(nums) + 1) if nums else 1:03d}"
     kn_dir = store.mem_dir / "06_KNOWLEDGE_NODES"
@@ -73,9 +81,12 @@ def _mint_insight_node(
             file_path=rel_path,
             tags=["auto-insight", tier_up.lower()],
             priority=88,
-            metadata={"memory_tier": tier_up, "note": note},
+            metadata={"memory_tier": tier_up, "note": note, "auto_superseded": auto_dups},
         )
     )
+    wire_contextual_edges(store, nid, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
+    if auto_dups:
+        apply_supersedes_links(store, [nid], auto_dups)
     return nd.to_dict()
 
 
@@ -85,10 +96,17 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
     mutated = False
     tier = str(args.get("memory_tier") or MemoryTier.SEMANTIC.value)
     note = str(args.get("note") or "")
+    ctx_ids = [
+        str(u.get("id") or u.get("item_id") or "").strip()
+        for u in (args.get("task_updates") or [])
+        if isinstance(u, dict) and str(u.get("id") or u.get("item_id") or "").strip()
+    ]
 
     if args.get("insight_title") and args.get("insight_summary"):
         captured_insights.append(
-            _mint_insight_node(store, str(args["insight_title"]), str(args["insight_summary"]), tier=tier, note=note)
+            _mint_insight_node(
+                store, str(args["insight_title"]), str(args["insight_summary"]), tier=tier, note=note, context_ids=ctx_ids
+            )
         )
         mutated = True
 
@@ -97,14 +115,16 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
         if not txt:
             continue
         head = txt.split(":", 1)[0].strip() if ":" in txt[:90] else txt[:84]
-        captured_insights.append(_mint_insight_node(store, head, txt, tier=tier, note=note))
+        captured_insights.append(_mint_insight_node(store, head, txt, tier=tier, note=note, context_ids=ctx_ids))
         mutated = True
 
     raw_sup = args.get("supersedes") or []
     sup_list = [s.strip() for s in raw_sup.split(",") if s.strip()] if isinstance(raw_sup, str) else [str(s).strip() for s in raw_sup if str(s).strip()]
-    superseded_ids: List[str] = []
+    superseded_ids: List[str] = [
+        sid for item in captured_insights for sid in ((item.get("metadata") or {}).get("auto_superseded") or [])
+    ]
     if sup_list and captured_insights:
-        superseded_ids = apply_supersedes_links(store, [str(x["id"]) for x in captured_insights], sup_list)
+        superseded_ids.extend(apply_supersedes_links(store, [str(x["id"]) for x in captured_insights], sup_list))
         mutated = True
 
     created_task = None

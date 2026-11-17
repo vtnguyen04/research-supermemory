@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from supermemory.graph.auto_linker import wire_contextual_edges
 from supermemory.graph.supersession import apply_supersedes_links
 from supermemory.lifecycle.validators import validate_experiment_schema
 from supermemory.models import (
@@ -198,6 +199,12 @@ def record_scientific_experiment(
             )
         )
         store.add_edge(MemoryEdge(source_id=obs_id, target_id=exp_id, relation=EdgeType.DERIVED_FROM.value))
+        wire_contextual_edges(
+            store,
+            obs_id,
+            ins_text,
+            context_ids=[exp_id, proposal_id] if proposal_id else [exp_id],
+        )
         observation_ids.append(obs_id)
 
     superseded_ids = apply_supersedes_links(store, observation_ids or [exp_id], supersedes or [])
@@ -206,7 +213,7 @@ def record_scientific_experiment(
     from supermemory.cognitive.tiers import auto_consolidate_episodic
     from supermemory.research.stagnation_guard import sync_stagnation_after_experiment
 
-    auto_cons = auto_consolidate_episodic(store, min_cluster_size=6)
+    auto_cons = auto_consolidate_episodic(store, min_cluster_size=6, repair_fallback=False)
     stagnation_alert = sync_stagnation_after_experiment(store, clean_track)
 
     out_payload: Dict[str, Any] = {

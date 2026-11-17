@@ -2,6 +2,7 @@
 (function () {
   const { esc } = window.SuperMemoryIcons;
   const { ACCENTS, LANES, CARD_W, CARD_H, cleanTitle, stepForce, computeLayout } = window.SuperMemoryGraphLayouts;
+  const isAuxOrMerged = (n) => n.node_type === "AGENT_RUN" || n.status === "CONSOLIDATED" || n.status === "SUPERSEDED" || Boolean(n.metadata?.consolidated || n.metadata?.superseded_by);
 
   class ForceGraphCanvas {
     constructor(canvas, tooltip, onSelectNode, onStats) {
@@ -27,8 +28,12 @@
     relayout() { this.nodes.forEach((n) => { n.pinned = false; }); this._applyLayout(true); }
 
     _visibleNodes() {
-      return this.nodes.filter((n) => (this.activeTier === "ALL" || n.memory_tier === this.activeTier) &&
-        (this.activeType === "ALL" || n.node_type === this.activeType) && (!this.hideAux || this.activeType === "AGENT_RUN" || n.node_type !== "AGENT_RUN"));
+      const base = this.nodes.filter((n) => (this.activeTier === "ALL" || n.memory_tier === this.activeTier) &&
+        (this.activeType === "ALL" || n.node_type === this.activeType) && (!this.hideAux || n.id === this.selectedId || this.activeType === n.node_type || (!isAuxOrMerged(n) && n.status !== "ARCHIVED")));
+      if (!this.hideAux || this.activeType !== "ALL" || base.length <= 45) return base;
+      const bSet = new Set(base.map((n) => n.id)), linked = new Set();
+      this.edges.forEach((e) => { if (bSet.has(e.source_id) && bSet.has(e.target_id)) { linked.add(e.source_id); linked.add(e.target_id); } });
+      return base.filter((n) => n.node_type !== "OBSERVATION" || linked.has(n.id) || n.id === this.selectedId || this.highlightIds.has(n.id));
     }
 
     _emitStats(vis) {
@@ -39,7 +44,8 @@
 
     focusNode(id) {
       const n = this.nodeMap.get(id); if (!n) return false;
-      if (n.node_type === "AGENT_RUN" && this.hideAux) this.hideAux = false;
+      this.selectedId = id;
+      if ((isAuxOrMerged(n) || n.status === "ARCHIVED") && this.hideAux) { this.hideAux = false; const chk = document.getElementById("chk-hide-aux"); if (chk) chk.checked = false; }
       if (this.activeTier !== "ALL" && n.memory_tier !== this.activeTier) this.activeTier = "ALL";
       if (this.activeType !== "ALL" && n.node_type !== this.activeType) this.activeType = "ALL";
       this._applyLayout(false); this.hoveredId = null; this.selectedId = id;

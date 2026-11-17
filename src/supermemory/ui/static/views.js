@@ -74,14 +74,15 @@
     sel.innerHTML = `<option value="ALL">${tr("All Tracks", "Tất cả nhánh")} (${exps.length})</option>` + tracks.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
     sel.value = tracks.includes(cur) ? cur : "ALL";
     const vMode = vSel?.value || "ALL", sMode = sSel?.value || "NEWEST";
-    const numScore = (e) => (typeof e.test_score === "number" ? e.test_score : typeof e.cv_score === "number" ? e.cv_score : -Infinity);
+    const dir = (sel.value !== "ALL" && state.metric_direction_by_track?.[sel.value]) || state.metric_direction || "higher_is_better", minBetter = dir === "lower_is_better";
+    const numScore = (e) => (typeof e.test_score === "number" ? e.test_score : typeof e.cv_score === "number" ? e.cv_score : null);
     let filtered = exps.filter((e) => (sel.value === "ALL" || e.track === sel.value) &&
-      (vMode === "ALL" || (vMode === "WINNERS" ? ["VICTORY_CONFIRMED", "KEEP"].includes(e.verdict) : ["REVERT", "FAILED", "DISCARD"].includes(e.verdict))));
+      (vMode === "ALL" || (vMode === "WINNERS" ? ["VICTORY_CONFIRMED", "KEEP"].includes(e.verdict) : ["REVERT", "FAILED", "DISCARD", "EARLY_KILLED"].includes(e.verdict))));
     if (sMode === "NEWEST") filtered = [...filtered].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")) || String(b.exp_id || "").localeCompare(String(a.exp_id || "")));
-    else if (sMode === "SCORE") filtered = [...filtered].sort((a, b) => numScore(b) - numScore(a));
-    else if (sMode === "DELTA") filtered = [...filtered].sort((a, b) => (b.delta_vs_baseline ?? -Infinity) - (a.delta_vs_baseline ?? -Infinity));
+    else if (sMode === "SCORE") filtered = [...filtered].sort((a, b) => { const sa = numScore(a), sb = numScore(b); return sa === null && sb === null ? 0 : sa === null ? 1 : sb === null ? -1 : minBetter ? sa - sb : sb - sa; });
+    else if (sMode === "DELTA") filtered = [...filtered].sort((a, b) => { const da = a.delta_vs_baseline, db = b.delta_vs_baseline; return da == null && db == null ? 0 : da == null ? 1 : db == null ? -1 : minBetter ? da - db : db - da; });
 
-    const chart = document.getElementById("exp-chart-box"), scored = [...filtered].reverse().filter((e) => Number.isFinite(numScore(e)));
+    const chart = document.getElementById("exp-chart-box"), scored = [...filtered].reverse().filter((e) => numScore(e) !== null);
     if (scored.length >= 2) {
       const vals = scored.map(numScore), minV = Math.min(...vals), maxV = Math.max(...vals), span = maxV - minV || 1, W = 1120, H = 152, px = 84, py = 28;
       const fmtV = (v) => (Math.abs(v) > 0 && Math.abs(v) < 1 ? v.toFixed(4) : Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(1));
@@ -127,7 +128,7 @@
     grid.innerHTML = pgProps.slice.length ? pgProps.slice.map((p) => {
       const idx = stages.indexOf(p.status); let acts = `<button type="button" class="btn btn-ghost btn-xs" data-nid="${esc(p.id)}">${tr("Details", "Chi tiết")}</button>`;
       if (idx >= 0 && idx < 3) acts += `<button type="button" class="btn btn-secondary btn-xs" data-prop-adv="${esc(p.id)}" data-next="${stages[idx + 1]}">${tr("To", "Sang")} ${stages[idx + 1]}</button>`;
-      if (p.status !== "AUDITED" && p.status !== "ARCHIVED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-audit="${esc(p.id)}">${tr("Approve Audit", "Duyệt Audit")}</button>`;
+      if (p.status !== "AUDITED" && p.status !== "ARCHIVED" && p.status !== "REJECTED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-audit="${esc(p.id)}">${tr("Approve Audit", "Duyệt Audit")}</button>`;
       if (p.status === "AUDITED") acts += `<button type="button" class="btn btn-primary btn-xs" data-prop-adv="${esc(p.id)}" data-next="ARCHIVED">${tr("Archive", "Lưu trữ")}</button>`;
       return `<div class="ledger-panel prop-card"><div class="ledger-item-static"><button type="button" class="row-trigger" data-nid="${esc(p.id)}" title="${esc(p.title)}"><span class="row-top"><span class="mono-id">${esc(p.id)}</span>${statusTag(p.status)}</span><span class="row-title">${esc(cleanText(p.title, 78))}</span><span class="row-desc line-clamp-3">${esc(cleanText(p.summary, 135))}</span></button><div class="row-actions">${acts}</div></div></div>`;
     }).join("") : `<div class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No proposals in this stage", "Không có Proposal ở giai đoạn này")}</p></div></div>`;
@@ -136,14 +137,14 @@
     grid.querySelectorAll("[data-prop-audit]").forEach((b) => b.addEventListener("click", () => h.onAuditProposal(b.dataset.propAudit)));
 
     const allIdeas = (state.nodes || []).filter((n) => ["IDEA", "ALGORITHM", "OBSERVATION", "KNOWLEDGE_NODE"].includes(n.node_type) && matchQ(q, n.id, n.title, n.summary)).sort(sortNewest);
-    const vBar = document.getElementById("vault-type-bar");
-    const vOpts = [["ALL", `${tr("All", "Tất cả")} (${allIdeas.length})`], ["OBSERVATION", `${tr("Insights", "Insights")} (${allIdeas.filter((x) => x.node_type === "OBSERVATION").length})`], ["ALGORITHM", `${tr("Algorithms", "Thuật toán")} (${allIdeas.filter((x) => x.node_type === "ALGORITHM").length})`], ["IDEA", `Ideas (${allIdeas.filter((x) => x.node_type === "IDEA").length})`], ["DEAD_END", `Dead-Ends (${allIdeas.filter((x) => x.status === "REJECTED").length})`]];
+    const vBar = document.getElementById("vault-type-bar"), isDead = (x) => x.status === "REJECTED" || x.status === "FAILURE_INSIGHT";
+    const vOpts = [["ALL", `${tr("All", "Tất cả")} (${allIdeas.length})`], ["OBSERVATION", `${tr("Insights", "Insights")} (${allIdeas.filter((x) => x.node_type === "OBSERVATION").length})`], ["ALGORITHM", `${tr("Algorithms", "Thuật toán")} (${allIdeas.filter((x) => x.node_type === "ALGORITHM").length})`], ["IDEA", `Ideas (${allIdeas.filter((x) => x.node_type === "IDEA").length})`], ["DEAD_END", `Dead-Ends (${allIdeas.filter(isDead).length})`]];
     vBar.innerHTML = vOpts.map(([k, lbl]) => `<button type="button" class="seg-btn" aria-pressed="${activeVaultType === k}" data-vtype="${k}">${esc(lbl)}</button>`).join("");
     vBar.querySelectorAll("[data-vtype]").forEach((b) => b.addEventListener("click", () => { activeVaultType = b.dataset.vtype; renderLifecycle(state, h); }));
-    const ideas = activeVaultType === "ALL" ? allIdeas : activeVaultType === "DEAD_END" ? allIdeas.filter((x) => x.status === "REJECTED") : allIdeas.filter((x) => x.node_type === activeVaultType);
+    const ideas = activeVaultType === "ALL" ? allIdeas : activeVaultType === "DEAD_END" ? allIdeas.filter(isDead) : allIdeas.filter((x) => x.node_type === activeVaultType);
     const shortType = { OBSERVATION: "INSIGHT", KNOWLEDGE_NODE: "KNOWLEDGE", ALGORITHM: "ALGO" };
     const pgIdeas = paginate(ideas, `ideas-${activeVaultType}`, 6), ideasGrid = document.getElementById("ideas-grid");
-    ideasGrid.innerHTML = ideas.length ? pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel idea-card"><button type="button" class="ledger-row" data-nid="${esc(n.id)}" title="${esc(n.title)}"><span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, shortType[n.node_type] || n.node_type)}</span><span class="row-title">${esc(cleanText(n.title, 78))}</span><span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 135))}</span></button></div>`).join("") : `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No vault items match filter", "Không có mục nào khớp bộ lọc")}</p></div></div>`;
+    ideasGrid.innerHTML = ideas.length ? pgIdeas.slice.map((n) => `<div role="listitem" class="ledger-panel idea-card"><button type="button" class="ledger-row" data-nid="${esc(n.id)}" title="${esc(n.title)}"><span class="row-top"><span class="mono-id">${esc(n.id)}</span>${statusTag(n.status, n.metadata?.superseded_by ? `SUPERSEDED → ${n.metadata.superseded_by}` : (shortType[n.node_type] || n.node_type))}</span><span class="row-title">${esc(cleanText(n.title, 78))}</span><span class="row-desc line-clamp-3">${esc(cleanText(n.summary, 135))}</span></button></div>`).join("") : `<div role="listitem" class="ledger-panel"><div class="empty-state"><p class="empty-title">${tr("No vault items match filter", "Không có mục nào khớp bộ lọc")}</p></div></div>`;
     document.getElementById("ideas-pager").innerHTML = pgIdeas.html; bindInspectTriggers(ideasGrid, h.onInspect); bindPagers(root, () => renderLifecycle(state, h));
   }
 

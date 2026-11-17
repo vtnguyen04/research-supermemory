@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from supermemory.cognitive.outcome_ledger import infer_metric_direction
 from supermemory.kernel import execute_command
 from supermemory.models import NodeType
 from supermemory.research.bottleneck_engine import rank_bottlenecks
@@ -19,11 +20,14 @@ _RESEARCH_ROUTE_TO_CMD = {
 
 
 def enrich_graph_payload_v3(store: GraphStore, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Attach Bottlenecks, SOTA Method Cards, Fast-DAG tasks, and Kanban execution KPIs."""
+    """Attach Bottlenecks, SOTA Method Cards, Fast-DAG tasks, Kanban KPIs, and metric direction."""
     payload["bottlenecks"] = rank_bottlenecks(store, include_resolved=True)
     payload["method_cards"] = [
         n.to_dict() for n in store.list_nodes(node_types=[NodeType.METHOD_CARD.value], limit=200)
     ]
+    tracks = {e.track for e in store.list_experiments() if e.track}
+    payload["metric_direction"] = infer_metric_direction(store)
+    payload["metric_direction_by_track"] = {tr: infer_metric_direction(store, track=tr) for tr in tracks}
     tasks = [t.to_dict() for t in list_tasks(store)]
     telemetry = dag_telemetry(store)
     payload["execution_overview"] = enrich_execution_state(

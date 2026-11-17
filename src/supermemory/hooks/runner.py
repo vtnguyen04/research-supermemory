@@ -20,7 +20,24 @@ from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
 from supermemory.storage.sqlite_store import GraphStore
 
-_EXPLICIT_ID_RE = re.compile(r"\b(?:BNK|RQ|METH|EXP|OBS|PROC|PROP|IDEA|ALGO|LESSON|DAG)-\d+\b", re.IGNORECASE)
+_EXPLICIT_ID_RE = re.compile(r"\b(?:BNK|RQ|METH|EXP|OBS|PROC|PROP|IDEA|ALGO|LESSON|DAG)-\d+[A-Z0-9-]*\b", re.IGNORECASE)
+_WORD4_RE = re.compile(r"[0-9a-zA-Z_\u00C0-\u1EF9]{4,}")
+_FUNC_WORDS = {
+    "this", "that", "with", "from", "have", "what", "when", "where", "which", "there", "their", "about",
+    "những", "được", "không", "trong", "đang", "phải", "nhiều", "nhưng", "chưa", "xem", "hiện",
+}
+
+
+def _has_content_overlap(query: str, hit: Dict[str, Any]) -> bool:
+    hid = str(hit.get("id") or "").upper()
+    if hid and hid in query.upper():
+        return True
+    q_words = {w.lower() for w in _WORD4_RE.findall(query)} - _FUNC_WORDS
+    if not q_words:
+        return False
+    d_txt = f"{hit.get('title', '')} {hit.get('summary', '')}"
+    d_words = {w.lower() for w in _WORD4_RE.findall(d_txt)} - _FUNC_WORDS
+    return bool(q_words & d_words)
 
 
 def _resolve_supermemory_workspace(payload: Dict[str, Any]) -> Optional[Path]:
@@ -164,7 +181,9 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
             )
             results = rec.get("results") or []
             seen_warns = set(st.get("recalled_warnings") or [])
-            if rec.get("anti_repeat_warnings") and any(float(r.get("score") or 0.0) >= 0.22 for r in results):
+            if rec.get("anti_repeat_warnings") and any(
+                float(r.get("score") or 0.0) >= 0.28 and _has_content_overlap(clean_in, r) for r in results
+            ):
                 fresh_warns = [w for w in rec["anti_repeat_warnings"] if w not in seen_warns][:3]
                 if fresh_warns:
                     injected_msgs.append("⚠️ SUPERMEMORY ANTI-REPEAT RECALL:\n" + "\n".join(f"  • {w}" for w in fresh_warns))
@@ -174,9 +193,10 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
             fresh_hits = [
                 r
                 for r in results
-                if float(r.get("score") or 0.0) >= 0.26
+                if float(r.get("score") or 0.0) >= 0.30
+                and _has_content_overlap(clean_in, r)
                 and not r.get("superseded_by")
-                and r.get("status") != "SUPERSEDED"
+                and r.get("status") not in ("SUPERSEDED", "CONSOLIDATED")
                 and r.get("type") not in ("LAW", "GATE")
                 and str(r.get("id")) not in seen_ids
             ][:3]

@@ -8,6 +8,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from supermemory.models import AgentTask, utc_now_iso
+from supermemory.research.stagnation_guard import count_untried_candidates
 from supermemory.storage.sqlite_store import GraphStore
 
 
@@ -155,11 +156,15 @@ def plan_research_sprint(
         return (cut[:sp] if sp > cap // 2 else cut).rstrip(" ,;:-(") + "…"
 
     g_short = _clip_goal(goal, 52)
-    specs = [
+    untried = count_untried_candidates(store, tgt)
+    specs: List[tuple[str, int, str, str, str, List[str], List[str], str]] = [
         (ids[0], 1, "bottleneck-profiler", f"Profile Error Slices: {g_short}",
          "Decompose validation errors/regret by slice; register `BNK-XXX` + falsifiable `RQ-XXX`.", [], [], ""),
-        (ids[1], 1, "sota-scout", f"Scout SOTA Cards: {g_short}",
-         "Query arXiv/Semantic Scholar/OpenAlex (SQLite cached) and mint `METH-XXX` cards with integration hooks.", [], [], ""),
+        (ids[1], 1, "memory-curator", f"Audit {untried} Untried Vault Mechanisms: {g_short}",
+         "Rank existing untried `IDEA`/`ALGO`/`METH` vault candidates before external search (Information-Gap rule).", [], [], "")
+        if untried > 0
+        else (ids[1], 1, "sota-scout", f"Scout SOTA Cards: {g_short}",
+              "Query arXiv/Semantic Scholar/OpenAlex (SQLite cached) and mint `METH-XXX` cards with integration hooks.", [], [], ""),
         (ids[2], 1, "memory-curator", "Federated + Sibling Vault Recall & Dead-End Check",
          "Run hybrid utility recall (`include_siblings=True`) to surface reusable wins and dead-end fingerprints.", [], [], ""),
         (ids[3], 2, "hypothesis-architect", "Synthesize High-Occam-ROI Single-Variable Spec",

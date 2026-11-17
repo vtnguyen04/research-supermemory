@@ -1,6 +1,7 @@
 // 4-Tier Cognitive Hierarchy & Paginated Memory Consolidation Workbench Controller
 (function () {
   const { esc, statusTag, paginate, bindPagers, tr, cleanText } = window.SuperMemoryIcons;
+  const isCons = (n) => n.status === "CONSOLIDATED" || n.status === "SUPERSEDED" || Boolean(n.metadata?.consolidated);
 
   class MergeStudioController {
     constructor(getState, postJson, onRefresh, onInspect, notify) {
@@ -30,7 +31,7 @@
       box.innerHTML = cols
         .map((c) => {
           const items = (state.nodes || []).filter((n) => {
-            if (n.memory_tier !== c.key || (hideCons && n.status === "CONSOLIDATED")) return false;
+            if (n.memory_tier !== c.key || (hideCons && isCons(n))) return false;
             return !q || `${n.id} ${n.title} ${n.summary} ${n.node_type}`.toLowerCase().includes(q);
           });
           const pg = paginate(items, `tier-${c.key}`, 5);
@@ -83,7 +84,7 @@
       });
       document.getElementById("btn-select-episodic").addEventListener("click", () => {
         (this.getState().nodes || [])
-          .filter((n) => n.memory_tier === "EPISODIC" && n.status !== "CONSOLIDATED")
+          .filter((n) => n.memory_tier === "EPISODIC" && !isCons(n) && n.status !== "VICTORY_CONFIRMED")
           .forEach((n) => this.selectedIds.add(n.id));
         this.render();
       });

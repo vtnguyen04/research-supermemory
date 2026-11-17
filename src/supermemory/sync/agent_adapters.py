@@ -89,7 +89,8 @@ def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True
         claude_path.write_text("@AGENTS.md\n", encoding="utf-8")
         written["CLAUDE.md"] = str(claude_path)
 
-    if install_workspace_hooks:
+    has_global_plugin = (Path.home() / ".gemini" / "config" / "plugins" / "supermemory").is_dir()
+    if install_workspace_hooks and not has_global_plugin:
         hooks_path = root / ".agents" / "hooks.json"
         hooks_path.parent.mkdir(parents=True, exist_ok=True)
         if not hooks_path.exists():
@@ -112,11 +113,17 @@ def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True
 
 def generate_handoff_briefing(store: GraphStore) -> Path:
     """Create a comprehensive compaction-proof & cross-agent HANDOFF_BRIEFING.md."""
+    from supermemory.cognitive.tiers import build_tiered_capsule
+
     qe = QueryEngine(store)
-    capsule = qe.build_session_capsule()
+    capsule = build_tiered_capsule(store)
     analytics = qe.graph_analytics()
-    lessons = store.list_nodes(node_types=[NodeType.LESSON.value], limit=10)
-    exps = store.list_experiments()[-6:]
+    lessons = sorted(
+        store.list_nodes(node_types=[NodeType.LESSON.value], limit=200),
+        key=lambda x: (x.created_at, x.id),
+        reverse=True,
+    )[:8]
+    exps = store.list_experiments()[:6]
 
     lines: List[str] = [
         "# 🤝 SUPERMEMORY ZERO-LOSS AGENT HANDOFF BRIEFING",
@@ -133,14 +140,14 @@ def generate_handoff_briefing(store: GraphStore) -> Path:
         "",
     ]
     if lessons:
-        for ls in lessons[-6:]:
+        for ls in lessons:
             lines.append(f"- **`{ls.id}`** ({ls.title}): {ls.summary}")
     else:
         lines.append("- None recorded yet.")
 
     lines.extend(["", "## 3. Recent Experiment Lineage", ""])
     if exps:
-        for ex in reversed(exps):
+        for ex in exps:
             lines.append(
                 f"- **`{ex.exp_id}`** [`{ex.track}` / `{ex.verdict}`]: {ex.title} | "
                 f"CV=`{ex.cv_summary}` | Test=`{ex.test_summary}` | Post-Mortem: {ex.post_mortem[:140]}"

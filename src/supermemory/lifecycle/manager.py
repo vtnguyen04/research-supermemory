@@ -6,6 +6,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from supermemory.cognitive.novelty_guard import enforce_novelty_against_history, extract_mechanism_signature
+from supermemory.graph.auto_linker import wire_contextual_edges
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.lifecycle.experiments import record_scientific_experiment
 from supermemory.lifecycle.validators import assert_all_steps_completed, validate_proposal_schema
@@ -117,8 +118,15 @@ class LifecycleManager:
         )
         for src_id in inspired_by or []:
             self.store.add_edge(MemoryEdge(source_id=src_id, target_id=nid, relation=EdgeType.INSPIRED.value))
-        if bottleneck_id and self.store.get_node(bottleneck_id):
-            self.store.add_edge(MemoryEdge(source_id=nid, target_id=bottleneck_id, relation=EdgeType.CANDIDATE_FOR.value))
+        eff_bnk = str(occam.get("bottleneck_id") or bottleneck_id).strip()
+        if eff_bnk and self.store.get_node(eff_bnk):
+            self.store.add_edge(MemoryEdge(source_id=nid, target_id=eff_bnk, relation=EdgeType.CANDIDATE_FOR.value))
+        wire_contextual_edges(
+            self.store,
+            nid,
+            f"{title} {summary} {invariants} {novelty_diff}",
+            context_ids=[eff_bnk] if eff_bnk else None,
+        )
         return {"node": node.to_dict(), "occam": occam, "prior_warnings": prior["anti_repeat_warnings"]}
 
     def create_proposal(
@@ -198,6 +206,12 @@ class LifecycleManager:
             self.store.add_edge(MemoryEdge(source_id=iid, target_id=pid, relation=EdgeType.PROMOTED_TO.value))
         if occam["bottleneck_id"] and self.store.get_node(occam["bottleneck_id"]):
             self.store.add_edge(MemoryEdge(source_id=pid, target_id=occam["bottleneck_id"], relation=EdgeType.CANDIDATE_FOR.value))
+        wire_contextual_edges(
+            self.store,
+            pid,
+            f"{title} {why} {what_changes} {design_notes}",
+            context_ids=[occam["bottleneck_id"]] if occam["bottleneck_id"] else None,
+        )
         return {"proposal_id": pid, "stage": stage, "path": rel_dir, "occam": occam, "node": node.to_dict()}
 
     def advance_proposal(self, proposal_id: str, new_stage: str, note: str = "") -> MemoryNode:

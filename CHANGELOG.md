@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [3.6.0] - 2026-11-17
+
+### Added
+- **Zero-Orphan Contextual Auto-Linker & Near-Duplicate Insight Supersession (`graph/auto_linker.py`, `checkpoint_sync.py`, `lifecycle/manager.py`):** Automatically wires `DERIVED_FROM` / `CANDIDATE_FOR` / `REFERENCES` edges from explicit graph ID mentions or active `PROPOSAL`/`BOTTLENECK`/`LAW` anchors whenever `OBS`, `ALGO`, `IDEA`, or `PROP` nodes are minted (`0` degree-0 perimeter orphans, without fabricating `EXPERIMENT` utility links), and automatically supersedes near-duplicate positive `OBSERVATION` notes (`>= 0.66` hybrid similarity).
+- **L2 Observation Cluster Compaction & Retroactive Orphan Repair (`outcome_ledger.py`, `tiers.py`):** Extended `consolidate_nodes` and `auto_consolidate_episodic` to backfill edges on legacy degree-0 orphans (`repair_orphan_nodes`) and compact overflow L2 `OBSERVATION` clusters (`> 24` active insights) into topic-grouped `SEM-XXX` syntheses while preserving `FAILURE_INSIGHT` warnings and newest working observations.
+- **Structural Metric-Direction Inference (`outcome_ledger.py`, `tiers.py`, `ui/api_research.py`):** Added `infer_metric_direction` (`lower_is_better` vs `higher_is_better` inferred from typed `KEEP`/`REVERT` `delta_vs_baseline` signs with `0` regexes) so `build_tiered_capsule` (`🏆 Best SOTA`) and Web Studio `Experiment Ledger` (`Sort: Best Score` / `Sort: Best Delta`) rank minimization benchmarks (`Regret`, `RMSE`, `MAE`, `LogLoss`) accurately via `min()`.
+
+### Fixed
+- **Active Core Graph Decluttering & Web Studio Filters (`graph_canvas.js`, `views.js`, `merge_studio.js`, `index.html`):** Upgraded `Active Core` (`chk-hide-aux`) to hide `AGENT_RUN`, `CONSOLIDATED`, and `SUPERSEDED` historical nodes by default on dense 450+ node graphs (auto-expanding on `focusNode`), included `FAILURE_INSIGHT` in `Proposals & Ideas -> Dead-Ends`, surfaced `SUPERSEDED -> <ID>` badges, and honored `metadata.consolidated` in Merge Studio.
+- **Information-Gap Sprint Planning, High-Precision Hook Auto-Recall & Handoff Slicing (`orchestrator.py`, `runner.py`, `agent_adapters.py`):** Updated `plan_research_sprint` Wave-1 to audit untried vault mechanisms instead of forcing external `sota-scout` when `count_untried_candidates > 0`, required content-word/ID overlap (`score >= 0.30`) in `PreInvocation` auto-recall to eliminate 3-gram false hits, fixed `HANDOFF_BRIEFING.md` newest-first slicing (`exps[:6]`, `lessons[:8]` from `limit=200`, lazy `build_tiered_capsule`), and skipped duplicate workspace `.agents/hooks.json` generation when the global Antigravity plugin is installed.
+
+---
+
 ## [3.5.2] - 2026-11-17
 
 ### Fixed
