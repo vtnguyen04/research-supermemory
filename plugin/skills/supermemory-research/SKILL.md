@@ -1,14 +1,14 @@
 ---
 name: supermemory-research
-description: Bottleneck-First Research Loop — profile Pareto error slices (BNK-XXX + RQ-XXX), scout SOTA literature into 07_METHOD_VAULT (METH-XXX), and enforce Occam's Razor ROI against bloated kitchen-sink ideas.
+description: Bottleneck-First & Anti-Stagnation Research Loop — profile Pareto error slices (BNK-XXX + RQ-XXX), scout verified external SOTA literature into 07_METHOD_VAULT (METH-XXX), and break local hill-climbing plateaus.
 ---
 
-# SuperMemory v3.0 Bottleneck-First Research Skill
+# SuperMemory v3.5 Bottleneck-First & Anti-Stagnation Research Skill
 
-Use this skill whenever starting R&D, diagnosing model/system bottlenecks, searching SOTA literature, or formulating new research hypotheses.
+Use this skill whenever starting R&D, diagnosing bottlenecks, hitting an experiment plateau (`>= 2` failed/reverted runs or `>= 3` flat tweaks), or searching external SOTA literature.
 
-## 4-Step Bottleneck-First Protocol
-1. **Cross-Workspace & Hybrid Utility Recall:** Call `recall(query=..., include_siblings=true)` to retrieve high-utility insights, reusable `METHOD_CARD`s across sibling repos, and structural dead-end fingerprints.
-2. **Quantify the Pareto Bottleneck First (No Blind Ideation):** Decompose errors/regret on validation slices and call `diagnose_bottleneck(action="diagnose", title=..., evidence_slice=..., error_share_pct=..., ceiling_gain=..., falsifiable_rq=..., kill_criterion=...)` to mint `BNK-XXX` + `RQ-XXX`.
-3. **Scout SOTA Methods into `07_METHOD_VAULT`:** Call `scout_sota(action="search", query=..., bottleneck_id="BNK-001", save_top_k=2)` (or `action="register_card"`) to store concise `METH-XXX` cards with core math mechanism, failure assumptions, complexity cost, and `< 100 LOC` integration hook.
-4. **Occam's Razor ROI Gate:** Call `diagnose_bottleneck(action="propose_hypothesis", bottleneck_id="BNK-001", coupled_vars=1, est_loc=..., kill_criterion=...)`. Never couple multiple paradigms in one experiment; let `Occam ROI` select the simplest high-ceiling mechanism.
+## 4-Step Anti-Stagnation & Zero-Hallucination Protocol
+1. **Cross-Workspace Recall:** Call `recall(query=..., include_siblings=true)` to surface current non-superseded insights, reusable `METHOD_CARD`s, and `Dead-End` warnings.
+2. **Quantify the Pareto Bottleneck First:** Decompose validation failure slices and call `diagnose_bottleneck(action="diagnose", title=..., evidence_slice=..., error_share_pct=..., ceiling_gain=..., falsifiable_rq=..., kill_criterion=...)` (`BNK-XXX` + `RQ-XXX`).
+3. **Scout Verified External SOTA (`07_METHOD_VAULT`):** Call `scout_sota(action="search", query=..., bottleneck_id="BNK-...", save_top_k=2)` (or `search_web` + `scout_sota(action="register_card", source_url="https://arxiv.org/...")`). **Strict Citation Gate:** `METH-XXX` is strictly for external scholarly papers/repositories — NEVER register internal forensic notes or local heuristics as fake papers (use `propose_idea(is_algorithm=True)` for internal designs).
+4. **Occam Single-Variable Spec:** Create a single-variable proposal via `manage_proposal(bottleneck_id="BNK-...", coupled_vars=1, tasks=[...])` and tick each Kanban subtask via `checkpoint(task_updates=[...])` as you execute.

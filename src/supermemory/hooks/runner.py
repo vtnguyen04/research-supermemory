@@ -15,6 +15,7 @@ from supermemory.hooks.claude_bridge import format_hook_output, normalize_hook_i
 from supermemory.hooks.turn_tracker import evaluate_stop_gate, track_post_tool_use
 from supermemory.models import NodeType
 from supermemory.research.kanban_digest import build_kanban_board_digest
+from supermemory.research.stagnation_guard import evaluate_stagnation_state
 from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
 from supermemory.storage.sqlite_store import GraphStore
@@ -130,6 +131,13 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
             injected_msgs.append(kb_digest)
             st["last_kanban_fp"] = kb_fp
             st["last_kanban_inv"] = inv_num
+
+        if store.get_meta("stagnation_alert"):
+            stag = evaluate_stagnation_state(store)
+            if stag["locked"]:
+                injected_msgs.append(str(stag["directive"]))
+            else:
+                store.set_meta("stagnation_alert", "")
 
         sig = SelfLearningDetector.analyze(user_input)
         if sig.requires_lesson:

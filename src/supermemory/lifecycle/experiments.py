@@ -199,10 +199,12 @@ def record_scientific_experiment(
 
     # Autonomous REM-sleep consolidation on long-horizon runs (>= 6 unconsolidated episodic runs/track)
     from supermemory.cognitive.tiers import auto_consolidate_episodic
+    from supermemory.research.stagnation_guard import sync_stagnation_after_experiment
 
     auto_cons = auto_consolidate_episodic(store, min_cluster_size=6)
+    stagnation_alert = sync_stagnation_after_experiment(store, clean_track)
 
-    return {
+    out_payload: Dict[str, Any] = {
         "exp_id": exp_id,
         "delta_vs_baseline": delta,
         "regression_detected": regression_detected,
@@ -211,3 +213,6 @@ def record_scientific_experiment(
         "auto_consolidated_nodes": auto_cons.get("created_semantic_nodes", []),
         "log_path": rel_log,
     }
+    if stagnation_alert:
+        out_payload["stagnation_alert"] = stagnation_alert
+    return out_payload

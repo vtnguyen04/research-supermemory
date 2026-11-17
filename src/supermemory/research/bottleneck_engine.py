@@ -118,7 +118,15 @@ def diagnose_bottleneck(
         )
     )
     store.add_edge(MemoryEdge(source_id=rq_id, target_id=bnk_id, relation=EdgeType.DIAGNOSES.value))
-    return {"bottleneck": bnk_node.to_dict(), "research_question": rq_node.to_dict(), "pareto_priority": pareto_priority}
+    return {
+        "bottleneck": bnk_node.to_dict(),
+        "research_question": rq_node.to_dict(),
+        "pareto_priority": pareto_priority,
+        "next_research_action": (
+            f"Scout external SOTA literature for `{bnk_id}` BEFORE proposing local heuristics: "
+            f"`scout_sota(action='search', query='<mechanism for {title[:40]}>', bottleneck_id='{bnk_id}', save_top_k=2)`"
+        ),
+    }
 
 
 def resolve_bottleneck(

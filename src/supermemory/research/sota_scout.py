@@ -15,6 +15,10 @@ from typing import Any, Dict, List, Optional, Sequence
 from supermemory.cognitive.novelty_guard import extract_mechanism_signature
 from supermemory.graph.hybrid_ranker import build_sparse_features
 from supermemory.models import EdgeType, MemoryEdge, MemoryNode, NodeType, utc_now_iso
+from supermemory.research.stagnation_guard import (
+    record_verified_scout_cursor,
+    validate_method_card_provenance,
+)
 from supermemory.storage.sqlite_store import GraphStore
 
 _ARXIV_NS = {"atom": "http://www.w3.org/2005/Atom"}
@@ -133,8 +137,10 @@ def register_method_card(
     venue: str = "",
     year: int = 2025,
     bottleneck_id: str = "",
+    fetched_from_api: bool = False,
 ) -> Dict[str, Any]:
     """Save a structured SOTA METHOD_CARD into memory/07_METHOD_VAULT and link to Bottleneck."""
+    provenance = validate_method_card_provenance(title, venue, source_url, fetched_from_api=fetched_from_api)
     mid = _next_method_id(store)
     vault_dir = store.mem_dir / "07_METHOD_VAULT"
     vault_dir.mkdir(parents=True, exist_ok=True)
@@ -172,12 +178,14 @@ def register_method_card(
                 "source_url": source_url,
                 "venue": venue,
                 "year": year,
+                "provenance": provenance,
                 "mechanism_fingerprint": sig,
             },
         )
     )
     if bottleneck_id and store.get_node(bottleneck_id):
         store.add_edge(MemoryEdge(source_id=mid, target_id=bottleneck_id, relation=EdgeType.CANDIDATE_FOR.value))
+    record_verified_scout_cursor(store, provenance, bottleneck_id=bottleneck_id)
     return node.to_dict()
 
 
@@ -237,7 +245,10 @@ def scout_sota_papers(
                     venue=str(paper.get("venue") or paper.get("source") or "SOTA"),
                     year=int(paper.get("year") or 2025),
                     bottleneck_id=bottleneck_id,
+                    fetched_from_api=True,
                 )
             )
+    if ranked and save_top_k > 0:
+        record_verified_scout_cursor(store, "VERIFIED_EXTERNAL", bottleneck_id=bottleneck_id)
     store.log_event("SOTA_SCOUT", bottleneck_id or "VAULT", f"Scouted '{clean_q}': {len(ranked)} papers, {len(saved_cards)} saved")
     return {"query": clean_q, "cache_hits": cache_hits, "papers": ranked, "saved_method_cards": saved_cards, "network_warnings": errors}

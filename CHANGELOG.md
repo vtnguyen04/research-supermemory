@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [3.5.0] - 2026-11-17
+
+### Added
+- **Anti-Stagnation Research Circuit-Breaker (`stagnation_guard.py`):** Automatically detects local hill-climbing plateaus (`>= 2` consecutive `REVERT`/`FAILED`/`DISCARD` runs, `>= 3` consecutive flat/non-improving deltas `<= 1e-5`, or `>= 2` failed attempts on the same `BNK-XXX`), injects `🚨 ANTI-STAGNATION CIRCUIT-BREAKER` alerts in `log_experiment` and `PreInvocation`/`UserPromptSubmit`, and hard-blocks `manage_proposal(action="create")` until fresh verified external SOTA literature is scouted.
+- **Anti-Hallucination Citation Provenance Gate (`07_METHOD_VAULT`):** Rejects self-fabricated internal notes/venues or local file paths disguised as `METH-XXX` papers (`LAW-01`), tags cards with `VERIFIED_EXTERNAL` vs `UNVERIFIED_MANUAL` scholarly domain provenance (`arxiv.org`, `doi.org`, `semanticscholar.org`, `openalex.org`, `openreview.net`, etc.), and requires `VERIFIED_EXTERNAL` provenance to unlock stagnation locks.
+- **Updated v3.5 Rules & Skills (`AGENTS.md`, `supermemory-research`, `supermemory-experiment`):** Synchronized plugin instructions across Antigravity CLI and Claude Code with zero-turn auto-recall, `supersedes=[...]`, Kanban `task_updates`, and anti-stagnation pivot rules.
+
+---
+
 ## [3.4.1] - 2026-11-17
 
 ### Added
@@ -149,6 +158,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **Initial Release:** SQLite WAL + FTS5 knowledge graph, `LAW-01`..`LAW-08` Constitutional Markdown compiler, `PreToolUse` CodeGate enforcer (`MAX_LINES`, `FORBIDDEN_REGEX`, `FORBIDDEN_FILENAME`, `FORBIDDEN_CMD_PATTERN`, `FROZEN_SHA256`, `AST_SYNTAX`), OpenSpec proposal state machine, and Antigravity CLI plugin package.
 
+[3.5.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/vtnguyen04/research-supermemory/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.5...v3.4.0
 [3.3.5]: https://github.com/vtnguyen04/research-supermemory/compare/v3.3.4...v3.3.5

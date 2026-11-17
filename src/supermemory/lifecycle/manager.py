@@ -138,6 +138,9 @@ class LifecycleManager:
         strict_occam: bool = False,
     ) -> Dict[str, Any]:
         task_items = validate_proposal_schema(title, why, what_changes, tasks)
+        from supermemory.research.stagnation_guard import enforce_anti_stagnation_on_proposal
+
+        enforce_anti_stagnation_on_proposal(self.store, bottleneck_id=bottleneck_id)
         enforce_novelty_against_history(
             self.store, title, f"{why} {what_changes}", novelty_diff=novelty_diff, bottleneck_id=bottleneck_id
         )
