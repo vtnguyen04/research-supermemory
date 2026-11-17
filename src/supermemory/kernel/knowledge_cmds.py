@@ -38,16 +38,26 @@ from supermemory.sync.markdown_compiler import MarkdownCompiler
 def _cmd_recall(args: Dict[str, Any]) -> Dict[str, Any]:
     raw_ws = resolve_default_workspace(str(args.get("workspace") or ""))
     local_ok = (raw_ws / ".supermemory").is_dir() or (raw_ws / "memory" / "graph_snapshot.json").is_file()
-    return federated_recall(
-        str(args.get("query") or ""),
+    q_str = str(args.get("query") or "")
+    nid = str(args.get("node_id") or "")
+    res = federated_recall(
+        q_str,
         local_ws=raw_ws if local_ok else None,
         include_global=bool(args.get("include_global", True)),
         include_siblings=bool(args.get("include_siblings", False)),
         limit=int(args.get("limit") or 6),
         hops=int(args.get("hops") or 1),
         compact=bool(args.get("compact", True)),
-        node_id=str(args.get("node_id") or ""),
+        node_id=nid,
     )
+    if local_ok and (q_str.strip() or nid.strip()):
+        with GraphStore(raw_ws) as store:
+            if nid.strip():
+                store.log_event("MEMORY_RECALLED", nid.strip(), f"Expanded node `{nid.strip()}` via Stage-2 recall")
+            else:
+                hits = len(res.get("results") or [])
+                store.log_event("MEMORY_RECALLED", "RECALL_QUERY", f"Recalled {hits} hits for `{q_str.strip()[:64]}`")
+    return res
 
 
 @REGISTRY.register(

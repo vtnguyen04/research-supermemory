@@ -1,4 +1,4 @@
-# SuperMemory v3.6.0 Autonomous Closed-Loop Research & Kanban Protocol
+# SuperMemory v3.6.1 Autonomous Closed-Loop Research & Kanban Protocol
 
 You operate with a **Federated 4-Tier Research Graph** (`Local` `.supermemory/` + `Global` `~/.supermemory/global` + `Sibling Vaults`; `L0 WORKING`, `L1 PROCEDURAL`, `L2 SEMANTIC`, `L3 EPISODIC`):
 

@@ -3,7 +3,7 @@ name: supermemory-research
 description: Information-Gap Gated Research Loop — profile Pareto error slices (BNK-XXX + RQ-XXX), synthesize directly when vault knowledge suffices, and scout external SOTA papers ONLY when an information gap or >=3-run plateau occurs.
 ---
 
-# SuperMemory v3.6.0 Information-Gap Gated Research Skill
+# SuperMemory v3.6.1 Information-Gap Gated Research Skill
 
 Use this skill ONLY when diagnosing new Pareto bottlenecks, when explicitly asked for external papers, or when hitting a genuine Information Gap (`0` untried viable ideas/methods in the vault AND `>= 3` consecutive failed or `|delta| <= 1e-5` runs). **Do NOT run external paper searches when proposing a method from already-clear forensic evidence.**
 

@@ -162,7 +162,7 @@
   function renderEvents(state, h) {
     const nodeSet = new Set((state.nodes || []).map((n) => n.id)), box = document.getElementById("events-list"), pagerBox = document.getElementById("events-pager"), q = (document.getElementById("events-filter-input")?.value || "").trim().toLowerCase();
     const allEvs = (state.events || []).filter((ev) => matchQ(q, ev.event_type, ev.entity_id, ev.summary));
-    const catOk = (c, t) => c === "ALL" || (c === "LEARNING" && /LEARN|LESSON|CONSOLIDAT/.test(t)) || (c === "GATE" && /GATE|AUDIT|STOP_GATE/.test(t)) || (c === "ERROR" && /ERROR|BLOCK|FAIL|STOP_GATE/.test(t)) || (c === "GRAPH" && /NODE|EDGE|EXP|PROP|DAG|KANBAN|CHECKPOINT|HANDOFF|STATE|SNAPSHOT/.test(t));
+    const catOk = (c, t) => c === "ALL" || (c === "LEARNING" && /LEARN|LESSON|CONSOLIDAT/.test(t)) || (c === "GATE" && /GATE|AUDIT|STOP_GATE/.test(t)) || (c === "ERROR" && /ERROR|BLOCK|FAIL|STOP_GATE/.test(t)) || (c === "GRAPH" && /NODE|EDGE|EXP|PROP|DAG|KANBAN|CHECKPOINT|HANDOFF|STATE|SNAPSHOT|RECALL|MEMORY_READ|COMPACTION|CAPSULE|PULSE/.test(t));
     const evBar = document.getElementById("events-cat-bar");
     evBar.innerHTML = [["ALL", `${tr("All Events", "Tất cả")} (${allEvs.length})`], ["LEARNING", `${tr("Self-Learning", "Tự học")} (${allEvs.filter((x) => catOk("LEARNING", x.event_type)).length})`], ["GATE", `CodeGates & Audits (${allEvs.filter((x) => catOk("GATE", x.event_type)).length})`], ["GRAPH", `${tr("Graph & Kanban", "Đồ thị & Kanban")} (${allEvs.filter((x) => catOk("GRAPH", x.event_type)).length})`], ["ERROR", `${tr("Blocks & Errors", "Chặn & Lỗi")} (${allEvs.filter((x) => catOk("ERROR", x.event_type)).length})`]]
       .map(([k, lbl]) => `<button type="button" class="seg-btn" aria-pressed="${activeEvtCat === k}" data-ecat="${k}">${esc(lbl)}</button>`).join("");
@@ -170,7 +170,7 @@
 
     const evs = allEvs.filter((ev) => catOk(activeEvtCat, String(ev.event_type || "")));
     const pg = paginate(evs, `ev-${activeEvtCat}`, 8);
-    const toneOf = (t) => (/ERROR|BLOCK|FAIL|STOP_GATE/.test(t) ? "BLOCKED" : /AUDIT_PASSED|AUDIT_VERDICT|LEARN|CONSOLIDAT|CHECKPOINT/.test(t) ? "VERIFIED" : /KANBAN|DAG|GATE|STATE/.test(t) ? "READY" : "LOGGED");
+    const toneOf = (t) => (/ERROR|BLOCK|FAIL|STOP_GATE/.test(t) ? "BLOCKED" : /AUDIT_PASSED|AUDIT_VERDICT|LEARN|CONSOLIDAT|CHECKPOINT/.test(t) ? "VERIFIED" : /KANBAN|DAG|GATE|STATE|RECALL|MEMORY_READ|COMPACTION|CAPSULE|PULSE/.test(t) ? "READY" : "LOGGED");
     box.innerHTML = pg.slice.length ? pg.slice.map((ev) => {
       const et = String(ev.event_type || "EVENT"), cleanSum = cleanText(String(ev.summary || ""), 180).replace(/^([A-Z0-9-]+):\s*(?:\[[A-Z0-9_ -]+\]\s*)?\1:\s*/, "$1: ");
       const openBtn = ev.entity_id && nodeSet.has(ev.entity_id) ? `<button type="button" class="btn btn-secondary btn-xs" data-nid="${esc(ev.entity_id)}">${tr("Open", "Mở")}</button>` : "";

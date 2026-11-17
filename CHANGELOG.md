@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [3.6.1] - 2026-11-17
+
+### Added
+- **O(1) Tail Transcript Compaction Probe (`hooks/compaction_probe.py`, `hooks/runner.py`, `GATE-036`):** Probes the last `48 KB` of `transcript.jsonl` (`< 1ms`) on every `PreInvocation` step to detect Antigravity mid-turn `SYSTEM CHECKPOINT` compactions even when `step_index` stays monotonic (`8534 -> 8535 -> 8536`), immediately restoring the Tiered Capsule + live Kanban board and resetting notification deduplication.
+- **Visible Memory-Read Telemetry (`kernel/knowledge_cmds.py`, `hooks/turn_tracker.py`, `hooks/runner.py`, `ui/static/views.js`):** Logs live `MEMORY_RECALLED` (MCP `recall`), `HOOK_AUTO_RECALL` (`PreInvocation` 0-turn recall), `MEMORY_READ` (`read_file` on `memory/...`), `PERIODIC_CAPSULE_REFRESH`, and `INCREMENTAL_SYNC_PULSE` events directly into SQLite `events` and Web Studio `System Events`.
+- **Attention-Distance Capsule Refresh & Latest L2 Insights (`cognitive/tiers.py`, `hooks/runner.py`):** Surfaces top-3 newest active `OBS-*` (`[L2 LATEST INSIGHTS]`) in `build_tiered_capsule` and automatically refreshes the capsule on `PreInvocation` whenever `>= 45` steps or `>= 6` invocations have elapsed (`0` keyword regexes, cross-language safe).
+
+### Fixed
+- **Antigravity `PostToolUse -> {}` Stdout Compliance & `PreInvocation` In-Flight Relay (`hooks/runner.py`, `hooks/turn_tracker.py`, `storage/snapshot_io.py`):** Emits strict `{}` on Antigravity `PostToolUse` stdout per the official Antigravity hook contract while relaying queued edit/execution/Kanban notifications + `12`-step incremental checkpoint pulses (`unsynced_work_steps % 12 == 0`) through `session_state` into the very next mid-turn `PreInvocation` `injectSteps`.
+
+---
+
 ## [3.6.0] - 2026-11-17
 
 ### Added

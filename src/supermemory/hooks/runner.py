@@ -11,7 +11,8 @@ from typing import Any, Dict, List, Optional
 from supermemory.cognitive.federation import ensure_global_memory, federated_recall, set_active_workspace
 from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.gates.enforcer import GateEnforcer
-from supermemory.hooks.claude_bridge import format_hook_output, normalize_hook_input
+from supermemory.hooks.claude_bridge import format_hook_output, is_claude_code_payload, normalize_hook_input
+from supermemory.hooks.compaction_probe import probe_transcript_compaction, reset_state_on_compaction
 from supermemory.hooks.turn_tracker import evaluate_stop_gate, track_post_tool_use
 from supermemory.models import NodeType
 from supermemory.research.kanban_digest import build_kanban_board_digest
@@ -99,7 +100,7 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
         elif ev == "PreToolUse":
             out = _on_pre_tool_use(store, payload)
         elif ev == "PostToolUse":
-            out = track_post_tool_use(store, conv_id, payload)
+            out = track_post_tool_use(store, conv_id, payload, is_claude=is_claude)
         elif ev == "Stop":
             out = evaluate_stop_gate(store, conv_id, payload)
     return format_hook_output(raw_ev, out, is_claude)
@@ -108,6 +109,11 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
 def _on_session_start(store: GraphStore, conv_id: str) -> Dict[str, Any]:
     capsule = build_tiered_capsule(store, global_rules=_global_rule_titles())
     st = get_session_state(store, conv_id)
+    _, m0 = probe_transcript_compaction(conv_id, "")
+    if m0:
+        st["last_compaction_marker"] = m0
+    st["last_capsule_step"] = 0
+    st["last_capsule_inv"] = 0
     save_session_state(store, st)
     store.log_event("HOOK_SESSION_START", conv_id, "Injected tiered SuperMemory capsule")
     return {"injectSteps": [{"systemMessage": {"systemMessage": capsule}}]}
@@ -119,20 +125,29 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
     step_idx = int(payload.get("initialNumSteps") or 0)
     prev_step = int(st.get("last_step_idx") or 0)
     user_input = str(payload.get("lastUserInput") or "")
+    is_new_turn = bool(user_input and user_input != st.get("last_seen_user_input"))
 
     injected_msgs: List[str] = []
-    if prev_step > 20 and 0 < step_idx < (prev_step // 2):
-        st["compaction_count"] = st.get("compaction_count", 0) + 1
-        st["last_heartbeat_bucket"] = 0
-        st["recalled_node_ids"] = []
-        st["recalled_warnings"] = []
-        st["last_kanban_fp"] = ""
-        st["last_kanban_inv"] = 0
+    step_drop = prev_step > 20 and 0 < step_idx < (prev_step // 2)
+    chk_hit, new_marker = probe_transcript_compaction(
+        conv_id, str(st.get("last_compaction_marker") or ""), str(payload.get("transcriptPath") or "")
+    )
+    if new_marker:
+        st["last_compaction_marker"] = new_marker
+    compacted_now = step_drop or chk_hit
+    if compacted_now:
+        reset_state_on_compaction(st, step_idx, inv_num, marker=new_marker)
         capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
         injected_msgs.append("♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED:\n" + capsule)
+        if not is_new_turn:
+            kb_mid, kb_fp_mid = build_kanban_board_digest(store)
+            if kb_mid:
+                injected_msgs.append(kb_mid)
+                st["last_kanban_fp"] = kb_fp_mid
+                st["last_kanban_inv"] = inv_num
         store.log_event("COMPACTION_RECOVERY", conv_id, f"Restored tiered state at step {step_idx}")
 
-    if user_input and user_input != st.get("last_seen_user_input"):
+    if is_new_turn:
         st["last_seen_user_input"] = user_input
         st["turn_memory_handled"] = False
         st["pending_kanban_sync"] = False
@@ -142,6 +157,19 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         st["notified_edit"] = False
         st["notified_exec"] = False
         st["notified_research"] = False
+        st["unsynced_work_steps"] = 0
+        st["pending_notifications"] = []
+        st["last_read_mem"] = ""
+
+        if not compacted_now:
+            steps_gap = step_idx - int(st.get("last_capsule_step") or 0)
+            invs_gap = inv_num - int(st.get("last_capsule_inv") or 0)
+            if (step_idx > 0 and steps_gap >= 45) or (inv_num > 0 and invs_gap >= 6):
+                capsule_ref = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
+                injected_msgs.append("🔄 PERIODIC MEMORY CAPSULE REFRESH (Zero-Amnesia Overview):\n" + capsule_ref)
+                st["last_capsule_step"] = step_idx
+                st["last_capsule_inv"] = inv_num
+                store.log_event("PERIODIC_CAPSULE_REFRESH", conv_id, f"Refreshed capsule at inv={inv_num}, step={step_idx}")
 
         kb_digest, kb_fp = build_kanban_board_digest(store)
         if kb_digest and (kb_fp != st.get("last_kanban_fp") or (inv_num - int(st.get("last_kanban_inv") or 0)) >= 4):
@@ -209,14 +237,21 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
                     "⚡ SUPERMEMORY AUTO-RECALL (0-Turn Context — call `recall(node_id=...)` only if full detail needed):\n"
                     + "\n".join(lines)
                 )
-                st["recalled_node_ids"] = list(seen_ids | {str(h["id"]) for h in fresh_hits})[-80:]
-    elif step_idx >= 20 and "/goal" in user_input.lower():
-        cur_bucket = step_idx // 20
-        prev_bucket = int(st.get("last_heartbeat_bucket") or 0)
-        if cur_bucket > prev_bucket:
-            st["last_heartbeat_bucket"] = cur_bucket
-            capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
-            injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT (ANTI-DRIFT & ANTI-REPEAT):\n" + capsule)
+                hit_ids = [str(h["id"]) for h in fresh_hits]
+                st["recalled_node_ids"] = list(seen_ids | set(hit_ids))[-80:]
+                store.log_event("HOOK_AUTO_RECALL", hit_ids[0], f"0-Turn Auto-Recall injected {hit_ids}")
+    else:
+        queued = list(st.get("pending_notifications") or [])
+        if queued:
+            st["pending_notifications"] = []
+            injected_msgs.extend(queued)
+        if step_idx >= 20 and "/goal" in user_input.lower():
+            cur_bucket = step_idx // 20
+            prev_bucket = int(st.get("last_heartbeat_bucket") or 0)
+            if cur_bucket > prev_bucket:
+                st["last_heartbeat_bucket"] = cur_bucket
+                capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
+                injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT (ANTI-DRIFT & ANTI-REPEAT):\n" + capsule)
 
     st["invocation_num"] = inv_num
     if step_idx > 0:
@@ -249,6 +284,8 @@ def main_from_stdin(event_name: str) -> int:
     raw = sys.stdin.read().strip()
     payload = json.loads(raw) if raw else {}
     out = dispatch_hook(event_name, payload)
+    if event_name.strip() == "PostToolUse" and not is_claude_code_payload(payload):
+        out = {}
     sys.stdout.write(json.dumps(out, ensure_ascii=False) + "\n")
     sys.stdout.flush()
     return 0

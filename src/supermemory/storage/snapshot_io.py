@@ -167,6 +167,16 @@ def import_snapshot(store: GraphStore, source_path: Path) -> Dict[str, int]:
     return {"nodes": len(nodes), "edges": len(edges), "gates": len(gates), "experiments": len(exps)}
 
 
+_EXTRA_DEFAULTS: Dict[str, Any] = {
+    "turn_memory_handled": False, "research_campaign_active": False, "last_heartbeat_bucket": 0,
+    "last_seen_user_input": "", "pending_sync_reason": "", "pending_kanban_sync": False,
+    "last_kanban_fp": "", "last_kanban_inv": 0, "recalled_node_ids": [], "recalled_warnings": [],
+    "notified_edit": False, "notified_exec": False, "notified_research": False,
+    "unsynced_work_steps": 0, "pending_notifications": [], "last_compaction_marker": "",
+    "last_capsule_step": 0, "last_capsule_inv": 0, "last_read_mem": "",
+}
+
+
 def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]:
     """Read or initialize hook session tracking state for a conversation."""
     row = store.conn.execute(
@@ -179,7 +189,7 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
             (conversation_id, now),
         )
         store.conn.commit()
-        return {
+        base: Dict[str, Any] = {
             "conversation_id": conversation_id,
             "invocation_num": 0,
             "last_step_idx": 0,
@@ -188,21 +198,15 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
             "pending_lesson_category": "",
             "dirty_files": [],
             "unlogged_exp_cmds": [],
-            "turn_memory_handled": False,
-            "research_campaign_active": False,
-            "last_heartbeat_bucket": 0,
-            "last_seen_user_input": "",
-            "pending_sync_reason": "",
-            "pending_kanban_sync": False,
-            "last_kanban_fp": "",
-            "last_kanban_inv": 0,
-            "recalled_node_ids": [],
-            "recalled_warnings": [],
             "compaction_count": 0,
         }
+        for k, v in _EXTRA_DEFAULTS.items():
+            base[k] = list(v) if isinstance(v, list) else v
+        return base
+
     raw_extra = str(row["unlogged_exp_cmds_json"] or "[]").strip()
     extra_obj = json.loads(raw_extra) if raw_extra.startswith("{") else {"cmds": json.loads(raw_extra or "[]")}
-    return {
+    out: Dict[str, Any] = {
         "conversation_id": str(row["conversation_id"]),
         "invocation_num": int(row["invocation_num"]),
         "last_step_idx": int(row["last_step_idx"]),
@@ -211,35 +215,27 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
         "pending_lesson_category": str(row["pending_lesson_category"]),
         "dirty_files": json.loads(row["dirty_files_json"] or "[]"),
         "unlogged_exp_cmds": list(extra_obj.get("cmds") or []),
-        "turn_memory_handled": bool(extra_obj.get("turn_memory_handled", False)),
-        "research_campaign_active": bool(extra_obj.get("research_campaign_active", False)),
-        "last_heartbeat_bucket": int(extra_obj.get("last_heartbeat_bucket", 0)),
-        "last_seen_user_input": str(extra_obj.get("last_seen_user_input") or ""),
-        "pending_sync_reason": str(extra_obj.get("pending_sync_reason") or ""),
-        "pending_kanban_sync": bool(extra_obj.get("pending_kanban_sync", False)),
-        "last_kanban_fp": str(extra_obj.get("last_kanban_fp") or ""),
-        "last_kanban_inv": int(extra_obj.get("last_kanban_inv", 0)),
-        "recalled_node_ids": list(extra_obj.get("recalled_node_ids") or []),
-        "recalled_warnings": list(extra_obj.get("recalled_warnings") or []),
         "compaction_count": int(row["compaction_count"]),
     }
+    for k, dv in _EXTRA_DEFAULTS.items():
+        val = extra_obj.get(k, dv)
+        if isinstance(dv, list):
+            out[k] = list(val or [])
+        elif isinstance(dv, bool):
+            out[k] = bool(val)
+        elif isinstance(dv, int):
+            out[k] = int(val or 0)
+        else:
+            out[k] = str(val or "")
+    return out
 
 
 def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
     """Persist hook session tracking state atomically."""
-    extra_envelope = {
-        "cmds": list(state.get("unlogged_exp_cmds") or []),
-        "turn_memory_handled": bool(state.get("turn_memory_handled", False)),
-        "research_campaign_active": bool(state.get("research_campaign_active", False)),
-        "last_heartbeat_bucket": int(state.get("last_heartbeat_bucket", 0)),
-        "last_seen_user_input": str(state.get("last_seen_user_input") or ""),
-        "pending_sync_reason": str(state.get("pending_sync_reason") or ""),
-        "pending_kanban_sync": bool(state.get("pending_kanban_sync", False)),
-        "last_kanban_fp": str(state.get("last_kanban_fp") or ""),
-        "last_kanban_inv": int(state.get("last_kanban_inv", 0)),
-        "recalled_node_ids": list(state.get("recalled_node_ids") or []),
-        "recalled_warnings": list(state.get("recalled_warnings") or []),
-    }
+    extra_envelope: Dict[str, Any] = {"cmds": list(state.get("unlogged_exp_cmds") or [])}
+    for k, dv in _EXTRA_DEFAULTS.items():
+        val = state.get(k, dv)
+        extra_envelope[k] = list(val or []) if isinstance(dv, list) else val
     store.conn.execute(
         """
         INSERT INTO session_state(conversation_id, invocation_num, last_step_idx,
@@ -281,6 +277,8 @@ def mark_turn_memory_handled(
         st["turn_memory_handled"] = True
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
+        st["unsynced_work_steps"] = 0
+        st["pending_notifications"] = []
         if clear_lesson_lock:
             st["pending_lesson_lock"] = False
         if clear_kanban_sync:

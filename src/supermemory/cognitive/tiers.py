@@ -155,6 +155,12 @@ def build_tiered_capsule(
     if mcards:
         mc_txt = " | ".join(f"`{m.id}`({m.metadata.get('venue', 'SOTA')} {m.metadata.get('year', '')}) {m.title[:38]}" for m in mcards[:3])
         blocks.append((2, f"• [L2 METHOD VAULT — Saved SOTA Cards]: {mc_txt}"))
+    recent_obs = sorted(
+        [o for o in store.list_nodes(node_types=[NodeType.OBSERVATION.value], limit=40) if o.status not in ("CONSOLIDATED", "SUPERSEDED") and not (o.metadata or {}).get("consolidated")],
+        key=lambda o: (o.updated_at, o.id), reverse=True,
+    )[:3]
+    if recent_obs:
+        blocks.append((2, "• [L2 LATEST INSIGHTS]: " + " | ".join(f"`{o.id}` {o.title[:44]}" for o in recent_obs)))
 
     has_agents_md = (store.workspace_root / "AGENTS.md").is_file()
     law_note = " (active in AGENTS.md)" if has_agents_md else ":"
