@@ -20,6 +20,12 @@ from supermemory.graph.query_engine import QueryEngine
 from supermemory.storage.sqlite_store import GraphStore
 from supermemory.ui.api_actions import dispatch_store_mutation, handle_workspace_action
 from supermemory.ui.api_research import enrich_graph_payload_v3
+from supermemory.ui.security import (
+    SECURITY_HEADERS,
+    read_json_body,
+    resolve_authorized_scope,
+    validate_http_request,
+)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -36,18 +42,6 @@ _MIME_TYPES: Dict[str, str] = {
     ".svg": "image/svg+xml",
     ".json": "application/json; charset=utf-8",
 }
-
-
-def _resolve_scope_workspace(default_ws: Path, scope_param: str) -> Path:
-    clean = (scope_param or "").strip()
-    if not clean or clean == "local":
-        return default_ws
-    if clean == "global":
-        return ensure_global_memory()
-    cand = Path(clean).expanduser().resolve()
-    if cand.is_dir() and ((cand / ".supermemory").is_dir() or (cand / "memory" / "graph_snapshot.json").is_file()):
-        return cand
-    return default_ws
 
 
 def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
@@ -86,14 +80,25 @@ def build_graph_api_payload(workspace_root: Path) -> Dict[str, Any]:
         return enrich_graph_payload_v3(store, payload)
 
 
-def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
+def _make_handler(default_ws: Path, bound_host: str = "127.0.0.1") -> type[BaseHTTPRequestHandler]:
     class GraphRequestHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
+            sec_err = validate_http_request(self.headers, bound_host=bound_host, is_post=False)
+            if sec_err is not None:
+                self._send_json({"error": sec_err[1]}, status=sec_err[0])
+                return
             parsed = urlparse(self.path)
             route = parsed.path
             qs = parse_qs(parsed.query)
             scope = (qs.get("scope") or ["local"])[0]
-            ws = _resolve_scope_workspace(default_ws, scope)
+            if route.startswith("/api/"):
+                try:
+                    ws = resolve_authorized_scope(default_ws, scope)
+                except PermissionError as exc:
+                    self._send_json({"error": str(exc)}, status=HTTPStatus.FORBIDDEN)
+                    return
+            else:
+                ws = default_ws
 
             if route == "/api/workspaces":
                 self._send_json({"default_workspace": str(default_ws), "workspaces": list_registered_workspaces()})
@@ -140,25 +145,38 @@ def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Type", mime)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            for hk, hv in SECURITY_HEADERS:
+                self.send_header(hk, hv)
             self.end_headers()
             self.wfile.write(body)
 
         def do_POST(self) -> None:  # noqa: N802
+            sec_err = validate_http_request(self.headers, bound_host=bound_host, is_post=True)
+            if sec_err is not None:
+                self._send_json({"error": sec_err[1]}, status=sec_err[0])
+                return
             parsed = urlparse(self.path)
             route = parsed.path
-            length = int(self.headers.get("Content-Length") or "0")
-            body = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            body_opt, body_err = read_json_body(self.rfile, self.headers)
+            if body_err is not None or body_opt is None:
+                err_st, err_msg = body_err or (HTTPStatus.BAD_REQUEST, "Invalid JSON payload.")
+                self._send_json({"error": err_msg}, status=err_st)
+                return
+            body = body_opt
 
             try:
                 if route == "/api/workspaces/init":
                     self._send_json(handle_workspace_action(body))
                     return
-                ws = _resolve_scope_workspace(default_ws, str(body.get("scope") or "local"))
+                ws = resolve_authorized_scope(default_ws, str(body.get("scope") or "local"))
                 with GraphStore(ws) as store:
                     result = dispatch_store_mutation(route, store, body)
                 if result is not None:
                     self._send_json(result)
                     return
+            except PermissionError as exc:
+                self._send_json({"error": str(exc)}, status=HTTPStatus.FORBIDDEN)
+                return
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
                 return
@@ -171,6 +189,8 @@ def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")
+            for hk, hv in SECURITY_HEADERS:
+                self.send_header(hk, hv)
             self.end_headers()
             self.wfile.write(data)
 
@@ -182,7 +202,7 @@ def _make_handler(default_ws: Path) -> type[BaseHTTPRequestHandler]:
 
 def create_http_server(workspace_root: Path, host: str = "127.0.0.1", port: int = 8765) -> Tuple[ThreadingHTTPServer, int]:
     """Bind ThreadingHTTPServer (supports port=0 for ephemeral test ports)."""
-    srv = ThreadingHTTPServer((host, port), _make_handler(workspace_root.resolve()))
+    srv = ThreadingHTTPServer((host, port), _make_handler(workspace_root.resolve(), bound_host=host))
     actual_port = int(srv.server_address[1])
     return srv, actual_port
 

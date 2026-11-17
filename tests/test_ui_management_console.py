@@ -204,6 +204,7 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         "/icons.js",
         "/math_md.js",
         "/graph_layouts.js",
+        "/graph_draw.js",
         "/graph_canvas.js",
         "/inspector.js",
         "/merge_studio.js",
@@ -254,7 +255,7 @@ def test_production_ui_design_system_and_accessibility_contract(tmp_path: Path) 
         assert not micro_font_rx.search(css), "Microscopic font-size (<13px) detected in styles.css"
 
         js_files = sorted(STATIC_DIR.glob("*.js"))
-        assert len(js_files) == 13
+        assert len(js_files) == 14
         for js_path in js_files:
             lines = js_path.read_text(encoding="utf-8").splitlines()
             assert len(lines) < 200, f"{js_path.name} exceeds 200 lines ({len(lines)})"

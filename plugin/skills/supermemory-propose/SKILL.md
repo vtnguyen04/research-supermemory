@@ -10,5 +10,5 @@ Use this skill before implementing non-trivial features, algorithms, or architec
 ## Workflow
 1. **Anti-Repeat Recall:** Call `recall` with the core concept/module keywords. Review all `anti_repeat_warnings`, past `LESSON`s, and `REJECTED` ideas.
 2. **Idea / Algorithm Registration:** Call `propose_idea` to record the candidate `IDEA` or `ALGORITHM` (`is_algorithm: true` with explicit `invariants`). If an idea is discarded during analysis, log it with `status: "REJECTED"` and `rejection_reason` so future agents never waste time re-inventing it.
-3. **Create OpenSpec Artifacts:** Call `manage_proposal` (`action: "create"`, `title`, `why`, `what_changes`, `design_notes`, `tasks`). This writes `openspec/changes/<PROP-ID>/{proposal.md,design.md,tasks.md}` and links it into the Knowledge Graph.
+3. **Create OpenSpec Artifacts:** Call `manage_proposal` (`action: "create"`, `title`, `why`, `what_changes`, `design_notes`, `tasks`). This writes `memory/04_PROPOSALS/<PROP-ID>_<slug>/{proposal.md,design.md,tasks.md}` and links it into the Knowledge Graph and Live Kanban Board.
 4. **Stage Progression:** Advance stages via `manage_proposal` (`action: "advance"`). Note that `ARCHIVED` is strictly blocked until `Challenger` or `VictoryAuditor` records an `APPROVE` verdict!

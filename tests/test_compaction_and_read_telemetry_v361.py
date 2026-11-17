@@ -81,7 +81,7 @@ def test_mid_turn_monotonic_step_compaction_recovery(tmp_path: Path) -> None:
         },
     )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
-    assert elapsed_ms < 25.0
+    assert elapsed_ms < (150.0 if sys.gettrace() is not None else 25.0)
 
     msg = mid_out["injectSteps"][0]["systemMessage"]["systemMessage"]
     assert "COMPACTION RECOVERY DETECTED" in msg

@@ -64,8 +64,7 @@ def compute_hybrid_similarity(
         fmap = build_sparse_features(doc_txt)
         doc_feats[nd.id] = fmap
         for k in fmap:
-            if k in q_feats:
-                df[k] = df.get(k, 0) + 1
+            df[k] = df.get(k, 0) + 1
 
     n_docs = len(nodes)
     q_vec: Dict[str, float] = {}

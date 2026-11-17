@@ -28,6 +28,8 @@ def normalize_hook_input(event_name: str, payload: Dict[str, Any]) -> Tuple[str,
     norm["hookEventName"] = norm_ev
     if payload.get("session_id") and not norm.get("conversationId"):
         norm["conversationId"] = str(payload["session_id"])
+    if payload.get("transcript_path") and not norm.get("transcriptPath"):
+        norm["transcriptPath"] = str(payload["transcript_path"])
 
     if norm_ev == "PreInvocation":
         prompt_txt = str(payload.get("prompt") or payload.get("user_prompt") or "")

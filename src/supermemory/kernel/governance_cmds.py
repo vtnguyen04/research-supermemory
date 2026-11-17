@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict
 
 from supermemory.bootstrap import init_workspace
@@ -12,9 +13,10 @@ from supermemory.cognitive.federation import (
 )
 from supermemory.cognitive.tiers import build_tiered_capsule, compute_tier_telemetry
 from supermemory.gates.enforcer import GateEnforcer
+from supermemory.gates.sim_helpers import validate_regex_pattern
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.kernel.registry import REGISTRY, SCOPE_SCHEMA_PROP
-from supermemory.models import CodeGate
+from supermemory.models import CodeGate, EdgeType, MemoryEdge, MemoryNode, NodeType
 from supermemory.self_learning.consolidator import LessonConsolidator
 from supermemory.storage.sqlite_store import GraphStore
 
@@ -128,19 +130,52 @@ def _cmd_add_gate(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
         gate = enf.freeze_file(str(args["freeze_path"]).strip(), law_id=str(args.get("law_id") or "LAW-05"))
     else:
         gid = str(args.get("id") or "").strip() or LessonConsolidator(store).next_gate_id()
-        gtype = str(args.get("gate_type") or "FORBIDDEN_REGEX").upper()
-        cfg = {"max_lines": int(args.get("max_lines") or 500)} if gtype == "MAX_LINES" else {"ignore_comments": True}
+        if not re.match(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", gid):
+            raise ValueError(f"Invalid `gate_id`: `{gid}`")
+        existing_g = next((x for x in store.list_gates() if x.id == gid), None)
+        gtype = str(args.get("gate_type") or (existing_g.gate_type if existing_g else "FORBIDDEN_REGEX")).upper()
+        pat = str(args.get("pattern") if args.get("pattern") is not None else (existing_g.pattern if existing_g else "")).strip()
+        if gtype in ("FORBIDDEN_REGEX", "FORBIDDEN_CMD_PATTERN", "FORBIDDEN_FILENAME"):
+            pat = validate_regex_pattern(pat, "pattern")
+        prev_cfg = dict(existing_g.config) if existing_g else {}
+        if gtype == "MAX_LINES":
+            raw_ml = args.get("max_lines") if args.get("max_lines") is not None else (pat if pat.isdigit() else prev_cfg.get("max_lines", 500))
+            ml_val = int(str(raw_ml if raw_ml is not None else 500))
+            if ml_val <= 0:
+                raise ValueError("`max_lines` must be > 0.")
+            cfg = {**prev_cfg, "max_lines": ml_val}
+            pat = str(ml_val)
+        else:
+            cfg = {**{"ignore_comments": True}, **prev_cfg}
+        law_id = str(args.get("law_id") or (existing_g.law_id if existing_g else "LAW-08")).strip()
         gate = store.upsert_gate(
             CodeGate(
                 id=gid,
                 gate_type=gtype,
                 name=str(args["name"]).strip(),
-                law_id=str(args.get("law_id") or "LAW-08").strip(),
-                target_glob=str(args.get("target_glob") or "**/*.py").strip(),
-                pattern=str(args.get("pattern") or "").strip(),
+                law_id=law_id,
+                lesson_id=existing_g.lesson_id if existing_g else "",
+                target_glob=str(args.get("target_glob") or (existing_g.target_glob if existing_g else "**/*.py")).strip(),
+                pattern=pat,
                 config=cfg,
+                enabled=existing_g.enabled if existing_g else True,
+                blocked_count=existing_g.blocked_count if existing_g else 0,
             )
         )
+        store.upsert_node(
+            MemoryNode(
+                id=gid,
+                node_type=NodeType.GATE.value,
+                title=gate.name,
+                summary=f"[{gtype}] `{gate.target_glob}` -> `{gate.pattern}`",
+                tags=["gate", law_id.lower()],
+                priority=95,
+                metadata=gate.to_dict(),
+            ),
+            log_event=False,
+        )
+        if law_id and store.get_node(law_id):
+            store.add_edge(MemoryEdge(source_id=law_id, target_id=gid, relation=EdgeType.ENFORCED_BY.value))
         store.log_event("GATE_UPSERTED", gid, f"[{gtype}] {gate.name} -> {gate.target_glob}")
     return gate.to_dict()
 

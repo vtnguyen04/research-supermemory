@@ -53,6 +53,7 @@ def _mint_insight_node(
             ex.content = s_clean
             ex.status = "SCIENTIFIC_INSIGHT" if ntype == NodeType.OBSERVATION.value else "ACTIVE"
             ex.metadata.pop("superseded_by", None)
+            store.conn.execute("DELETE FROM edges WHERE target_id = ? AND relation = 'SUPERSEDES'", (ex.id,))
             store.upsert_node(ex, log_event=True)
             wire_contextual_edges(store, ex.id, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
             return ex.to_dict()

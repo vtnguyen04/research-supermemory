@@ -2,10 +2,34 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+_SAFE_ENTITY_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 _LAZY_TITLES = {"untitled", "untitled proposal", "todo", "test", "fix", "update", "temp", "wip"}
 _LAZY_INSIGHTS = {"ok", "done", "clean", "fixed", "fixed bug", "updated", "updated code", "none", "n/a"}
+
+
+def validate_safe_entity_id(raw_id: str, field_name: str = "id") -> str:
+    """Reject path-traversal or shell-unsafe characters in custom entity IDs."""
+    clean = (raw_id or "").strip()
+    if not clean:
+        return ""
+    if not _SAFE_ENTITY_ID_RE.match(clean):
+        raise ValueError(
+            f"Invalid `{field_name}` ('{clean}'): must match `^[A-Za-z0-9][A-Za-z0-9_-]{{0,63}}$` (no slashes or `..`)."
+        )
+    return clean
+
+
+def assert_safe_subpath(target: Path, root: Path) -> Path:
+    """Verify `target` resolves strictly inside `root` to prevent directory traversal."""
+    res_target = target.resolve()
+    res_root = root.resolve()
+    if not res_target.is_relative_to(res_root):
+        raise ValueError(f"Security Gate: Path `{res_target}` escapes workspace root `{res_root}`.")
+    return res_target
 
 
 def validate_proposal_schema(

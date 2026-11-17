@@ -50,12 +50,14 @@ def handle_status(args: argparse.Namespace) -> int:
 
 
 def handle_recall(args: argparse.Namespace) -> int:
-    ws = "" if getattr(args, "use_global", False) else str(Path(args.workspace).resolve())
+    use_glb = bool(getattr(args, "use_global", False))
+    ws = "" if use_glb else str(Path(args.workspace).resolve())
     res = execute_command(
         "recall",
         {
             "query": args.query,
             "workspace": ws,
+            "scope": "global" if use_glb else "local",
             "include_global": True,
             "include_siblings": bool(getattr(args, "siblings", False)),
             "limit": args.limit,

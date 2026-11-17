@@ -9,7 +9,12 @@ from supermemory.cognitive.novelty_guard import enforce_novelty_against_history,
 from supermemory.graph.auto_linker import wire_contextual_edges
 from supermemory.graph.query_engine import QueryEngine
 from supermemory.lifecycle.experiments import record_scientific_experiment
-from supermemory.lifecycle.validators import assert_all_steps_completed, validate_proposal_schema
+from supermemory.lifecycle.validators import (
+    assert_all_steps_completed,
+    assert_safe_subpath,
+    validate_proposal_schema,
+    validate_safe_entity_id,
+)
 from supermemory.models import (
     EdgeType,
     ExperimentVerdict,
@@ -157,9 +162,9 @@ class LifecycleManager:
             bottleneck_id=bottleneck_id, est_loc=est_loc, coupled_vars=coupled_vars,
             kill_criterion=kill_criterion, strict_occam=strict_occam,
         )
-        pid = proposal_id.strip() or self._next_id("PROP", NodeType.PROPOSAL.value)
+        pid = validate_safe_entity_id(proposal_id, "proposal_id") if proposal_id.strip() else self._next_id("PROP", NodeType.PROPOSAL.value)
         slug = f"{pid}_{_slugify(title)}"
-        prop_dir = self.store.mem_dir / "04_PROPOSALS" / slug
+        prop_dir = assert_safe_subpath(self.store.mem_dir / "04_PROPOSALS" / slug, self.store.workspace_root)
         prop_dir.mkdir(parents=True, exist_ok=True)
 
         (prop_dir / "proposal.md").write_text(
@@ -222,13 +227,16 @@ class LifecycleManager:
         st = new_stage.upper()
         if st not in valid_stages:
             raise ValueError(f"Invalid stage '{new_stage}'. Valid: {sorted(valid_stages)}")
-        if st == ProposalStage.AUDITED.value and not node.metadata.get("audits"):
+        audits = list(node.metadata.get("audits") or [])
+        if st == ProposalStage.AUDITED.value and not audits:
             p_tasks = [str(x).strip() for x in (node.metadata.get("tasks") or []) if str(x).strip()]
             p_done = [bool(x) for x in (node.metadata.get("tasks_done") or [])]
             assert_all_steps_completed(proposal_id, p_tasks, p_done)
-        if st == ProposalStage.ARCHIVED.value and not node.metadata.get("audits"):
+        if st == ProposalStage.ARCHIVED.value and not any(
+            isinstance(a, dict) and str(a.get("verdict") or "").upper() == "APPROVE" for a in audits
+        ):
             raise ValueError(
-                f"LAW-06 Gate: Cannot ARCHIVE {proposal_id} without at least one Challenger/Victory Audit verdict."
+                f"LAW-06 Gate: Cannot ARCHIVE {proposal_id} without at least one APPROVE Challenger/Victory Audit verdict."
             )
         node.status = st
         if note:
@@ -248,6 +256,9 @@ class LifecycleManager:
         monotonic_verified: bool = True,
         zero_leakage_verified: bool = True,
     ) -> Dict[str, Any]:
+        target_node = self.store.get_node(target_id)
+        if target_node is None:
+            raise ValueError(f"Audit target not found: {target_id}")
         audit_id = self._next_id("AUDIT", NodeType.AGENT_RUN.value)
         clean_verdict = verdict.upper()
         node = self.store.upsert_node(
@@ -272,14 +283,12 @@ class LifecycleManager:
         )
         self.store.log_event("AUDIT_VERDICT", target_id, f"{auditor_role} -> {clean_verdict} on {target_id}: {findings[:110]}")
         self.store.add_edge(MemoryEdge(source_id=target_id, target_id=audit_id, relation=EdgeType.AUDITED_BY.value))
-        target_node = self.store.get_node(target_id)
-        if target_node:
-            audits = list(target_node.metadata.get("audits") or [])
-            audits.append({"audit_id": audit_id, "role": auditor_role, "verdict": clean_verdict})
-            target_node.metadata["audits"] = audits
-            if target_node.node_type == NodeType.PROPOSAL.value and clean_verdict == "APPROVE":
-                target_node.status = ProposalStage.AUDITED.value
-            elif target_node.node_type == NodeType.EXPERIMENT.value and clean_verdict == "APPROVE":
-                target_node.status = ExperimentVerdict.VICTORY_CONFIRMED.value
-            self.store.upsert_node(target_node, log_event=False)
+        audits = list(target_node.metadata.get("audits") or [])
+        audits.append({"audit_id": audit_id, "role": auditor_role, "verdict": clean_verdict})
+        target_node.metadata["audits"] = audits
+        if target_node.node_type == NodeType.PROPOSAL.value and clean_verdict == "APPROVE":
+            target_node.status = ProposalStage.AUDITED.value
+        elif target_node.node_type == NodeType.EXPERIMENT.value and clean_verdict == "APPROVE":
+            target_node.status = ExperimentVerdict.VICTORY_CONFIRMED.value
+        self.store.upsert_node(target_node, log_event=False)
         return node.to_dict()

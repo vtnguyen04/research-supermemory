@@ -45,7 +45,7 @@ supermemory ui
 supermemory recall "rollout drift" --siblings
 
 # 4. Log a bottleneck and fetch SOTA papers into memory/07_METHOD_VAULT/
-supermemory bottleneck diagnose --title "Long-horizon drift" --error-share 58 --ceiling-gain 0.09
+supermemory bottleneck add --title "Long-horizon drift" --slice "t > 60 rollout steps" --share 58 --ceiling 0.09 --rq "Can latent MPC curb drift?"
 supermemory scout search "model predictive control latent rollout" --bottleneck BNK-001 --save-top 2
 
 # 5. Audit code gates or export a cross-agent handoff file
@@ -68,8 +68,8 @@ flowchart LR
 | :--- | :--- |
 | `.supermemory/supermemory.db` | Local SQLite WAL + FTS5 graph, Kanban subtasks, DAG glob leases, and HTTP paper cache. |
 | `~/.supermemory/global/` | Cross-project rules, lessons, and registered workspace index. |
-| `memory/01_ACTIVE_STATE.md` | Current goal, phase, and top open bottlenecks (`< 150` lines). |
-| `memory/02_CONSTITUTION_AND_LESSONS.md` | Project laws (`LAW-01`..`08`), deduplicated lessons, and active `CodeGates` (`< 200` lines). |
+| `memory/01_ACTIVE_STATE.md` | Current goal, phase, Kanban tasks, and top open bottlenecks (`<= 180` lines). |
+| `memory/02_CONSTITUTION_AND_LESSONS.md` | Project laws (`LAW-01`..`08`), deduplicated lessons, and active `CodeGates` (`<= 250` lines). |
 | `memory/04_PROPOSALS/` | OpenSpec proposals (`PROPOSED` -> `DESIGNED` -> `IMPLEMENTING` -> `AUDITED` -> `ARCHIVED`). |
 | `memory/07_METHOD_VAULT/` | Distilled SOTA paper cards (`METH-XXX.md`). |
 | `memory/08_BOTTLENECKS/` | Quantified failure slices (`BNK-XXX.md`) and research questions (`RQ-XXX`). |

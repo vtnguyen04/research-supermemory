@@ -105,7 +105,7 @@
       this.open(ex ? tr(`Edit CodeGate ${ex.id}`, `Chỉnh sửa CodeGate ${ex.id}`) : tr("Add PreToolUse CodeGate / SHA-256 Freeze", "Thêm Chốt chặn PreToolUse CodeGate / Khóa SHA-256"),
         (ex ? "" : fld("freeze_path", tr("Freeze File Integrity via SHA-256 (optional)", "Khóa toàn vẹn tệp bằng SHA-256 (tùy chọn)"), inp("freeze_path", "", "eval/evaluate.py"))) +
         row2(fld("name", tr("Gate Name", "Tên Gate"), inp("name", ex?.name || "", "Block Print Debug")), fld("law_id", tr("Bound LAW", "Thuộc LAW"), inp("law_id", ex?.law_id || "LAW-08"))) +
-        row2(fld("gate_type", tr("Gate Type", "Loại Gate"), sel("gate_type", ["FORBIDDEN_REGEX", "FORBIDDEN_CMD_PATTERN", "MAX_LINES", "FROZEN_SHA256", "CHANGELOG_SYNC"], ex?.gate_type || "FORBIDDEN_REGEX")),
+        row2(fld("gate_type", tr("Gate Type", "Loại Gate"), sel("gate_type", ["FORBIDDEN_REGEX", "FORBIDDEN_CMD_PATTERN", "FORBIDDEN_FILENAME", "AST_SYNTAX", "MAX_LINES", "FROZEN_SHA256", "CHANGELOG_SYNC"], ex?.gate_type || "FORBIDDEN_REGEX")),
              fld("target_glob", "Target Glob", inp("target_glob", ex?.target_glob || "**/*.py"))) +
         fld("pattern", tr("Rule Pattern / Max Lines / SHA-256", "Biểu thức Regex / Số dòng / SHA-256"), area("pattern", ex?.pattern || "", 2)),
         async (v) => {
@@ -154,7 +154,7 @@
 
     async runAuditDialog() {
       const res = await this.postJson("/api/audit", {});
-      const vList = (res.violations || []).map((v) => `<li><code>${esc(v.gate_id)}</code>: ${esc(v.message)}</li>`).join("");
+      const vList = (res.violations || []).map((v) => typeof v === "string" ? `<li><code>${esc(v)}</code></li>` : `<li><code>${esc(v.gate_id)}</code>: ${esc(v.message)}</li>`).join("");
       this.open(tr("Full Workspace CodeGate Audit Results", "Kết quả Kiểm định Toàn bộ Workspace"),
         `<div>${statusTag(res.passed ? "ACTIVE" : "FAILED", res.passed ? tr("100% PASSED", "ĐẠT CHUẨN 100%") : tr("VIOLATIONS FOUND", "PHÁT HIỆN VI PHẠM"))}</div>` +
         `<p class="row-desc">${tr(`Scanned ${res.checked_files || 0} files across ${res.active_gates || res.gates_evaluated || 0} active CodeGates.`, `Đã quét ${res.checked_files || 0} tệp qua ${res.active_gates || res.gates_evaluated || 0} chốt chặn CodeGate.`)}</p>` +

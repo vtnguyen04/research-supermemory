@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 import shlex
 from pathlib import Path
 from typing import Any, Dict, List
 
+from supermemory.gates.sim_helpers import extract_tool_file_path
 from supermemory.hooks.compaction_probe import extract_memory_read_relpath
 from supermemory.kernel import classify_mcp_call
 from supermemory.lifecycle.validators import summarize_active_task_focus
@@ -26,15 +28,39 @@ _DEV_PLUMBING_PREFIXES = (
     "git push", "git tag", "agy plugin validate", "supermemory audit", "supermemory status",
     "supermemory recall", "supermemory workspaces", "supermemory gate list",
 )
-_SM_CLI_MUTATIONS = (
-    "supermemory sync", "supermemory exp", "supermemory learn", "supermemory idea",
-    "supermemory proposal", "supermemory gate add", "supermemory gate freeze",
-    "supermemory checkpoint", "supermemory consolidate", "supermemory promote",
-    "supermemory bottleneck add", "supermemory bottleneck resolve",
-    "supermemory scout", "supermemory orchestrate plan", "supermemory orchestrate complete",
-)
+_SM_MUTATION_SUBCMDS = {
+    "sync", "exp", "learn", "idea", "proposal", "checkpoint",
+    "consolidate", "promote", "scout", "orchestrate", "bottleneck", "gate",
+}
 _EXTERNAL_DOMAINS = ("arxiv.org", "semanticscholar.org", "openalex.org", "huggingface.co/papers")
 _IGNORED_DIR_PARTS = {".supermemory", "memory", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+
+
+def _split_shell_segments(raw: str) -> List[List[str]]:
+    parsed: List[List[str]] = []
+    for seg in re.split(r"(?:&&|\|\||[;|\n&])", raw or ""):
+        clean = seg.strip().removeprefix("uv run ").strip()
+        if not clean:
+            continue
+        try:
+            toks = shlex.split(clean)
+        except ValueError:
+            toks = clean.split()
+        if toks and Path(toks[0]).name.lower() == "rtk" and len(toks) > 1:
+            toks = toks[1:]
+        if toks:
+            parsed.append(toks)
+    return parsed
+
+
+def _has_sm_cli_subcmd(cmd: str, subcmds: set[str]) -> bool:
+    for toks in _split_shell_segments(cmd):
+        prog = Path(toks[0]).name.lower()
+        if prog in ("supermemory", "research-supermemory") and len(toks) >= 2 and toks[1] in subcmds:
+            if toks[1] == "gate" and len(toks) >= 3 and toks[2] == "list":
+                continue
+            return True
+    return False
 
 
 def _classify_shell_command(cmd: str) -> str:
@@ -42,30 +68,23 @@ def _classify_shell_command(cmd: str) -> str:
     raw = (cmd or "").strip()
     if not raw:
         return "READONLY"
+    if _has_sm_cli_subcmd(raw, _SM_MUTATION_SUBCMDS):
+        return "SM_MUTATION"
     if any(d in raw.lower() for d in _EXTERNAL_DOMAINS):
         return "EXTERNAL_RESEARCH"
-    if any(m in raw for m in _SM_CLI_MUTATIONS):
-        return "SM_MUTATION"
 
-    segments = [seg.strip() for part in raw.split("&&") for seg in part.split(";") if seg.strip()]
     has_substantive = False
-    for seg in segments:
-        low = seg.removeprefix("uv run ").strip()
-        if any(low.startswith(p) for p in _DEV_PLUMBING_PREFIXES):
-            continue
-        try:
-            toks = shlex.split(low)
-        except ValueError:
-            toks = low.split()
-        if not toks:
+    for toks in _split_shell_segments(raw):
+        joined = " ".join(toks)
+        if any(joined.startswith(p) for p in _DEV_PLUMBING_PREFIXES):
             continue
         prog = Path(toks[0]).name.lower()
-        if prog == "rtk" and len(toks) > 1:
-            toks = toks[1:]
-            prog = Path(toks[0]).name.lower()
         if prog in _READONLY_BINS:
             continue
         if prog == "git" and (len(toks) < 2 or toks[1] in _READONLY_GIT_SUBCMDS):
+            continue
+        if any(op in joined for op in (">", ">>", "tee ")):
+            has_substantive = True
             continue
         has_substantive = True
     return "SUBSTANTIVE_EXEC" if has_substantive else "READONLY"
@@ -90,9 +109,9 @@ def _is_kanban_sync_action(t_name: str, norm_mcp: str, inner_args: Dict[str, Any
             return True
         if str(inner_args.get("status") or "").upper() == "CLEAN" and not inner_args.get("insights") and not inner_args.get("insight_title"):
             return True
-    if "supermemory orchestrate" in cmd or "supermemory proposal" in cmd:
+    if _has_sm_cli_subcmd(cmd, {"orchestrate", "proposal"}):
         return True
-    return "supermemory checkpoint" in cmd and "--status CLEAN" in cmd
+    return _has_sm_cli_subcmd(cmd, {"checkpoint"}) and "--status" in cmd and "CLEAN" in cmd
 
 
 def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any], is_claude: bool = False) -> Dict[str, Any]:
@@ -117,8 +136,7 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
         store.log_event("MEMORY_READ", Path(mem_rel).stem[:32], f"Agent read `{mem_rel}`")
 
     if not err and (
-        "supermemory learn" in cmd
-        or "supermemory gate" in cmd
+        (t_name in ("run_command", "bash") and _has_sm_cli_subcmd(cmd, {"learn", "gate"}))
         or (("supermemory" in t_name or "supermemory" in mcp_srv) and ("record_lesson" in t_name or "add_gate" in t_name or norm_mcp in ("record_lesson", "add_gate")))
     ):
         st["pending_lesson_lock"] = False
@@ -173,12 +191,9 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
                 "`07_METHOD_VAULT/` (`scout_sota`), `08_BOTTLENECKS/` (`diagnose_bottleneck`), or `checkpoint(insights=[...])`."
             )
 
-    if not err and t_name in ("write_file", "edit_file", "write", "edit", "multiedit", "replace_file_content", "multi_replace_file_content"):
-        raw_p = str(t_args.get("Path") or t_args.get("TargetFile") or t_args.get("file_path") or "")
-        if "02_CONSTITUTION_AND_LESSONS.md" in raw_p:
-            st["pending_lesson_lock"] = False
-            st["turn_memory_handled"] = True
-        elif raw_p:
+    if not err and t_name in ("write_file", "edit_file", "write", "edit", "multiedit", "replace_file_content", "multi_replace_file_content", "notebookedit"):
+        raw_p = extract_tool_file_path(t_args)
+        if raw_p:
             abs_p = (Path(raw_p) if Path(raw_p).is_absolute() else (store.workspace_root / raw_p)).resolve()
             if abs_p.is_relative_to(store.workspace_root):
                 rel_parts = abs_p.relative_to(store.workspace_root).parts

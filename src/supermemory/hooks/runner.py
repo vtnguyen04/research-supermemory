@@ -12,7 +12,11 @@ from supermemory.cognitive.federation import ensure_global_memory, federated_rec
 from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.hooks.claude_bridge import format_hook_output, is_claude_code_payload, normalize_hook_input
-from supermemory.hooks.compaction_probe import probe_transcript_compaction, reset_state_on_compaction
+from supermemory.hooks.compaction_probe import (
+    has_content_overlap,
+    probe_transcript_compaction,
+    reset_state_on_compaction,
+)
 from supermemory.hooks.turn_tracker import evaluate_stop_gate, track_post_tool_use
 from supermemory.models import NodeType
 from supermemory.research.kanban_digest import build_kanban_board_digest
@@ -22,23 +26,6 @@ from supermemory.storage.snapshot_io import get_session_state, save_session_stat
 from supermemory.storage.sqlite_store import GraphStore
 
 _EXPLICIT_ID_RE = re.compile(r"\b(?:BNK|RQ|METH|EXP|OBS|PROC|PROP|IDEA|ALGO|LESSON|DAG)-\d+[A-Z0-9-]*\b", re.IGNORECASE)
-_WORD4_RE = re.compile(r"[0-9a-zA-Z_\u00C0-\u1EF9]{4,}")
-_FUNC_WORDS = {
-    "this", "that", "with", "from", "have", "what", "when", "where", "which", "there", "their", "about",
-    "những", "được", "không", "trong", "đang", "phải", "nhiều", "nhưng", "chưa", "xem", "hiện",
-}
-
-
-def _has_content_overlap(query: str, hit: Dict[str, Any]) -> bool:
-    hid = str(hit.get("id") or "").upper()
-    if hid and hid in query.upper():
-        return True
-    q_words = {w.lower() for w in _WORD4_RE.findall(query)} - _FUNC_WORDS
-    if not q_words:
-        return False
-    d_txt = f"{hit.get('title', '')} {hit.get('summary', '')}"
-    d_words = {w.lower() for w in _WORD4_RE.findall(d_txt)} - _FUNC_WORDS
-    return bool(q_words & d_words)
 
 
 def _resolve_supermemory_workspace(payload: Dict[str, Any]) -> Optional[Path]:
@@ -94,7 +81,7 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
     with GraphStore(ws) as store:
         set_active_workspace(ws)
         if ev == "SessionStart":
-            out = _on_session_start(store, conv_id)
+            out = _on_session_start(store, conv_id, payload)
         elif ev == "PreInvocation":
             out = _on_pre_invocation(store, conv_id, payload)
         elif ev == "PreToolUse":
@@ -106,12 +93,12 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
     return format_hook_output(raw_ev, out, is_claude)
 
 
-def _on_session_start(store: GraphStore, conv_id: str) -> Dict[str, Any]:
+def _on_session_start(store: GraphStore, conv_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     capsule = build_tiered_capsule(store, global_rules=_global_rule_titles())
     st = get_session_state(store, conv_id)
-    _, m0 = probe_transcript_compaction(conv_id, "")
-    if m0:
-        st["last_compaction_marker"] = m0
+    t_path = str((payload or {}).get("transcriptPath") or "")
+    _, m0 = probe_transcript_compaction(conv_id, "", t_path)
+    st["last_compaction_marker"] = m0 or "NONE"
     st["last_capsule_step"] = 0
     st["last_capsule_inv"] = 0
     save_session_state(store, st)
@@ -210,7 +197,7 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
             results = rec.get("results") or []
             seen_warns = set(st.get("recalled_warnings") or [])
             if rec.get("anti_repeat_warnings") and any(
-                float(r.get("score") or 0.0) >= 0.28 and _has_content_overlap(clean_in, r) for r in results
+                float(r.get("score") or 0.0) >= 0.28 and has_content_overlap(clean_in, r) for r in results
             ):
                 fresh_warns = [w for w in rec["anti_repeat_warnings"] if w not in seen_warns][:3]
                 if fresh_warns:
@@ -222,7 +209,7 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
                 r
                 for r in results
                 if float(r.get("score") or 0.0) >= 0.30
-                and _has_content_overlap(clean_in, r)
+                and has_content_overlap(clean_in, r)
                 and not r.get("superseded_by")
                 and r.get("status") not in ("SUPERSEDED", "CONSOLIDATED")
                 and r.get("type") not in ("LAW", "GATE")
@@ -267,9 +254,11 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
 
 
 def _on_pre_tool_use(store: GraphStore, payload: Dict[str, Any]) -> Dict[str, Any]:
-    tc = payload.get("toolCall") or {}
-    t_name = str(tc.get("name") or "")
-    t_args = tc.get("args") or {}
+    raw_tc = payload.get("toolCall")
+    tc: Dict[str, Any] = raw_tc if isinstance(raw_tc, dict) else {}
+    t_name = str(tc.get("name") or payload.get("toolName") or payload.get("tool_name") or "")
+    raw_args = tc.get("args") if tc.get("args") is not None else (payload.get("toolInput") or payload.get("tool_input") or {})
+    t_args = raw_args if isinstance(raw_args, dict) else {}
     decision = GateEnforcer(store).evaluate_tool_call(t_name, t_args)
     if not decision.allowed:
         return {
@@ -281,11 +270,22 @@ def _on_pre_tool_use(store: GraphStore, payload: Dict[str, Any]) -> Dict[str, An
 
 def main_from_stdin(event_name: str) -> int:
     """CLI entrypoint reading Antigravity/Claude Code hook JSON from stdin and printing JSON to stdout."""
-    raw = sys.stdin.read().strip()
-    payload = json.loads(raw) if raw else {}
-    out = dispatch_hook(event_name, payload)
-    if event_name.strip() == "PostToolUse" and not is_claude_code_payload(payload):
-        out = {}
+    try:
+        raw = sys.stdin.read().strip()
+        payload = json.loads(raw) if raw else {}
+        if not isinstance(payload, dict):
+            payload = {}
+        out = dispatch_hook(event_name, payload)
+        if event_name.strip() == "PostToolUse" and not is_claude_code_payload(payload):
+            out = {}
+    except Exception as exc:
+        ev_clean = (event_name or "").strip()
+        if ev_clean == "PreToolUse":
+            out = {"decision": "deny", "reason": f"SuperMemory hook internal error: {exc}"}
+        elif ev_clean == "Stop":
+            out = {"decision": "allow"}
+        else:
+            out = {}
     sys.stdout.write(json.dumps(out, ensure_ascii=False) + "\n")
     sys.stdout.flush()
     return 0

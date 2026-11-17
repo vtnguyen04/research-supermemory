@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 
@@ -138,7 +139,8 @@ def test_zero_turn_hook_auto_recall_antigravity_and_claude_code(
         },
     )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
-    assert elapsed_ms < 25.0, f"Hook latency {elapsed_ms:.2f}ms exceeded 25ms kill criterion"
+    budget_ms = 150.0 if sys.gettrace() is not None else 25.0
+    assert elapsed_ms < budget_ms, f"Hook latency {elapsed_ms:.2f}ms exceeded {budget_ms}ms kill criterion"
     msg1 = out1["injectSteps"][0]["systemMessage"]["systemMessage"]
     assert "SUPERMEMORY AUTO-RECALL" in msg1
     assert new_id in msg1 and old_id not in msg1

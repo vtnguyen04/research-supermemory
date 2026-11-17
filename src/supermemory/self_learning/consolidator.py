@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List
 
+from supermemory.gates.sim_helpers import validate_regex_pattern
 from supermemory.models import CodeGate, EdgeType, GateType, MemoryEdge, MemoryNode, NodeType, utc_now_iso
 from supermemory.storage.sqlite_store import GraphStore
 
@@ -60,6 +61,12 @@ class LessonConsolidator:
     ) -> Dict[str, Any]:
         """Record a lesson, fold into a Law, write archive file, and optionally bind a CodeGate."""
         lid = lesson_id.strip() or self.next_lesson_id()
+        if not re.match(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", lid):
+            raise ValueError(f"Invalid `lesson_id`: `{lid}`")
+        if forbid_regex.strip():
+            validate_regex_pattern(forbid_regex, "forbid_regex")
+        if forbid_cmd_regex.strip():
+            validate_regex_pattern(forbid_cmd_regex, "forbid_cmd_regex")
         resolved_law_id = self._resolve_or_create_law(law_id, new_law_title, title, prevention_rule)
 
         # Write full archival detail to memory/lessons/<LESSON-ID>.md so 0% history is ever lost
@@ -125,70 +132,64 @@ class LessonConsolidator:
                 )
             )
 
-        created_gate: Optional[CodeGate] = None
+        created_gates: List[CodeGate] = []
         if forbid_regex.strip():
             gid = self.next_gate_id()
-            created_gate = self.store.upsert_gate(
-                CodeGate(
-                    id=gid,
-                    gate_type=GateType.FORBIDDEN_REGEX.value,
-                    name=f"Guard for {lid}: {title[:60]}",
-                    law_id=resolved_law_id,
-                    lesson_id=lid,
-                    target_glob=target_glob or "**/*.py",
-                    pattern=forbid_regex.strip(),
-                    config={"ignore_comments": True},
+            created_gates.append(
+                self.store.upsert_gate(
+                    CodeGate(
+                        id=gid,
+                        gate_type=GateType.FORBIDDEN_REGEX.value,
+                        name=f"Guard for {lid}: {title[:60]}",
+                        law_id=resolved_law_id,
+                        lesson_id=lid,
+                        target_glob=target_glob or "**/*.py",
+                        pattern=forbid_regex.strip(),
+                        config={"ignore_comments": True},
+                    )
                 )
             )
-        elif forbid_cmd_regex.strip():
+        if forbid_cmd_regex.strip():
             gid = self.next_gate_id()
-            created_gate = self.store.upsert_gate(
-                CodeGate(
-                    id=gid,
-                    gate_type=GateType.FORBIDDEN_CMD_PATTERN.value,
-                    name=f"CLI Guard for {lid}: {title[:60]}",
-                    law_id=resolved_law_id,
-                    lesson_id=lid,
-                    target_glob="run_command",
-                    pattern=forbid_cmd_regex.strip(),
+            created_gates.append(
+                self.store.upsert_gate(
+                    CodeGate(
+                        id=gid,
+                        gate_type=GateType.FORBIDDEN_CMD_PATTERN.value,
+                        name=f"CLI Guard for {lid}: {title[:60]}",
+                        law_id=resolved_law_id,
+                        lesson_id=lid,
+                        target_glob="run_command",
+                        pattern=forbid_cmd_regex.strip(),
+                    )
                 )
             )
 
-        if created_gate:
+        for cg in created_gates:
             gate_node = MemoryNode(
-                id=created_gate.id,
+                id=cg.id,
                 node_type=NodeType.GATE.value,
-                title=created_gate.name,
-                summary=f"[{created_gate.gate_type}] pattern=`{created_gate.pattern}` on `{created_gate.target_glob}`",
+                title=cg.name,
+                summary=f"[{cg.gate_type}] pattern=`{cg.pattern}` on `{cg.target_glob}`",
                 tags=["gate", resolved_law_id.lower()],
                 priority=95,
-                metadata=created_gate.to_dict(),
+                metadata=cg.to_dict(),
             )
             self.store.upsert_node(gate_node, log_event=False)
-            self.store.add_edge(
-                MemoryEdge(
-                    source_id=resolved_law_id,
-                    target_id=created_gate.id,
-                    relation=EdgeType.ENFORCED_BY.value,
-                )
-            )
-            self.store.add_edge(
-                MemoryEdge(
-                    source_id=created_gate.id,
-                    target_id=lid,
-                    relation=EdgeType.BLOCKS_RECURRENCE_OF.value,
-                )
-            )
+            self.store.add_edge(MemoryEdge(source_id=resolved_law_id, target_id=cg.id, relation=EdgeType.ENFORCED_BY.value))
+            self.store.add_edge(MemoryEdge(source_id=cg.id, target_id=lid, relation=EdgeType.BLOCKS_RECURRENCE_OF.value))
 
+        lead_gate = created_gates[0] if created_gates else None
         self.store.log_event(
             "SELF_LEARNING_COMMIT",
             lid,
-            f"Learned {lid} -> {resolved_law_id}" + (f" + {created_gate.id}" if created_gate else ""),
+            f"Learned {lid} -> {resolved_law_id}" + (f" + {', '.join(g.id for g in created_gates)}" if created_gates else ""),
         )
         return {
             "lesson_id": lid,
             "law_id": resolved_law_id,
-            "gate_id": created_gate.id if created_gate else None,
+            "gate_id": lead_gate.id if lead_gate else None,
+            "gate_ids": [g.id for g in created_gates],
             "archive_path": rel_path,
         }
 

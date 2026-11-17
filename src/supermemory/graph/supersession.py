@@ -76,17 +76,18 @@ def apply_supersedes_links(
     linked: List[str] = []
     lead_new = clean_new[-1]
     for old_id in clean_old:
-        for new_id in clean_new:
-            if new_id != old_id:
-                store.add_edge(MemoryEdge(source_id=new_id, target_id=old_id, relation=EdgeType.SUPERSEDES.value))
         if old_id == lead_new:
             continue
         old_nd = store.get_node(old_id)
-        if old_nd is not None and not is_negative_warning_node(old_nd) and old_nd.node_type != NodeType.LAW.value:
-            old_nd.metadata["superseded_by"] = lead_new
-            if old_nd.node_type == NodeType.OBSERVATION.value:
-                old_nd.status = "SUPERSEDED"
-            store.upsert_node(old_nd, log_event=False)
+        if old_nd is None or is_negative_warning_node(old_nd) or old_nd.node_type == NodeType.LAW.value:
+            continue
+        for new_id in clean_new:
+            if new_id != old_id:
+                store.add_edge(MemoryEdge(source_id=new_id, target_id=old_id, relation=EdgeType.SUPERSEDES.value))
+        old_nd.metadata["superseded_by"] = lead_new
+        if old_nd.node_type == NodeType.OBSERVATION.value:
+            old_nd.status = "SUPERSEDED"
+        store.upsert_node(old_nd, log_event=False)
         store.log_event("NODE_SUPERSEDED", old_id, f"{old_id} superseded by {lead_new}")
         linked.append(old_id)
     return linked

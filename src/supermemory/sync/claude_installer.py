@@ -79,10 +79,13 @@ def install_claude_code_integration(
     c_data: Dict[str, Any] = {}
     if c_json.is_file():
         try:
-            c_data = json.loads(c_json.read_text(encoding="utf-8"))
+            loaded = json.loads(c_json.read_text(encoding="utf-8"))
+            c_data = loaded if isinstance(loaded, dict) else {}
         except (OSError, json.JSONDecodeError):
             c_data = {}
-    mcp_servers = c_data.setdefault("mcpServers", {})
+    if not isinstance(c_data.get("mcpServers"), dict):
+        c_data["mcpServers"] = {}
+    mcp_servers = c_data["mcpServers"]
     mcp_servers["supermemory_graph"] = {
         "type": "stdio",
         "command": sm_bin,
@@ -96,23 +99,28 @@ def install_claude_code_integration(
     settings: Dict[str, Any] = {}
     if settings_path.is_file():
         try:
-            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+            loaded_s = json.loads(settings_path.read_text(encoding="utf-8"))
+            settings = loaded_s if isinstance(loaded_s, dict) else {}
         except (OSError, json.JSONDecodeError):
             settings = {}
 
-    perms = settings.setdefault("permissions", {})
+    if not isinstance(settings.get("permissions"), dict):
+        settings["permissions"] = {}
+    perms = settings["permissions"]
     allow_list: List[str] = list(perms.get("allow") or [])
     for rule in ("mcp__supermemory_graph__*", "Bash(supermemory *)"):
         if rule not in allow_list:
             allow_list.append(rule)
     perms["allow"] = allow_list
 
-    hooks_cfg: Dict[str, Any] = settings.setdefault("hooks", {})
+    if not isinstance(settings.get("hooks"), dict):
+        settings["hooks"] = {}
+    hooks_cfg: Dict[str, Any] = settings["hooks"]
     sm_events: Dict[str, Dict[str, Any]] = {
-        "SessionStart": {"matcher": "*", "cmd": f'"{sm_bin}" hook SessionStart', "timeout": 10},
+        "SessionStart": {"matcher": None, "cmd": f'"{sm_bin}" hook SessionStart', "timeout": 10},
         "UserPromptSubmit": {"matcher": None, "cmd": f'"{sm_bin}" hook UserPromptSubmit', "timeout": 10},
-        "PreToolUse": {"matcher": "Write|Edit|MultiEdit|Bash", "cmd": f'"{sm_bin}" hook PreToolUse', "timeout": 10},
-        "PostToolUse": {"matcher": "*", "cmd": f'"{sm_bin}" hook PostToolUse', "timeout": 10},
+        "PreToolUse": {"matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash", "cmd": f'"{sm_bin}" hook PreToolUse', "timeout": 10},
+        "PostToolUse": {"matcher": None, "cmd": f'"{sm_bin}" hook PostToolUse', "timeout": 10},
         "Stop": {"matcher": None, "cmd": f'"{sm_bin}" hook Stop', "timeout": 10},
     }
     for ev, spec in sm_events.items():

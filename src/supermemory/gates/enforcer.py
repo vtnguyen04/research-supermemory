@@ -10,6 +10,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
 
+from supermemory.gates.sim_helpers import (
+    check_shell_frozen_write_bypass,
+    extract_tool_file_path,
+    match_forbidden_regex,
+    simulate_file_text,
+)
 from supermemory.models import CodeGate, EdgeType, GateType, MemoryEdge, MemoryNode, NodeType
 from supermemory.storage.sqlite_store import GraphStore
 
@@ -104,22 +110,30 @@ class GateEnforcer:
             cmd = str(tool_args.get("CommandLine") or tool_args.get("command") or "")
             for g in gates:
                 if g.gate_type == GateType.FORBIDDEN_CMD_PATTERN.value and g.pattern:
-                    if re.search(g.pattern, cmd):
+                    try:
+                        matched = bool(re.search(g.pattern, cmd))
+                    except re.error:
+                        matched = False
+                    if matched:
                         msg = f"[{g.id}/{g.law_id or 'LAW'}] Blocked command matching `{g.name}`"
                         violations.append(msg)
                         triggered.append(g.id)
                         self.store.record_gate_block(g.id, f"{msg}: {cmd[:120]}")
+            for fg_id, fg_msg in check_shell_frozen_write_bypass(cmd, gates):
+                violations.append(fg_msg)
+                triggered.append(fg_id)
+                self.store.record_gate_block(fg_id, f"{fg_msg}: {cmd[:120]}")
             return GateDecision(allowed=not violations, violations=violations, triggered_gate_ids=triggered)
 
-        if t_low in ("write_file", "edit_file", "write", "edit", "multiedit", "replace_file_content", "multi_replace_file_content"):
-            raw_path = str(tool_args.get("Path") or tool_args.get("TargetFile") or tool_args.get("file_path") or "")
+        if t_low in ("write_file", "edit_file", "write", "edit", "multiedit", "replace_file_content", "multi_replace_file_content", "notebookedit"):
+            raw_path = extract_tool_file_path(tool_args)
             if not raw_path:
                 return GateDecision(allowed=True)
             abs_p = (Path(raw_path) if Path(raw_path).is_absolute() else (self.store.workspace_root / raw_path)).resolve()
             if not abs_p.is_relative_to(self.store.workspace_root):
                 return GateDecision(allowed=True)
             rel = str(abs_p.relative_to(self.store.workspace_root)).replace("\\", "/")
-            candidate_text = self._simulate_file_text(t_low, abs_p, tool_args)
+            candidate_text = simulate_file_text(t_low, abs_p, tool_args)
             return self._check_file_gates(rel, candidate_text, gates, record_blocks=True, is_mutation=True)
 
         return GateDecision(allowed=True)
@@ -138,10 +152,12 @@ class GateEnforcer:
             if any(part in skip_dirs for part in rel_parts):
                 continue
             rel = "/".join(rel_parts)
+            if rel.startswith("plugin/lib/"):
+                continue
             checked_files += 1
             try:
                 text = p.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
+            except (UnicodeDecodeError, OSError):
                 text = ""
             dec = self._check_file_gates(rel, text, gates, record_blocks=False, is_mutation=False, disk_path=p)
             violations.extend(dec.violations)
@@ -205,7 +221,11 @@ class GateEnforcer:
                         violations.append(f"[{g.id}/{g.law_id}] Frozen SHA-256 mismatch on `{rel}`")
 
             elif g.gate_type == GateType.FORBIDDEN_FILENAME.value and g.pattern:
-                if re.search(g.pattern, rel):
+                try:
+                    bad_fn = bool(re.search(g.pattern, rel))
+                except re.error:
+                    bad_fn = False
+                if bad_fn:
                     msg = f"[{g.id}/{g.law_id}] Throwaway/forbidden filename `{rel}` violates `{g.name}`"
                     violations.append(msg)
                     triggered.append(g.id)
@@ -238,38 +258,20 @@ class GateEnforcer:
                         triggered.append(g.id)
 
             elif g.gate_type == GateType.FORBIDDEN_REGEX.value and g.pattern and text:
-                ignore_comments = bool(g.config.get("ignore_comments", True))
-                for idx, ln in enumerate(lines, 1):
-                    if ignore_comments and not rel.endswith(".md") and ln.lstrip().startswith("#"):
-                        continue
-                    if re.search(g.pattern, ln):
-                        msg = f"[{g.id}/{g.law_id}] Forbidden pattern in `{rel}:{idx}` ({g.name}): `{ln.strip()[:90]}`"
-                        violations.append(msg)
-                        triggered.append(g.id)
-                        break
+                hit = match_forbidden_regex(
+                    rel,
+                    text,
+                    g.pattern,
+                    ignore_comments=bool(g.config.get("ignore_comments", True)),
+                    force_multiline=bool(g.config.get("multiline", False)),
+                )
+                if hit is not None:
+                    line_no, snippet = hit
+                    msg = f"[{g.id}/{g.law_id}] Forbidden pattern in `{rel}:{line_no}` ({g.name}): `{snippet}`"
+                    violations.append(msg)
+                    triggered.append(g.id)
 
         if record_blocks:
             for gid, msg in zip(triggered, violations):
                 self.store.record_gate_block(gid, msg)
         return GateDecision(allowed=not violations, violations=violations, triggered_gate_ids=triggered)
-
-    @staticmethod
-    def _simulate_file_text(tool_low: str, abs_p: Path, args: Dict[str, Any]) -> str:
-        existing = abs_p.read_text(encoding="utf-8") if abs_p.is_file() else ""
-        if tool_low in ("write_file", "write"):
-            content = str(args.get("Content") or args.get("content") or "")
-            return (existing + content) if args.get("Append") else content
-        if tool_low in ("edit_file", "edit"):
-            target = str(args.get("Target") or args.get("old_string") or "")
-            repl = str(args.get("Replacement") or args.get("new_string") or "")
-            return existing.replace(target, repl) if (target and target in existing) else existing
-        if tool_low == "multiedit":
-            cur = existing
-            for ed in args.get("edits") or []:
-                if isinstance(ed, dict):
-                    t = str(ed.get("old_string") or "")
-                    r = str(ed.get("new_string") or "")
-                    if t and t in cur:
-                        cur = cur.replace(t, r)
-            return cur
-        return existing

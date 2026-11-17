@@ -82,7 +82,7 @@
     else if (sMode === "SCORE") filtered = [...filtered].sort((a, b) => { const sa = numScore(a), sb = numScore(b); return sa === null && sb === null ? 0 : sa === null ? 1 : sb === null ? -1 : minBetter ? sa - sb : sb - sa; });
     else if (sMode === "DELTA") filtered = [...filtered].sort((a, b) => { const da = a.delta_vs_baseline, db = b.delta_vs_baseline; return da == null && db == null ? 0 : da == null ? 1 : db == null ? -1 : minBetter ? da - db : db - da; });
 
-    const chart = document.getElementById("exp-chart-box"), scored = [...filtered].reverse().filter((e) => numScore(e) !== null);
+    const chart = document.getElementById("exp-chart-box"), scored = filtered.filter((e) => numScore(e) !== null).sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")) || String(a.exp_id || "").localeCompare(String(b.exp_id || "")));
     if (scored.length >= 2) {
       const vals = scored.map(numScore), minV = Math.min(...vals), maxV = Math.max(...vals), span = maxV - minV || 1, W = 1120, H = 152, px = 84, py = 28;
       const fmtV = (v) => (Math.abs(v) > 0 && Math.abs(v) < 1 ? v.toFixed(4) : Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(1));
@@ -173,9 +173,10 @@
     const toneOf = (t) => (/ERROR|BLOCK|FAIL|STOP_GATE/.test(t) ? "BLOCKED" : /AUDIT_PASSED|AUDIT_VERDICT|LEARN|CONSOLIDAT|CHECKPOINT/.test(t) ? "VERIFIED" : /KANBAN|DAG|GATE|STATE|RECALL|MEMORY_READ|COMPACTION|CAPSULE|PULSE/.test(t) ? "READY" : "LOGGED");
     box.innerHTML = pg.slice.length ? pg.slice.map((ev) => {
       const et = String(ev.event_type || "EVENT"), cleanSum = cleanText(String(ev.summary || ""), 180).replace(/^([A-Z0-9-]+):\s*(?:\[[A-Z0-9_ -]+\]\s*)?\1:\s*/, "$1: ");
-      const openBtn = ev.entity_id && nodeSet.has(ev.entity_id) ? `<button type="button" class="btn btn-secondary btn-xs" data-nid="${esc(ev.entity_id)}">${tr("Open", "Mở")}</button>` : "";
+      const rawEid = String(ev.entity_id || ""), shortEid = /^[0-9a-f]{8}-[0-9a-f-]{18,}$/i.test(rawEid) ? `sess:${rawEid.slice(0, 8)}` : (rawEid.length > 18 ? `${rawEid.slice(0, 17)}…` : rawEid);
+      const openBtn = rawEid && nodeSet.has(rawEid) ? `<button type="button" class="btn btn-secondary btn-xs" data-nid="${esc(rawEid)}">${tr("Open", "Mở")}</button>` : "";
       return `<div role="listitem" class="ledger-item-static event-cell">
-      <div class="row-top"><span class="badge-cluster">${statusTag(toneOf(et), et)}${ev.entity_id ? `<span class="mono-id">${esc(ev.entity_id)}</span>` : ""}</span><span class="ev-right">${openBtn}<span class="mono-id" title="${esc(ev.created_at || "")}">${esc(fmtEvtTime(ev.created_at))}</span></span></div>
+      <div class="row-top"><span class="badge-cluster">${statusTag(toneOf(et), et)}${rawEid ? `<span class="mono-id" title="${esc(rawEid)}">${esc(shortEid)}</span>` : ""}</span><span class="ev-right">${openBtn}<span class="mono-id" title="${esc(ev.created_at || "")}">${esc(fmtEvtTime(ev.created_at))}</span></span></div>
       <div class="row-desc ev-desc">${esc(cleanSum)}</div></div>`;
     }).join("")
       : `<div role="listitem" class="empty-state"><p class="empty-desc">${tr("No telemetry events match current filter.", "Không có sự kiện nào khớp bộ lọc.")}</p></div>`;

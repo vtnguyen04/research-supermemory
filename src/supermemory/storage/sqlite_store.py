@@ -35,15 +35,23 @@ def _safe_fts_query(raw: str) -> str:
 class GraphStore:
     """Transactional SQLite-backed property graph and telemetry store."""
 
-    def __init__(self, workspace_root: Path | str, db_path: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        workspace_root: Path | str,
+        db_path: Optional[Path] = None,
+        in_memory_if_missing: bool = False,
+    ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self.dot_dir = self.workspace_root / ".supermemory"
         self.mem_dir = self.workspace_root / "memory"
         self.db_path = db_path or (self.dot_dir / "supermemory.db")
         self.snapshot_path = self.mem_dir / "graph_snapshot.json"
-        self.dot_dir.mkdir(parents=True, exist_ok=True)
         was_missing = not self.db_path.exists()
-        self.conn = sqlite3.connect(str(self.db_path), timeout=15.0)
+        if was_missing and in_memory_if_missing:
+            self.conn = sqlite3.connect(":memory:")
+        else:
+            self.dot_dir.mkdir(parents=True, exist_ok=True)
+            self.conn = sqlite3.connect(str(self.db_path), timeout=15.0)
         self.conn.row_factory = sqlite3.Row
         apply_schema(self.conn)
         if was_missing and self.snapshot_path.exists():

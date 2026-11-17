@@ -178,7 +178,8 @@ def build_tiered_capsule(
         sem_lines = [
             f"  - [{classify_tier(nd)}/{nd.node_type}] `{nd.id}`: {nd.title[:55]} — {nd.summary[:95]}"
             for nd, _ in hits
-            if nd.status != "CONSOLIDATED"
+            if nd.status not in ("CONSOLIDATED", "SUPERSEDED")
+            and not (nd.metadata or {}).get("superseded_by")
             and (classify_tier(nd) == MemoryTier.SEMANTIC.value or nd.status in ("REJECTED", "REVERT", "FAILED", "FAILURE_INSIGHT"))
         ]
         if sem_lines:
@@ -187,11 +188,8 @@ def build_tiered_capsule(
                 blocks.append((3, sl))
 
     if exps:
-        blocks.append((
-            4,
-            "• [L3 EPISODIC POINTERS — Paged on Disk]: "
-            + " | ".join(f"`{x.exp_id}`({x.verdict}: {x.test_summary[:28] or x.cv_summary[:28]})" for x in exps),
-        ))
+        ep_txt = " | ".join(f"`{x.exp_id}`({x.verdict}: {x.test_summary[:28] or x.cv_summary[:28]})" for x in exps)
+        blocks.append((4, f"• [L3 EPISODIC POINTERS — Paged on Disk]: {ep_txt}"))
     return _trim_capsule_blocks(blocks, max_tokens=max_tokens)
 
 
@@ -283,12 +281,10 @@ def auto_consolidate_episodic(store: GraphStore, min_cluster_size: int = 3, repa
     created = []
     for tr, items in by_track.items():
         if len(items) >= min_cluster_size:
+            items.sort(key=lambda x: (x.created_at, x.id))
             batch = items[:-1] if len(items) > min_cluster_size else items
             summary, split_body = build_split_consolidation_digest(store, tr, batch)
-            res = consolidate_nodes(
-                store, [b.id for b in batch], MemoryTier.SEMANTIC.value,
-                f"Distilled Track Ledger: {tr.upper()} ({len(batch)} runs)", summary, split_body,
-            )
+            res = consolidate_nodes(store, [b.id for b in batch], MemoryTier.SEMANTIC.value, f"Distilled Track Ledger: {tr.upper()} ({len(batch)} runs)", summary, split_body)
             created.append(res["created_node"]["id"])
 
     for ttl, summ, body, obs_ids in collect_observation_consolidation_batches(store, min_cluster_size=max(3, min_cluster_size)):

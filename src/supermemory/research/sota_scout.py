@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import math
 import re
@@ -58,13 +59,13 @@ def _cache_put(store: GraphStore, cache_key: str, source: str, query: str, items
 def _http_get(url: str, timeout_sec: float) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT, "Accept": "*/*"})
     with urllib.request.urlopen(req, timeout=timeout_sec) as resp:  # noqa: S310
-        raw: bytes = resp.read()
+        raw: bytes = resp.read(2 * 1024 * 1024)
         return raw.decode("utf-8", errors="replace")
 
 
 def _fetch_arxiv(query: str, limit: int, timeout_sec: float) -> List[Dict[str, Any]]:
     enc = urllib.parse.quote_plus(query)
-    url = f"http://export.arxiv.org/api/query?search_query=all:{enc}&start=0&max_results={limit}&sortBy=relevance"
+    url = f"https://export.arxiv.org/api/query?search_query=all:{enc}&start=0&max_results={limit}&sortBy=relevance"
     root = ET.fromstring(_http_get(url, timeout_sec))  # noqa: S314
     out: List[Dict[str, Any]] = []
     for entry in root.findall("atom:entry", _ARXIV_NS):
@@ -226,7 +227,7 @@ def scout_sota_papers(
                 fetched = fn(clean_q, limit, timeout_sec)
                 _cache_put(store, ckey, src, clean_q, fetched)
                 raw_papers.extend(fetched)
-            except (urllib.error.URLError, TimeoutError, ET.ParseError, ValueError, OSError) as exc:
+            except (urllib.error.URLError, http.client.HTTPException, TimeoutError, ET.ParseError, ValueError, OSError) as exc:
                 errors.append(f"{src}: {type(exc).__name__}")
 
     ranked = _rank_papers(clean_q, raw_papers, min_year=min_year)[:limit]

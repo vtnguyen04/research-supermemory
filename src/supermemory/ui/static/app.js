@@ -7,7 +7,7 @@
   const { ResearchHubController } = window.SuperMemoryResearchHub, { KanbanBoardController } = window.SuperMemoryKanbanBoard;
   const rawVer = document.querySelector('meta[name="sm-version"]')?.content || "", UI_VER = rawVer.includes("{{") ? "" : rawVer;
   let state = { nodes: [], edges: [], gates: [], experiments: [], events: [], meta: {}, analytics: {}, cognitive_tiers: {}, workspaces: [] };
-  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, liveTimer = null, lastFetch = 0;
+  let currentScope = "local", activeTier = "ALL", activeType = "ALL", toastTimer = null, liveTimer = null, lastFetch = 0, reqSeq = 0;
   let graphView = null, inspector = null, mergeStudio = null, modals = null, researchHub = null, kanbanBoard = null, activateTabFn = null;
 
   function toast(msg, isError = false) {
@@ -51,11 +51,12 @@
 
   const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
   async function loadGraph() {
-    const errStrip = document.getElementById("error-banner"); errStrip.classList.add("hidden");
+    const seq = ++reqSeq, errStrip = document.getElementById("error-banner"); errStrip.classList.add("hidden");
     try {
       const res = await fetch(`/api/graph?scope=${encodeURIComponent(currentScope)}`);
       if (!res.ok) throw new Error(tr(`Failed to load graph (HTTP ${res.status})`, `Không thể tải dữ liệu đồ thị (HTTP ${res.status})`));
-      state = await res.json(); lastFetch = Date.now();
+      const nextState = await res.json(); if (seq !== reqSeq) return;
+      state = nextState; lastFetch = Date.now();
       if (state.ui_version && UI_VER && cmpVer(state.ui_version, UI_VER) > 0 && !sessionStorage.getItem(`sm_rl_${state.ui_version}`)) { sessionStorage.setItem(`sm_rl_${state.ui_version}`, "1"); location.reload(); return; }
       graphView.setData(state.nodes, state.edges); rerenderAll();
       const qs = new URLSearchParams(window.location.search), qMode = qs.get("mode"), qInspect = qs.get("inspect");
@@ -172,7 +173,7 @@
     on("btn-toggle-l0", "click", () => { const c = document.getElementById("l0-context-strip").classList.toggle("is-compact"); localStorage.setItem("sm_l0_hidden", c ? "1" : "0"); requestAnimationFrame(() => graphView.fitView()); });
     const setLive = (next, say = false) => {
       const btn = document.getElementById("btn-live-sync"); if (!btn) return;
-      clearInterval(liveTimer); liveTimer = next ? setInterval(() => { if (!document.hidden && !document.getElementById("workbench-dialog").open && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) loadGraph(); }, 4000) : null;
+      clearInterval(liveTimer); liveTimer = next ? setInterval(() => { if (!document.hidden && !document.getElementById("workbench-dialog").open && !kanbanBoard?.dragItem && !graphView?.dragNode && !document.querySelector("[data-confirm-gate], #btn-confirm-del-node") && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) loadGraph(); }, 4000) : null;
       btn.setAttribute("aria-pressed", String(next)); btn.classList.toggle("is-live", next); localStorage.setItem("sm_live_sync", next ? "1" : "0");
       if (say) toast(next ? tr("Live auto-sync enabled (4s)", "Đã bật cập nhật trực tiếp (4s)") : tr("Live auto-sync paused", "Đã tạm dừng cập nhật trực tiếp"));
     };

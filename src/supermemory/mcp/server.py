@@ -13,26 +13,39 @@ from supermemory.cognitive.federation import resolve_default_workspace, set_acti
 from supermemory.mcp.tool_defs import MCP_TOOLS, execute_mcp_tool
 
 _CLIENT_ROOT: Optional[Path] = None
+MAX_RPC_BYTES = 8 * 1024 * 1024
 
 
 def _read_rpc_message(stream: BinaryIO) -> Optional[Dict[str, Any]]:
     """Read either newline-delimited JSON-RPC (MCP 2024-11-05+) or Content-Length framed JSON-RPC."""
     while True:
-        line = stream.readline()
+        line = stream.readline(MAX_RPC_BYTES)
         if not line:
             return None
         stripped = line.strip()
         if not stripped:
             continue
         if stripped.lower().startswith(b"content-length:"):
-            length = int(stripped.split(b":", 1)[1].strip())
+            try:
+                length = int(stripped.split(b":", 1)[1].strip())
+            except ValueError:
+                return {"jsonrpc": "2.0", "id": None, "_parse_error": "Invalid Content-Length header."}
             while True:
-                hdr = stream.readline()
+                hdr = stream.readline(4096)
                 if not hdr or hdr in (b"\r\n", b"\n"):
                     break
-            body = stream.read(length)
-            return json.loads(body.decode("utf-8"))
-        return json.loads(stripped.decode("utf-8"))
+            if length < 0 or length > MAX_RPC_BYTES:
+                return {"jsonrpc": "2.0", "id": None, "_parse_error": f"Invalid Content-Length: {length}."}
+            raw_body = stream.read(length)
+        else:
+            raw_body = stripped
+        try:
+            parsed = json.loads(raw_body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return {"jsonrpc": "2.0", "id": None, "_parse_error": f"Parse error: {exc}"}
+        if not isinstance(parsed, dict):
+            return {"jsonrpc": "2.0", "id": None, "_invalid_req": "JSON-RPC payload must be an object."}
+        return parsed
 
 
 def _write_rpc_message(stream: BinaryIO, payload: Dict[str, Any]) -> None:
@@ -41,11 +54,18 @@ def _write_rpc_message(stream: BinaryIO, payload: Dict[str, Any]) -> None:
     stream.flush()
 
 
-def handle_rpc_request(msg: Dict[str, Any], default_ws: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def handle_rpc_request(msg: Any, default_ws: Optional[Path] = None) -> Optional[Dict[str, Any]]:
     """Process a single JSON-RPC 2.0 message and return response dict (or None for notifications)."""
+    if not isinstance(msg, dict):
+        return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid Request"}}
+    if "_parse_error" in msg:
+        return {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": str(msg["_parse_error"])}}
+    if "_invalid_req" in msg:
+        return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": str(msg["_invalid_req"])}}
     method = str(msg.get("method") or "")
     req_id = msg.get("id")
-    params = msg.get("params") or {}
+    raw_params = msg.get("params")
+    params = raw_params if isinstance(raw_params, dict) else {}
 
     # Notifications carry no id and expect no response
     if req_id is None:
@@ -138,7 +158,7 @@ def handle_rpc_request(msg: Dict[str, Any], default_ws: Optional[Path] = None) -
             }
 
         if method == "prompts/get":
-            ws = default_ws or Path.cwd()
+            ws = default_ws or _CLIENT_ROOT or resolve_default_workspace()
             out = execute_mcp_tool("status", {"workspace": str(ws)})
             return {
                 "jsonrpc": "2.0",

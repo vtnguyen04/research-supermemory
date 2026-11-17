@@ -54,8 +54,10 @@ def select_best_sota_experiment(store: GraphStore) -> Optional[ExperimentRecord]
     ]
     if not scored:
         return None
-    lead_track = scored[0].track
-    same_track = [e for e in scored if e.track == lead_track] or scored
+    confirmed = [e for e in scored if e.verdict.upper() in _PASS_SET]
+    pool = confirmed or scored
+    lead_track = pool[0].track
+    same_track = [e for e in pool if e.track == lead_track] or pool
     direction = infer_metric_direction(store, track=lead_track)
 
     def _metric_val(rec: ExperimentRecord) -> float:
@@ -186,6 +188,11 @@ def collect_observation_consolidation_batches(
         if ed.source_id.startswith("OBS-") and ed.target_id.startswith(("BNK-", "PROP-", "METH-", "ALGO-")):
             anchor_of.setdefault(ed.source_id, ed.target_id)
 
+    def _obs_seq(nid: str) -> int:
+        tail = nid.rsplit("-", 1)[-1]
+        return int(tail) if tail.isdigit() else 0
+
+    active_obs.sort(key=lambda n: (n.created_at, _obs_seq(n.id)), reverse=True)
     overflow = active_obs[12:]
     grouped: Dict[str, List[MemoryNode]] = {}
     for nd in overflow:

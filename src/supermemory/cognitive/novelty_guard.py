@@ -147,8 +147,7 @@ def enforce_novelty_against_history(
         doc_tfs[past.id] = tf_map
         doc_words[past.id] = _word_set(f"{past.title} {diff_txt}" if diff_txt.strip() else full_past)
         for k in tf_map:
-            if k in cand_tf:
-                df[k] = df.get(k, 0) + 1
+            df[k] = df.get(k, 0) + 1
 
     n_docs = len(candidates)
     matches: List[Dict[str, object]] = []
@@ -180,14 +179,20 @@ def enforce_novelty_against_history(
             }
         )
 
-        if is_dead_end and sim >= dead_end_threshold and not has_explicit_pivot:
+        pivot_ok = has_explicit_pivot and (sim < 0.80 or len((novelty_diff or "").strip()) >= 30)
+        if is_dead_end and sim >= dead_end_threshold and not pivot_ok:
             raise ValueError(
                 f"LAW-06 Anti-Repeat Gate: Hypothesis overlaps ({int(sim * 100)}% subword/graph similarity) "
                 f"with known DEAD-END `{past.id}` [{true_status}] ('{past.title}': {past.summary[:140]}). "
-                "Do NOT repeat failed mechanisms; pivot or pass `novelty_diff` (>=15 chars)."
+                "Do NOT repeat failed mechanisms; pivot or pass a concrete `novelty_diff`."
             )
 
-        if not is_dead_end and sim >= duplicate_threshold and not has_explicit_pivot:
+        if (
+            not is_dead_end
+            and past.node_type in (NodeType.PROPOSAL.value, NodeType.EXPERIMENT.value)
+            and sim >= duplicate_threshold
+            and not has_explicit_pivot
+        ):
             raise ValueError(
                 f"LAW-06 Duplicate-Work Gate: Hypothesis duplicates ({int(sim * 100)}%) existing "
                 f"`{past.id}` [{true_status}] ('{past.title}'). Check `supermemory recall` or specify `novelty_diff`."

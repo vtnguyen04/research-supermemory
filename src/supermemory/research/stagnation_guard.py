@@ -70,7 +70,19 @@ def count_untried_candidates(store: GraphStore, bottleneck_id: str = "") -> int:
     ]
     props = store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=300)
     bnk_props = [p for p in props if not clean_bnk or str((p.metadata or {}).get("bottleneck_id") or "") == clean_bnk]
-    unused_cards = max(0, len(active_cards) - len(bnk_props))
+    prop_ids = {p.id for p in bnk_props}
+    used_cards = {
+        ed.source_id if ed.target_id in prop_ids else ed.target_id
+        for ed in edges
+        if (ed.source_id in prop_ids and ed.target_id.startswith("METH-"))
+        or (ed.target_id in prop_ids and ed.source_id.startswith("METH-"))
+    }
+    for p in bnk_props:
+        p_blob = f"{p.title} {p.content}".upper()
+        for c in active_cards:
+            if c.id.upper() in p_blob:
+                used_cards.add(c.id)
+    unused_cards = sum(1 for c in active_cards if c.id not in used_cards)
     return len(untried_ideas) + unused_cards
 
 

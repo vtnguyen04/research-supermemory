@@ -166,7 +166,7 @@
           card.classList.add("is-dragging");
           ev.dataTransfer?.setData("text/plain", card.dataset.dragId);
         });
-        card.addEventListener("dragend", () => card.classList.remove("is-dragging"));
+        card.addEventListener("dragend", () => { this.dragItem = null; card.classList.remove("is-dragging"); });
       });
       mount.querySelectorAll("[data-kcol]").forEach((col) => {
         col.addEventListener("dragover", (ev) => { ev.preventDefault(); col.classList.add("is-drag-over"); });

@@ -29,6 +29,7 @@ from supermemory.sync.markdown_compiler import MarkdownCompiler
             "compact": {"type": "boolean", "default": True},
             "include_global": {"type": "boolean", "default": True},
             "include_siblings": {"type": "boolean", "default": False},
+            "scope": SCOPE_SCHEMA_PROP,
             "workspace": {"type": "string"},
         },
     },
@@ -36,8 +37,11 @@ from supermemory.sync.markdown_compiler import MarkdownCompiler
     mutates_memory=False,
 )
 def _cmd_recall(args: Dict[str, Any]) -> Dict[str, Any]:
-    raw_ws = resolve_default_workspace(str(args.get("workspace") or ""))
-    local_ok = (raw_ws / ".supermemory").is_dir() or (raw_ws / "memory" / "graph_snapshot.json").is_file()
+    is_global_only = str(args.get("scope") or "local").lower() == "global"
+    raw_ws = None if is_global_only else resolve_default_workspace(str(args.get("workspace") or ""))
+    local_ok = raw_ws is not None and (
+        (raw_ws / ".supermemory").is_dir() or (raw_ws / "memory" / "graph_snapshot.json").is_file()
+    )
     q_str = str(args.get("query") or "")
     nid = str(args.get("node_id") or "")
     res = federated_recall(
@@ -50,7 +54,7 @@ def _cmd_recall(args: Dict[str, Any]) -> Dict[str, Any]:
         compact=bool(args.get("compact", True)),
         node_id=nid,
     )
-    if local_ok and (q_str.strip() or nid.strip()):
+    if local_ok and raw_ws is not None and (q_str.strip() or nid.strip()):
         with GraphStore(raw_ws) as store:
             if nid.strip():
                 store.log_event("MEMORY_RECALLED", nid.strip(), f"Expanded node `{nid.strip()}` via Stage-2 recall")

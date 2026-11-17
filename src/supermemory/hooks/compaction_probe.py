@@ -1,11 +1,31 @@
-"""O(1) Tail Transcript Compaction Probe & Memory-Read Telemetry Helpers."""
+"""O(1) Tail Transcript Compaction Probe, Content-Overlap Guard & Memory-Read Telemetry."""
 
 from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+_WORD4_RE = re.compile(r"[0-9a-zA-Z_\u00C0-\u1EF9]{4,}")
+_FUNC_WORDS = {
+    "this", "that", "with", "from", "have", "what", "when", "where", "which", "there", "their", "about",
+    "những", "được", "không", "trong", "đang", "phải", "nhiều", "nhưng", "chưa", "xem", "hiện",
+}
+
+
+def has_content_overlap(query: str, hit: Dict[str, Any]) -> bool:
+    """Require at least 1 shared content word (`len >= 4`, non-stopword) or explicit ID match."""
+    hid = str(hit.get("id") or "").upper()
+    if hid and hid in query.upper():
+        return True
+    q_words = {w.lower() for w in _WORD4_RE.findall(query)} - _FUNC_WORDS
+    if not q_words:
+        return False
+    d_txt = f"{hit.get('title', '')} {hit.get('summary', '')}"
+    d_words = {w.lower() for w in _WORD4_RE.findall(d_txt)} - _FUNC_WORDS
+    return bool(q_words & d_words)
 
 
 def _resolve_transcript_file(conv_id: str, transcript_path: str = "") -> Optional[Path]:
@@ -32,40 +52,44 @@ def probe_transcript_compaction(
     prev_marker: str,
     transcript_path: str = "",
 ) -> Tuple[bool, str]:
-    """Read last 48KB of `transcript.jsonl` (<1ms) to detect mid-turn `SYSTEM CHECKPOINT` compactions."""
+    """Read last 64KB of `transcript.jsonl` (<1ms) to detect Antigravity & Claude Code compactions."""
     t_file = _resolve_transcript_file(conv_id, transcript_path)
     if t_file is None:
-        return False, prev_marker
+        return False, prev_marker or "NONE"
     try:
         size = t_file.stat().st_size
-        offset = max(0, size - 49152)
+        offset = max(0, size - 65536)
         with t_file.open("rb") as fh:
             if offset > 0:
                 fh.seek(offset)
             chunk = fh.read().decode("utf-8", errors="replace")
     except OSError:
-        return False, prev_marker
+        return False, prev_marker or "NONE"
 
     lines = chunk.splitlines()
     if offset > 0 and lines:
         lines = lines[1:]
 
     for idx_from_end, raw_ln in enumerate(reversed(lines)):
-        if "CHECKPOINT" not in raw_ln:
+        if "CHECKPOINT" not in raw_ln and "compact_boundary" not in raw_ln and '"summary"' not in raw_ln:
             continue
         try:
             obj = json.loads(raw_ln)
         except ValueError:
             continue
-        if obj.get("type") != "CHECKPOINT":
+        if not isinstance(obj, dict):
             continue
-        marker = f"{obj.get('step_index', 0)}:{obj.get('created_at', '')}"
+        otype = str(obj.get("type") or "")
+        subtype = str(obj.get("subtype") or "")
+        if otype != "CHECKPOINT" and subtype != "compact_boundary" and otype != "summary":
+            continue
+        marker = f"{obj.get('step_index', obj.get('uuid', len(lines) - idx_from_end))}:{obj.get('created_at', obj.get('timestamp', ''))}"
         if marker == prev_marker:
             return False, marker
         if not prev_marker:
             return (idx_from_end <= 10), marker
         return True, marker
-    return False, prev_marker
+    return False, prev_marker or "NONE"
 
 
 def reset_state_on_compaction(st: Dict[str, Any], step_idx: int, inv_num: int, marker: str = "") -> None:
@@ -94,6 +118,7 @@ def extract_memory_read_relpath(workspace_root: Path, tool_name: str, tool_args:
         or tool_args.get("AbsolutePath")
         or tool_args.get("TargetFile")
         or tool_args.get("file_path")
+        or tool_args.get("path")
         or ""
     ).strip()
     if not raw_p:

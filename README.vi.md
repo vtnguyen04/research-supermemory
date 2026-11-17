@@ -45,7 +45,7 @@ supermemory ui
 supermemory recall "rollout drift" --siblings
 
 # 4. Ghi nhận điểm nghẽn (Bottleneck) & tìm bài báo SOTA lưu vào memory/07_METHOD_VAULT/
-supermemory bottleneck diagnose --title "Long-horizon drift" --error-share 58 --ceiling-gain 0.09
+supermemory bottleneck add --title "Long-horizon drift" --slice "t > 60 rollout steps" --share 58 --ceiling 0.09 --rq "Can latent MPC curb drift?"
 supermemory scout search "model predictive control latent rollout" --bottleneck BNK-001 --save-top 2
 
 # 5. Kiểm tra CodeGates hoặc xuất file bàn giao giữa các Agent
@@ -68,8 +68,8 @@ flowchart LR
 | :--- | :--- |
 | `.supermemory/supermemory.db` | Cơ sở dữ liệu SQLite WAL + FTS5, checklist Kanban, khóa file DAG và cache bài báo. |
 | `~/.supermemory/global/` | Bộ nhớ chung xuyên dự án và danh sách các workspace trên máy. |
-| `memory/01_ACTIVE_STATE.md` | Mục tiêu hiện tại, tiến độ và các điểm nghẽn đang mở (`< 150` dòng). |
-| `memory/02_CONSTITUTION_AND_LESSONS.md` | 8 Luật cốt lõi (`LAW-01`..`08`), bài học đã gộp và danh sách `CodeGates` (`< 200` dòng). |
+| `memory/01_ACTIVE_STATE.md` | Mục tiêu hiện tại, tiến độ Kanban và các điểm nghẽn đang mở (`<= 180` dòng). |
+| `memory/02_CONSTITUTION_AND_LESSONS.md` | 8 Luật cốt lõi (`LAW-01`..`08`), bài học đã gộp và danh sách `CodeGates` (`<= 250` dòng). |
 | `memory/04_PROPOSALS/` | Các đề xuất OpenSpec (`PROPOSED` -> `DESIGNED` -> `IMPLEMENTING` -> `AUDITED` -> `ARCHIVED`). |
 | `memory/07_METHOD_VAULT/` | Thẻ phương pháp chắt lọc từ bài báo SOTA (`METH-XXX.md`). |
 | `memory/08_BOTTLENECKS/` | Phân khúc lỗi định lượng (`BNK-XXX.md`) và câu hỏi nghiên cứu (`RQ-XXX`). |

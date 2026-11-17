@@ -5,9 +5,14 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from supermemory.cognitive.outcome_ledger import infer_metric_direction
 from supermemory.graph.auto_linker import wire_contextual_edges
 from supermemory.graph.supersession import apply_supersedes_links
-from supermemory.lifecycle.validators import validate_experiment_schema
+from supermemory.lifecycle.validators import (
+    assert_safe_subpath,
+    validate_experiment_schema,
+    validate_safe_entity_id,
+)
 from supermemory.models import (
     EdgeType,
     ExperimentRecord,
@@ -65,9 +70,14 @@ def record_scientific_experiment(
     clean_verdict = verdict.strip().upper() or ExperimentVerdict.KEEP.value
     is_explicit_win = clean_verdict in (ExperimentVerdict.VICTORY_CONFIRMED.value, ExperimentVerdict.KEEP.value)
     validate_experiment_schema(title, hypothesis, single_var_diff, clean_verdict, cv_score, cv_summary, test_score, test_summary)
-    if not exp_id.strip():
+    direction = infer_metric_direction(store, track=clean_track)
+    if exp_id.strip():
+        exp_id = validate_safe_entity_id(exp_id, "exp_id")
+    else:
         exps = store.list_experiments(track=clean_track)
-        exp_id = f"EXP-{clean_track.upper()[:6]}-{len(exps) + 1:03d}"
+        pref = f"EXP-{clean_track.upper()[:6]}-"
+        nums = [int(e.exp_id[len(pref):]) for e in exps if e.exp_id.startswith(pref) and e.exp_id[len(pref):].isdigit()]
+        exp_id = f"{pref}{(max(nums) + 1) if nums else (len(exps) + 1):03d}"
 
     delta: Optional[float] = None
     regression_detected = False
@@ -79,7 +89,8 @@ def record_scientific_experiment(
             prev_metric = prev.test_score if prev.test_score is not None else prev.cv_score
             if cur_metric is not None and prev_metric is not None:
                 delta = round(cur_metric - prev_metric, 6)
-                if delta < 0 and not is_explicit_win:
+                worse = (delta > 1e-6) if direction == "lower_is_better" else (delta < -1e-6)
+                if worse and not is_explicit_win:
                     regression_detected = True
 
     clean_insights = [s.strip() for s in (insights or []) if s and s.strip()]
@@ -101,6 +112,7 @@ def record_scientific_experiment(
     exp_dir = store.mem_dir / "experiments" / clean_track
     exp_dir.mkdir(parents=True, exist_ok=True)
     rel_log = f"memory/experiments/{clean_track}/{exp_id}.md"
+    assert_safe_subpath(store.workspace_root / rel_log, store.workspace_root)
     insights_md = "\n".join(f"- {ins}" for ins in clean_insights) if clean_insights else "- Recorded atomically."
     log_md = (
         f"# Scientific Experiment Log: `{exp_id}` — {title}\n\n"
@@ -157,14 +169,14 @@ def record_scientific_experiment(
         )
     )
     if baseline_id:
+        improved = delta is not None and (
+            (delta < -1e-6 if direction == "lower_is_better" else delta > 1e-6)
+            or (is_explicit_win and abs(delta) > 1e-6)
+        )
         rel_type = (
             EdgeType.REGRESSED_FROM.value
             if regression_detected
-            else (
-                EdgeType.IMPROVES_OVER.value
-                if (delta is not None and (delta > 0 or (is_explicit_win and abs(delta) > 1e-6)))
-                else EdgeType.DERIVED_FROM.value
-            )
+            else (EdgeType.IMPROVES_OVER.value if improved else EdgeType.DERIVED_FROM.value)
         )
         store.add_edge(MemoryEdge(source_id=exp_id, target_id=baseline_id, relation=rel_type))
     if proposal_id:

@@ -45,25 +45,33 @@ def _registry_file() -> Path:
     return g_root / "workspaces.json"
 
 
+def _is_ephemeral_test_ws(ws: Path, g_root: Path) -> bool:
+    if os.environ.get("SUPERMEMORY_GLOBAL_DIR", "").strip() or str(ws).startswith(str(g_root)):
+        return False
+    s = ws.as_posix()
+    return "pytest-of-" in s or s.startswith("/tmp/tmp")
+
+
 def register_local_workspace(workspace_root: Path, project_name: str = "") -> None:
     """Register a Local project SuperMemory in ~/.supermemory/global/workspaces.json."""
     ws = workspace_root.resolve()
     g_root = get_global_root()
-    if ws == g_root or ("pytest-of-" in str(ws) and not os.environ.get("SUPERMEMORY_GLOBAL_DIR", "").strip()):
+    if ws == g_root or _is_ephemeral_test_ws(ws, g_root):
         return
     reg_path = _registry_file()
     entries: List[Dict[str, Any]] = []
     if reg_path.is_file():
-        try:
-            entries = json.loads(reg_path.read_text(encoding="utf-8"))
-        except ValueError:
-            entries = []
-    by_path = {str(item.get("path")): item for item in entries if item.get("path")}
-    by_path[str(ws)] = {
-        "path": str(ws),
-        "name": project_name or ws.name,
-        "updated_at": utc_now_iso(),
-    }
+        raw_txt = reg_path.read_text(encoding="utf-8").strip()
+        if raw_txt:
+            try:
+                parsed = json.loads(raw_txt)
+                if not isinstance(parsed, list):
+                    return
+                entries = parsed
+            except ValueError:
+                return
+    by_path = {str(item.get("path")): item for item in entries if isinstance(item, dict) and item.get("path")}
+    by_path[str(ws)] = {"path": str(ws), "name": project_name or ws.name, "updated_at": utc_now_iso()}
     reg_path.write_text(json.dumps(list(by_path.values()), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -71,13 +79,7 @@ def list_registered_workspaces() -> List[Dict[str, Any]]:
     """Return Global SuperMemory plus all active Local project workspaces."""
     g_root = ensure_global_memory()
     out: List[Dict[str, Any]] = [
-        {
-            "id": "global",
-            "scope": "GLOBAL",
-            "name": "Global SuperMemory (All Workspaces)",
-            "path": str(g_root),
-            "exists": True,
-        }
+        {"id": "global", "scope": "GLOBAL", "name": "Global SuperMemory (All Workspaces)", "path": str(g_root), "exists": True}
     ]
     reg_path = g_root / "workspaces.json"
     if reg_path.is_file():
@@ -85,20 +87,12 @@ def list_registered_workspaces() -> List[Dict[str, Any]]:
             raw = json.loads(reg_path.read_text(encoding="utf-8"))
         except ValueError:
             raw = []
-        for item in raw:
+        for item in raw if isinstance(raw, list) else []:
             p = Path(str(item.get("path") or ""))
-            if "pytest-of-" in str(p) and not os.environ.get("SUPERMEMORY_GLOBAL_DIR", "").strip():
+            if _is_ephemeral_test_ws(p, g_root):
                 continue
             if p.is_dir() and ((p / ".supermemory").is_dir() or (p / "memory" / "graph_snapshot.json").is_file()):
-                out.append(
-                    {
-                        "id": str(p),
-                        "scope": "LOCAL",
-                        "name": str(item.get("name") or p.name),
-                        "path": str(p),
-                        "exists": True,
-                    }
-                )
+                out.append({"id": str(p), "scope": "LOCAL", "name": str(item.get("name") or p.name), "path": str(p), "exists": True})
     return out
 
 
@@ -176,9 +170,12 @@ def _inspect_federated_node(node_id: str, local_ws: Optional[Path], include_glob
                 if all(p != existing_p for _, existing_p in candidates):
                     candidates.append((f"SIBLING:{item.get('name') or p.name}", p))
     for scope_lbl, root_p in candidates:
-        with GraphStore(root_p) as st:
+        is_sib = scope_lbl.startswith("SIBLING:")
+        with GraphStore(root_p, in_memory_if_missing=is_sib) as st:
             detail = QueryEngine(st).inspect_node(nid)
             if detail is not None:
+                if is_sib and detail["node"].get("node_type") not in _SIBLING_REUSABLE_TYPES:
+                    continue
                 detail["node"]["memory_tier"] = classify_tier(detail["node"])
                 return {"stage": "NODE_DETAIL", "scope": scope_lbl, "workspace": str(root_p), **detail}
     return {"stage": "NODE_DETAIL", "error": f"Node `{nid}` not found across federated vaults."}
@@ -236,9 +233,8 @@ def federated_recall(
             if local_resolved is not None and sib_path == local_resolved:
                 continue
             sib_name = str(ws_item.get("name") or sib_path.name)
-            with GraphStore(sib_path) as sib_store:
+            with GraphStore(sib_path, in_memory_if_missing=True) as sib_store:
                 s_rec = QueryEngine(sib_store).recall(query, limit=3, hops=1, compact=compact)
-                warnings.extend(f"[SIBLING:{sib_name}] {w}" for w in s_rec["anti_repeat_warnings"][:1])
                 _collect([r for r in s_rec["results"] if r.get("type") in _SIBLING_REUSABLE_TYPES], f"SIBLING:{sib_name}")
 
     merged.sort(key=lambda x: (x.get("hop", 0) == 0, x["scope"] == "LOCAL", float(x.get("score") or 0.0)), reverse=True)
@@ -259,9 +255,7 @@ def set_active_workspace(workspace_root: Path) -> None:
     """Persist the most recently active project workspace so MCP calls without `workspace` never misroute."""
     ws = workspace_root.resolve()
     g_root = get_global_root()
-    if ws == g_root or "plugins/supermemory" in ws.as_posix():
-        return
-    if "pytest-of-" in str(ws) and not os.environ.get("SUPERMEMORY_GLOBAL_DIR", "").strip():
+    if ws == g_root or "plugins/supermemory" in ws.as_posix() or _is_ephemeral_test_ws(ws, g_root):
         return
     g_root.mkdir(parents=True, exist_ok=True)
     (g_root / "active_workspace.json").write_text(

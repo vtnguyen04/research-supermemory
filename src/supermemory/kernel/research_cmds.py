@@ -215,7 +215,7 @@ def _cmd_scout_sota(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
         },
     },
     mutates_memory=lambda args, _res: str(args.get("action") or "status").lower()
-    in ("plan_sprint", "enqueue", "update", "move", "toggle_step", "add_step", "complete"),
+    in ("plan_sprint", "enqueue", "update", "claim", "move", "toggle_step", "add_step", "delete", "complete", "clear_done"),
 )
 def _cmd_orchestrate(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
     act = str(args.get("action") or "status").lower()

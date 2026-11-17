@@ -8,9 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- **Web Studio HTTP Security Module & Canvas Frame Split (`ui/security.py`, `ui/server.py`, `ui/static/graph_draw.js`):** Added loopback `Host` validation (DNS rebinding guard), browser CSRF checks (`Content-Type: application/json`, `Sec-Fetch-Site`, `Origin`/`Referer`), `2 MB` body caps, security headers (`CSP`, `X-Content-Type-Options`, `X-Frame-Options`), registered-scope allowlisting, and `>= 13px` / WCAG AA (`#565B66`) canvas rendering.
+- **PreToolUse Edit Simulation & Shell Freeze Guard (`gates/sim_helpers.py`, `gates/enforcer.py`, `plugin/hooks.json`):** Extended `PreToolUse` enforcement to simulate Antigravity `replace_file_content` / `multi_replace_file_content` / `multiedit`, detect multiline `FORBIDDEN_REGEX` patterns with language-aware comment stripping, compile-validate regexes on gate creation, and block shell redirect/overwrite bypasses on `FROZEN_SHA256` files.
+
 ### Changed
 - **Raised Default Source File Ceiling to `< 500` Lines (`LAW-02`, `GATE-001`):** Updated `max_lines` default from `300` to `500` across `universal_laws.py`, `bootstrap.py`, `enforcer.py`, CLI/MCP `init` & `add_gate`, Web Studio workspace initializer, Fast-DAG slice descriptions, and subagent prompts.
 - **Release Discipline Guard (`GATE-037`, `LESSON-023`):** Added `FORBIDDEN_CMD_PATTERN` blocking automatic `git tag vX.Y.Z` release tags on routine commits so ongoing fixes accumulate under `[Unreleased]` until an explicit user-requested release.
+
+### Fixed
+- **P0–P2 Multi-Agent Audit Hardening (`federation.py`, `outcome_ledger.py`, `tiers.py`, `hybrid_ranker.py`, `novelty_guard.py`, `stagnation_guard.py`, `experiments.py`, `manager.py`, `turn_tracker.py`, `compaction_probe.py`, `mcp/server.py`, `sota_scout.py`, `palette.js`, `modals.js`, `app.js`, `views.js`):** Loaded snapshot-only sibling vaults into `:memory:` SQLite (`in_memory_if_missing=True`) with zero disk mutation or private warning/node leakage; fixed newest-first L2 `OBS` compaction order, symmetric `df` IDF normalization, graph-linked `count_untried_candidates`, direction-aware `REGRESSED_FROM` edges, entity ID path-traversal validation, `02_CONSTITUTION` lesson-lock enforcement, `SessionStart` `"NONE"` compaction marker + Claude `transcript_path` mapping, MCP `8 MB` framing guards, `https://export.arxiv.org`, search popover XSS escaping, and `tests/conftest.py` global registry isolation.
 
 ---
 

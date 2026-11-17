@@ -46,7 +46,7 @@
       this.items = res.map((r) => ({ kind: "node", data: r }));
       this.activeIdx = Math.min(this.activeIdx, Math.max(0, this.items.length - 1));
       if (!res.length) {
-        this.popover.innerHTML = `<div class="pop-empty">${tr(`No entities matched "${q}" in Local or Global memory.`, `Không tìm thấy kết quả khớp "${q}" trong bộ nhớ Local và Global.`)}</div>`;
+        this.popover.innerHTML = `<div class="pop-empty">${tr(`No entities matched "${esc(q)}" in Local or Global memory.`, `Không tìm thấy kết quả khớp "${esc(q)}" trong bộ nhớ Local và Global.`)}</div>`;
         this.popover.classList.remove("hidden");
         return;
       }
