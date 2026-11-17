@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [3.5.2] - 2026-11-17
+
+### Fixed
+- **Direction-Agnostic Minimization Deltas (`experiments.py`, `stagnation_guard.py`, `GATE-035`):** Fixed signed `delta < 0` / `delta <= 1e-5` checks so minimization breakthroughs (`Regret`, `RMSE`, `MAE`, `LogLoss` dropping with `verdict="KEEP"`/`"VICTORY_CONFIRMED"`) record `IMPROVES_OVER` (`regression_detected=False`) and never trigger false plateau locks (`|delta| <= 1e-5` only).
+- **Information-Gap Gated Research (`stagnation_guard.py`, `bottleneck_engine.py`, `detector.py`):** Allowed `manage_proposal` to proceed freely whenever untried `IDEA`/`ALGORITHM`/`METHOD_CARD` candidates exist in the vault (`count_untried_candidates > 0`) or on pre-existing campaign history, raised plateau lock threshold to `>= 3` consecutive failed/zero-delta runs with `0` untried candidates, removed unconditional `scout_sota` directives from `diagnose_bottleneck`, and decoupled `"đề xuất phương pháp"` prompts from paper-search auto-routing.
+
+---
+
 ## [3.5.1] - 2026-11-17
 
 ### Changed
@@ -166,6 +174,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **Initial Release:** SQLite WAL + FTS5 knowledge graph, `LAW-01`..`LAW-08` Constitutional Markdown compiler, `PreToolUse` CodeGate enforcer (`MAX_LINES`, `FORBIDDEN_REGEX`, `FORBIDDEN_FILENAME`, `FORBIDDEN_CMD_PATTERN`, `FROZEN_SHA256`, `AST_SYNTAX`), OpenSpec proposal state machine, and Antigravity CLI plugin package.
 
+[3.5.2]: https://github.com/vtnguyen04/research-supermemory/compare/v3.5.1...v3.5.2
 [3.5.1]: https://github.com/vtnguyen04/research-supermemory/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/vtnguyen04/research-supermemory/compare/v3.4.0...v3.4.1

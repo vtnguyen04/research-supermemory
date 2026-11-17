@@ -62,6 +62,7 @@ def record_scientific_experiment(
     """Log an experiment, enforce post-mortem on failures, and crystallize OBSERVATION nodes."""
     clean_track = re.sub(r"[^a-zA-Z0-9_-]+", "_", track.strip() or "main").lower()
     clean_verdict = verdict.strip().upper() or ExperimentVerdict.KEEP.value
+    is_explicit_win = clean_verdict in (ExperimentVerdict.VICTORY_CONFIRMED.value, ExperimentVerdict.KEEP.value)
     validate_experiment_schema(title, hypothesis, single_var_diff, clean_verdict, cv_score, cv_summary, test_score, test_summary)
     if not exp_id.strip():
         exps = store.list_experiments(track=clean_track)
@@ -77,7 +78,7 @@ def record_scientific_experiment(
             prev_metric = prev.test_score if prev.test_score is not None else prev.cv_score
             if cur_metric is not None and prev_metric is not None:
                 delta = round(cur_metric - prev_metric, 6)
-                if delta < 0:
+                if delta < 0 and not is_explicit_win:
                     regression_detected = True
 
     clean_insights = [s.strip() for s in (insights or []) if s and s.strip()]
@@ -158,7 +159,11 @@ def record_scientific_experiment(
         rel_type = (
             EdgeType.REGRESSED_FROM.value
             if regression_detected
-            else (EdgeType.IMPROVES_OVER.value if (delta and delta > 0) else EdgeType.DERIVED_FROM.value)
+            else (
+                EdgeType.IMPROVES_OVER.value
+                if (delta is not None and (delta > 0 or (is_explicit_win and abs(delta) > 1e-6)))
+                else EdgeType.DERIVED_FROM.value
+            )
         )
         store.add_edge(MemoryEdge(source_id=exp_id, target_id=baseline_id, relation=rel_type))
     if proposal_id:

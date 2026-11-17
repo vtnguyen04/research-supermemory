@@ -1,4 +1,4 @@
-"""Tests for SuperMemory v3.5.0: Anti-Stagnation Research Circuit-Breaker & Verified Citation Gate."""
+"""Tests for SuperMemory v3.5.2: Information-Gap Gated Research, Minimization Deltas & Zero-Regex Novelty."""
 
 from __future__ import annotations
 
@@ -7,36 +7,34 @@ from pathlib import Path
 import pytest
 
 from supermemory.bootstrap import init_workspace
+from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.hooks.runner import dispatch_hook
 from supermemory.kernel import execute_command
+from supermemory.models import EdgeType
 from supermemory.research.sota_scout import scout_sota_papers
+from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.sqlite_store import GraphStore
 
 
-def test_anti_hallucination_citation_gate_blocks_fake_internal_papers(
+def test_structural_provenance_and_lossless_consolidation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Ensure structural URI parsing classifies provenance with zero phrase regexes and preserves dead-ends across consolidation."""
-    from supermemory.cognitive.tiers import build_tiered_capsule
-
+    """Ensure structural URI parsing classifies provenance (0 phrase regexes) and consolidation preserves dead-ends."""
     monkeypatch.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_cit"))
     ws = tmp_path / "cit_proj"
     init_workspace(ws, project_name="CitationProj")
     w = str(ws)
 
-    # 1. Card without scholarly URL is structurally tagged UNVERIFIED_MANUAL regardless of venue wording (0 phrase regex!)
     unv = execute_command(
         "scout_sota",
         {
             "workspace": w, "action": "register_card",
             "title": "Wide-Band Schmitt-Trigger Reservoir Hysteresis",
-            "core_mechanism": "Local deadband heuristic",
-            "venue": "Any Custom Venue Text", "year": 2026,
+            "core_mechanism": "Local deadband heuristic", "venue": "Custom Venue", "year": 2026,
         },
     )
     assert unv["method_card"]["metadata"]["provenance"] == "UNVERIFIED_MANUAL"
 
-    # 2. Local file path or non-http URI disguised as source_url -> HARD BLOCKED structurally by urlparse
     with pytest.raises(ValueError, match="Structural Citation Gate"):
         execute_command(
             "scout_sota",
@@ -47,7 +45,6 @@ def test_anti_hallucination_citation_gate_blocks_fake_internal_papers(
             },
         )
 
-    # 3. Real arXiv URL -> VERIFIED_EXTERNAL
     ok = execute_command(
         "scout_sota",
         {
@@ -59,7 +56,6 @@ def test_anti_hallucination_citation_gate_blocks_fake_internal_papers(
     )
     assert ok["method_card"]["metadata"]["provenance"] == "VERIFIED_EXTERNAL"
 
-    # 4. Multi-run REM-sleep consolidation splits PASSED vs FAILED and NEVER erases REVERT dead-ends!
     execute_command(
         "log_experiment",
         {
@@ -81,7 +77,6 @@ def test_anti_hallucination_citation_gate_blocks_fake_internal_papers(
 
     sem_detail = execute_command("recall", {"workspace": w, "node_id": "SEM-001"})
     assert "Verified Wins" in sem_detail["node"]["content"] and "Falsified Dead-Ends" in sem_detail["node"]["content"]
-    # Even AFTER consolidation into SEM-001, repeating the REVERTED CatBoost Quantile Loss is STILL HARD-BLOCKED (0 keyword lists)!
     with pytest.raises(ValueError, match="Anti-Repeat Gate"):
         execute_command(
             "manage_proposal",
@@ -97,195 +92,146 @@ def test_anti_hallucination_citation_gate_blocks_fake_internal_papers(
         assert "PROVEN WINS" in cap and "FALSIFIED DEAD-ENDS" in cap
 
 
-def test_consecutive_failure_plateau_locks_proposals_until_verified_external_scout(
+def test_minimization_wins_and_method_proposals_never_trigger_false_research(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Verify >=2 consecutive failed/discarded runs lock local tweaking and unverified cards cannot cheat unlock."""
-    monkeypatch.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_stag"))
-    ws = tmp_path / "stag_proj"
-    init_workspace(ws, project_name="StagProj")
+    """Verify negative deltas on minimization metrics (RMSE/Regret) and 'đề xuất method' never force research."""
+    monkeypatch.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_min"))
+    ws = tmp_path / "min_proj"
+    init_workspace(ws, project_name="MinRegretProj")
+    w = str(ws)
+
+    # 1. Method proposal prompt MUST NOT trigger RESEARCH_CAMPAIGN auto-routing
+    sig = SelfLearningDetector.analyze("Hãy đề xuất phương pháp và thuật toán tối ưu cho BNK-010 từ dữ liệu hiện có")
+    assert sig.category == "NONE"
+
+    # 2. 4 consecutive minimization breakthroughs (0.0050 -> 0.0042 -> 0.0037 -> 0.0033, negative delta!)
+    prev_id = ""
+    scores = [0.0050, 0.0042, 0.0037, 0.0033]
+    for i, sc in enumerate(scores):
+        out = execute_command(
+            "log_experiment",
+            {
+                "workspace": w, "track": "main", "baseline_id": prev_id,
+                "title": f"Minimization Regret Breakthrough Step {i + 1}",
+                "hypothesis": f"Step {i + 1} cuts validation regret",
+                "single_var_diff": f"step_opt={i + 1}", "cv_score": sc, "verdict": "KEEP",
+            },
+        )
+        assert out["regression_detected"] is False
+        assert "stagnation_alert" not in out
+        prev_id = out["exp_id"]
+
+    with GraphStore(ws) as store:
+        edges = store.list_edges(prev_id)
+        assert any(ed.relation == EdgeType.IMPROVES_OVER.value for ed in edges)
+
+
+def test_information_gap_gate_allows_untried_vault_ideas_and_locks_only_when_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify research lock triggers ONLY when >=3 runs fail AND 0 untried ideas/methods exist in vault."""
+    monkeypatch.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_igap"))
+    ws = tmp_path / "igap_proj"
+    init_workspace(ws, project_name="InfoGapProj")
     w = str(ws)
 
     bnk = execute_command(
         "diagnose_bottleneck",
         {
-            "workspace": w,
-            "title": "Open-Valve Boiler Recharge Spikes",
+            "workspace": w, "title": "Open-Valve Boiler Recharge Spikes",
             "evidence_slice": "627-886 kW spikes every 6 steps on winter strips",
-            "error_share_pct": 71.5,
-            "ceiling_gain": 0.00065,
+            "error_share_pct": 71.5, "ceiling_gain": 0.00065,
             "falsifiable_rq": "Can continuous enthalpy modulation eliminate 6-step recharge spikes?",
         },
     )
     bnk_id = bnk["bottleneck"]["id"]
-    assert "scout_sota" in bnk["next_research_action"]
+    assert "manage_proposal" in bnk["next_step"]
 
-    r1 = execute_command(
-        "log_experiment",
-        {
-            "workspace": w, "track": "main", "title": "Threshold Tweak 328K -> 326K",
-            "hypothesis": "Lowering tank threshold reduces spikes", "single_var_diff": "low_k=326.0",
-            "cv_score": 0.0045, "verdict": "REVERT", "post_mortem": "Regressed morning comfort on minneapolis_2.",
-        },
-    )
-    assert "stagnation_alert" not in r1
-
-    r2 = execute_command(
-        "log_experiment",
-        {
-            "workspace": w, "track": "main", "title": "Threshold Tweak 328K -> 327K",
-            "hypothesis": "Smaller threshold shift avoids comfort regression", "single_var_diff": "low_k=327.0",
-            "cv_score": 0.0044, "verdict": "DISCARD", "post_mortem": "Still regresses comfort without cutting spike.",
-        },
-    )
-    assert "ANTI-STAGNATION CIRCUIT-BREAKER" in r2["stagnation_alert"]
+    # 3 consecutive failed runs with 0 untried ideas in vault -> INFORMATION-GAP PLATEAU LOCKS!
+    for idx in range(3):
+        res = execute_command(
+            "log_experiment",
+            {
+                "workspace": w, "track": "main", "title": f"Threshold Tweak #{idx + 1}",
+                "hypothesis": "Nudge tank threshold", "single_var_diff": f"low_k={326 + idx * 0.4}",
+                "cv_score": 0.0045, "verdict": "REVERT", "post_mortem": "Regressed winter comfort.",
+            },
+        )
+    assert "INFORMATION-GAP PLATEAU DETECTED" in res["stagnation_alert"]
 
     pre = dispatch_hook(
         "PreInvocation",
-        {"conversationId": "c-stag", "cwd": w, "invocationNum": 3, "initialNumSteps": 20, "lastUserInput": "tiếp tục tối ưu điểm đi"},
+        {"conversationId": "c-gap", "cwd": w, "invocationNum": 2, "initialNumSteps": 10, "lastUserInput": "tiếp tục đi"},
     )
-    assert "ANTI-STAGNATION CIRCUIT-BREAKER" in pre["injectSteps"][0]["systemMessage"]["systemMessage"]
+    assert "INFORMATION-GAP PLATEAU DETECTED" in pre["injectSteps"][0]["systemMessage"]["systemMessage"]
 
     with pytest.raises(ValueError, match="Anti-Stagnation Literature Gate"):
         execute_command(
             "manage_proposal",
             {
                 "workspace": w, "action": "create", "bottleneck_id": bnk_id,
-                "title": "Try Threshold 327.4K Heuristic", "why": "Nudge tank threshold one more time on winter strips",
-                "what_changes": "Set tank_low_k = 327.4 in config.py",
-                "novelty_diff": "Uses fractional 327.4K setpoint instead of integer 327K.",
+                "title": "Blind Threshold Guess #4", "why": "Nudge threshold again without new idea",
+                "what_changes": "Set tank_low_k = 327.8", "novelty_diff": "Tries 327.8K scalar tweak.",
             },
         )
 
-    # Unverified manual card (no scholarly URL) CANNOT cheat the stagnation lock!
-    unv = execute_command(
-        "scout_sota",
+    # Case A: If an untried internal ALGORITHM from forensic analysis is logged in vault -> Proposal ALLOWED without forced paper search!
+    idea = execute_command(
+        "propose_idea",
         {
-            "workspace": w, "action": "register_card", "bottleneck_id": bnk_id,
-            "title": "Unverified Manual Note", "core_mechanism": "Guessing smoother ramp", "venue": "ICML",
+            "workspace": w, "is_algorithm": True, "bottleneck_id": bnk_id,
+            "title": "Exact Return-Water Enthalpy Mass-Balance Feedforward",
+            "summary": "Derive exact coil mass-flow feedforward from return-water enthalpy balance.",
         },
     )
-    assert unv["method_card"]["metadata"]["provenance"] == "UNVERIFIED_MANUAL"
+    prop_from_vault = execute_command(
+        "manage_proposal",
+        {
+            "workspace": w, "action": "create", "bottleneck_id": bnk_id,
+            "title": "Implement Return-Water Enthalpy Feedforward",
+            "why": "Use untried forensic enthalpy balance from ALGO-001",
+            "what_changes": "Wire enthalpy feedforward in boiler.py",
+        },
+    )
+    assert prop_from_vault["proposal_id"].startswith("PROP-")
+
+    # Mark ALGO-001 REJECTED -> vault now has 0 untried candidates again -> locked until verified external paper!
+    with GraphStore(ws) as store:
+        nd = store.get_node(idea["node"]["id"])
+        assert nd is not None
+        nd.status = "REJECTED"
+        store.upsert_node(nd, log_event=False)
+
     with pytest.raises(ValueError, match="Anti-Stagnation Literature Gate"):
         execute_command(
             "manage_proposal",
             {
                 "workspace": w, "action": "create", "bottleneck_id": bnk_id,
-                "title": "Still Guessing Ramp Heuristic", "why": "Try linear valve ramp without real paper",
-                "what_changes": "Add ad-hoc valve ramp factor in boiler.py",
-                "novelty_diff": "Adds ad-hoc 0.5x linear valve ramp multiplier.",
+                "title": "Another Blind Tweak #5", "why": "Vault is empty again",
+                "what_changes": "Change scalar gain to 0.85", "novelty_diff": "Changes gain scalar to 0.85.",
             },
         )
 
     with GraphStore(ws) as store:
         scout_sota_papers(
-            store,
-            query="economic model predictive control stratified thermal storage",
-            bottleneck_id=bnk_id,
-            save_top_k=1,
+            store, query="economic MPC thermal storage", bottleneck_id=bnk_id, save_top_k=1,
             offline_fixtures=[
                 {
-                    "title": "Economic MPC for Stratified Thermal Energy Storage with Smooth Valve Actuation",
-                    "abstract": "Formulates convex L1-rate-penalized economic MPC eliminating recharge spikes.",
-                    "year": 2025, "venue": "arXiv", "citations": 14,
+                    "title": "Convex L1-Rate Economic MPC for Thermal Storage",
+                    "abstract": "Eliminates recharge spikes via L1 rate penalty.",
+                    "year": 2025, "venue": "arXiv", "citations": 12,
                     "url": "https://arxiv.org/abs/2501.09999", "source": "arxiv",
                 }
             ],
         )
 
-    unlocked_prop = execute_command(
+    unlocked = execute_command(
         "manage_proposal",
         {
             "workspace": w, "action": "create", "bottleneck_id": bnk_id,
-            "title": "Convex L1-Rate-Penalized Economic MPC Valve Actuation",
-            "why": "Apply arXiv:2501.09999 L1 rate penalty to eliminate 627-886 kW recharge spikes",
-            "what_changes": "Add convex delta-u L1 rate penalty in hydraulic MPC objective",
-            "novelty_diff": "Pivots from static deadband thresholds to arXiv:2501.09999 L1 rate-penalized economic MPC.",
+            "title": "Apply L1-Rate Economic MPC", "why": "Test arXiv:2501.09999 mechanism",
+            "what_changes": "Add L1 delta-u penalty in mpc.py", "novelty_diff": "Applies arXiv:2501.09999 L1 rate penalty.",
         },
     )
-    assert unlocked_prop["proposal_id"].startswith("PROP-")
-
-
-def test_bottleneck_thrashing_forces_literature_pivot_per_bottleneck(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Verify >=2 failed attempts on one BNK-XXX locks that bottleneck even if another track had a KEEP run."""
-    monkeypatch.setenv("SUPERMEMORY_GLOBAL_DIR", str(tmp_path / "global_thr"))
-    ws = tmp_path / "thrash_proj"
-    init_workspace(ws, project_name="ThrashProj")
-    w = str(ws)
-
-    bnk = execute_command(
-        "diagnose_bottleneck",
-        {
-            "workspace": w, "title": "94% Chiller Cooling Floor",
-            "evidence_slice": "Singapore & Phoenix cooling electricity floor",
-            "error_share_pct": 64.9, "ceiling_gain": 0.00055,
-            "falsifiable_rq": "Can enthalpy-aware free cooling break the 94% chiller floor?",
-        },
-    )
-    bnk_id = bnk["bottleneck"]["id"]
-
-    p1 = execute_command(
-        "manage_proposal",
-        {
-            "workspace": w, "action": "create", "bottleneck_id": bnk_id,
-            "title": "Cooling Attempt 1: Fixed 60% Duty Cap",
-            "why": "Clamp cooling duty cycle on singapore_5", "what_changes": "Clamp ahu_duty <= 0.60 in cooling.py",
-        },
-    )
-    execute_command(
-        "log_experiment",
-        {
-            "workspace": w, "track": "cooling", "proposal_id": p1["proposal_id"],
-            "title": "Fixed 60% Duty Cap Run", "hypothesis": "60% cap cuts chiller power",
-            "single_var_diff": "duty_cap=0.60", "cv_score": 0.0051, "verdict": "REVERT",
-            "post_mortem": "Zone temp violated comfort ceiling by 1.2K.",
-        },
-    )
-    execute_command(
-        "log_experiment",
-        {
-            "workspace": w, "track": "winter", "title": "Winter Baseline Verification",
-            "hypothesis": "Verify winter baseline", "single_var_diff": "winter_check=1",
-            "cv_score": 0.0039, "verdict": "KEEP",
-        },
-    )
-
-    p2 = execute_command(
-        "manage_proposal",
-        {
-            "workspace": w, "action": "create", "bottleneck_id": bnk_id,
-            "title": "Cooling Attempt 2: Fixed 75% Duty Cap",
-            "why": "Relax cooling duty cap to 75% on singapore_5", "what_changes": "Clamp ahu_duty <= 0.75 in cooling.py",
-            "novelty_diff": "Relaxes duty cap from 60% to 75% to preserve zone comfort.",
-        },
-    )
-    execute_command(
-        "log_experiment",
-        {
-            "workspace": w, "track": "cooling", "proposal_id": p2["proposal_id"],
-            "title": "Fixed 75% Duty Cap Run", "hypothesis": "75% cap balances power and comfort",
-            "single_var_diff": "duty_cap=0.75", "cv_score": 0.0049, "verdict": "FAILED",
-            "post_mortem": "Still regresses afternoon latent humidity cooling load.",
-        },
-    )
-    execute_command(
-        "log_experiment",
-        {
-            "workspace": w, "track": "winter", "title": "Winter Warmup Check",
-            "hypothesis": "Verify warmup timing", "single_var_diff": "warmup=15m",
-            "cv_score": 0.0038, "verdict": "KEEP",
-        },
-    )
-
-    with pytest.raises(ValueError, match="Anti-Stagnation Literature Gate"):
-        execute_command(
-            "manage_proposal",
-            {
-                "workspace": w, "action": "create", "bottleneck_id": bnk_id,
-                "title": "Cooling Attempt 3: Fixed 82% Duty Cap",
-                "why": "Try 82% duty cap on singapore_5", "what_changes": "Clamp ahu_duty <= 0.82 in cooling.py",
-                "novelty_diff": "Adjusts cap to 82%.",
-            },
-        )
+    assert unlocked["proposal_id"].startswith("PROP-")

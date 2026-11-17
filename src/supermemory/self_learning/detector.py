@@ -48,8 +48,8 @@ _DIRECTIVE_PATTERNS: List[Tuple[str, str]] = [
 ]
 
 _RESEARCH_INTENT_RE = re.compile(
-    r"(?:\b(?:research|literature\s+review|paper\s+search|arxiv|semantic\s*scholar|openalex|sota\s+(?:method|paper|approach|idea)s?|scout\s+sota|diagnose\s+bottleneck|find\s+bottleneck|error\s+slice)\b"
-    r"|(?:nghiên\s+cứu|tìm\s+paper|săn\s+paper|bài\s+báo\s+(?:sota|mới|khoa\s+học)|điểm\s+nghẽn|chẩn\s+đoán\s+lỗi|tìm\s+bottleneck|đề\s+xuất\s+(?:phương\s+pháp|hướng|ý\s+tưởng|thuật\s+toán)|tìm\s+hướng\s+cải\s+tiến))",
+    r"(?:\b(?:literature\s+review|paper\s+search|arxiv|semantic\s*scholar|openalex|sota\s+papers?|scout\s+sota)\b"
+    r"|(?:tìm\s+paper|săn\s+paper|bài\s+báo\s+(?:sota|mới|khoa\s+học)|tìm\s+tài\s+liệu\s+khoa\s+học))",
     flags=re.IGNORECASE | re.UNICODE,
 )
 

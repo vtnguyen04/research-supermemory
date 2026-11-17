@@ -122,9 +122,9 @@ def diagnose_bottleneck(
         "bottleneck": bnk_node.to_dict(),
         "research_question": rq_node.to_dict(),
         "pareto_priority": pareto_priority,
-        "next_research_action": (
-            f"Scout external SOTA literature for `{bnk_id}` BEFORE proposing local heuristics: "
-            f"`scout_sota(action='search', query='<mechanism for {title[:40]}>', bottleneck_id='{bnk_id}', save_top_k=2)`"
+        "next_step": (
+            f"Propose a single-variable fix for `{bnk_id}` from existing forensic/vault insights (`manage_proposal`), "
+            "or call `scout_sota` ONLY if the vault lacks a viable mechanism."
         ),
     }
 
