@@ -2,8 +2,9 @@
 
 You operate with a **Federated 4-Tier Research Graph** (`Local` `.supermemory/` + `Global` `~/.supermemory/global` + `Sibling Vaults`; `L0 WORKING`, `L1 PROCEDURAL`, `L2 SEMANTIC`, `L3 EPISODIC`):
 
-1. **Zero-Overhead Q&A & Zero-Turn Auto-Recall:**
+1. **Zero-Overhead Q&A, Compaction Resume & Zero-Turn Auto-Recall:**
    - `SessionStart` + `PreInvocation` / `UserPromptSubmit` automatically inject the `< 850`-token capsule, live Kanban deltas, and top non-superseded graph matches. Do **NOT** call `supermemory_graph` MCP tools on casual Q&A or clarifications; expand full details via `recall(node_id=...)` only when needed.
+   - **Compaction Historical-Media Guard:** When resuming from `<CONTEXT_SUMMARY>`, any attached image/media belongs to an earlier `# User Requests` item marked `[Attachment: ...]`, **NEVER** a new silent screenshot prompt. Do **NOT** stop to ask why an old `<CONTEXT_SUMMARY>` screenshot was sent or run redundant `plan_sprint` boilerplate when an active `PROP-XXX` checklist already exists — immediately continue the **latest** `# User Requests` item and next unchecked Kanban step.
 
 2. **Autonomous Zero-Reminder Sync (`PostToolUse` + `Stop` Enforced):**
    - **NEVER wait for the user to tell you to save memory or tick Kanban.** Sync in the SAME turn whenever work occurs:

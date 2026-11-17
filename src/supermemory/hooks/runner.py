@@ -125,7 +125,11 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
     if compacted_now:
         reset_state_on_compaction(st, step_idx, inv_num, marker=new_marker)
         capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
-        injected_msgs.append("♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED:\n" + capsule)
+        injected_msgs.append(
+            "♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED "
+            "(Note: images attached to `<CONTEXT_SUMMARY>` are old `[Attachment:]` items, NOT a new prompt — continue the latest request & active Kanban step directly!):\n"
+            + capsule
+        )
         if not is_new_turn:
             kb_mid, kb_fp_mid = build_kanban_board_digest(store)
             if kb_mid:

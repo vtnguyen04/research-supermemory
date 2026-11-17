@@ -11,7 +11,7 @@ from supermemory.models import CodeGate, GateType
 _HASH_COMMENT_EXTS = (".py", ".sh", ".bash", ".zsh", ".yaml", ".yml", ".toml", ".rb", ".r")
 _SLASH_COMMENT_EXTS = (".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".css", ".scss", ".c", ".cpp", ".h", ".go", ".rs", ".java")
 _SHELL_MUTATE_RE = re.compile(
-    r"(?:>>?|<<|\btee\b|\bsed\s+-[a-zA-Z]*i|\bperl\s+-[a-zA-Z]*i|\b(?:cp|mv|rm|dd|install|truncate)\b|\.write_text\(|\.write_bytes\(|open\([^)]*['\"][wa+])"
+    r"(?:>>?|<<|\btee\b|\bsed\s+-[a-zA-Z]*i|\bperl\s+-[a-zA-Z]*i|\b(?:cp|mv|rm|dd|truncate)\b|\.write_text\(|\.write_bytes\(|open\([^)]*['\"][wa+])"
 )
 
 
@@ -132,7 +132,10 @@ def match_forbidden_regex(
 
 def check_shell_frozen_write_bypass(cmd: str, gates: List[CodeGate]) -> List[Tuple[str, str]]:
     """Block shell commands attempting to overwrite, redirect into, or delete FROZEN_SHA256 files."""
-    if not cmd or not _SHELL_MUTATE_RE.search(cmd):
+    if not cmd:
+        return []
+    segments = [s.strip() for s in re.split(r"(?:&&|\|\||[;\n])", cmd) if s.strip() and _SHELL_MUTATE_RE.search(s)]
+    if not segments:
         return []
     hits: List[Tuple[str, str]] = []
     for g in gates:
@@ -142,7 +145,9 @@ def check_shell_frozen_write_bypass(cmd: str, gates: List[CodeGate]) -> List[Tup
         if not rel:
             continue
         bname = Path(rel).name
-        if rel in cmd or (len(bname) >= 8 and re.search(rf"(?<![\w.-]){re.escape(bname)}(?![\w.-])", cmd)):
-            msg = f"[{g.id}/{g.law_id or 'LAW-05'}] FROZEN FILE SHELL GUARD: command mutates SHA-256 locked `{rel}`"
-            hits.append((g.id, msg))
+        for seg in segments:
+            if rel in seg or (len(bname) >= 8 and re.search(rf"(?<![\w.-]){re.escape(bname)}(?![\w.-])", seg)):
+                msg = f"[{g.id}/{g.law_id or 'LAW-05'}] FROZEN FILE SHELL GUARD: command mutates SHA-256 locked `{rel}`"
+                hits.append((g.id, msg))
+                break
     return hits
