@@ -229,8 +229,8 @@ def evaluate_occam_gate(
             f"Occam Anti-Bloat Warning: Detected {inferred_vars} coupled variables/paradigms ({', '.join(fams) or 'multi-change'}). "
             "Isolate ONE surgical mechanism first!"
         )
-    if est_loc > 250:
-        warnings.append(f"Complexity Warning: `est_loc={est_loc}` approaches 300-line ceiling; split or simplify.")
+    if est_loc > 420:
+        warnings.append(f"Complexity Warning: `est_loc={est_loc}` approaches 500-line ceiling; split or simplify.")
     if not bnk_node:
         warnings.append("Ungrounded Hypothesis: Not linked to a quantified `BNK-XXX` bottleneck.")
 

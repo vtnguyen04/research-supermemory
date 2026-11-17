@@ -47,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_init = sub.add_parser("init", help="Initialize Local SuperMemory in a project folder")
     p_init.add_argument("dir", nargs="?", default=".")
     p_init.add_argument("--name", default="")
-    p_init.add_argument("--max-lines", type=int, default=300)
+    p_init.add_argument("--max-lines", type=int, default=500)
     p_init.add_argument("--goal", default="")
 
     p_status = sub.add_parser("status", help="Display 4-Tier Cognitive capsule & graph telemetry")

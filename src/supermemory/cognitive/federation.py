@@ -32,7 +32,7 @@ def ensure_global_memory() -> Path:
         init_workspace(
             g_root,
             project_name="Global-SuperMemory",
-            max_lines=300,
+            max_lines=500,
             active_goal="Cross-project developer preferences, universal laws, reusable procedures & anti-regression gates.",
             install_workspace_hooks=False,
             register_in_global=False,

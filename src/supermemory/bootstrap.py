@@ -15,7 +15,7 @@ from supermemory.sync.markdown_compiler import MarkdownCompiler
 def init_workspace(
     workspace_dir: Path | str,
     project_name: str = "",
-    max_lines: int = 300,
+    max_lines: int = 500,
     active_goal: str = "",
     install_workspace_hooks: bool = True,
     register_in_global: bool = True,

@@ -36,7 +36,7 @@ Lệnh `supermemory install-plugin` tự động cài vào cả hai môi trườ
 ```bash
 # 1. Khởi tạo trong thư mục dự án
 cd /path/to/project
-supermemory init . --name "MyProject" --max-lines 300
+supermemory init . --name "MyProject" --max-lines 500
 
 # 2. Mở giao diện Web Studio (http://127.0.0.1:8765)
 supermemory ui

@@ -27,7 +27,7 @@ from supermemory.storage.sqlite_store import GraphStore
         "properties": {
             "workspace": {"type": "string"},
             "project_name": {"type": "string"},
-            "max_lines": {"type": "integer", "default": 300},
+            "max_lines": {"type": "integer", "default": 500},
             "active_goal": {"type": "string"},
         },
     },
@@ -39,7 +39,7 @@ def _cmd_init(args: Dict[str, Any]) -> Dict[str, Any]:
     return init_workspace(
         raw_ws,
         project_name=str(args.get("project_name") or raw_ws.name),
-        max_lines=int(args.get("max_lines") or 300),
+        max_lines=int(args.get("max_lines") or 500),
         active_goal=str(args.get("active_goal") or ""),
     )
 
@@ -129,7 +129,7 @@ def _cmd_add_gate(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
     else:
         gid = str(args.get("id") or "").strip() or LessonConsolidator(store).next_gate_id()
         gtype = str(args.get("gate_type") or "FORBIDDEN_REGEX").upper()
-        cfg = {"max_lines": int(args.get("max_lines") or 300)} if gtype == "MAX_LINES" else {"ignore_comments": True}
+        cfg = {"max_lines": int(args.get("max_lines") or 500)} if gtype == "MAX_LINES" else {"ignore_comments": True}
         gate = store.upsert_gate(
             CodeGate(
                 id=gid,

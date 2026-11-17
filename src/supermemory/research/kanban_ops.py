@@ -37,7 +37,7 @@ ROLE_DEFAULT_STEPS: Dict[str, List[str]] = {
     ],
     "slice-builder": [
         "Acquire conflict-free file-glob lease",
-        "Implement <300L slice & pass 10% smoke gate",
+        "Implement <500L slice & pass 10% smoke gate",
         "Pass full test suite & log_experiment",
     ],
 }

@@ -172,7 +172,7 @@ def plan_research_sprint(
         (ids[4], 2, "experiment-challenger", "Adversarial Red-Team Audit (Leakage & Anti-Bloat)",
          "Verify 0 test leakage, 1 isolated variable, valid `BNK-XXX` link, and 0 dead-end mechanism collision.", [ids[3]], [], ""),
         (ids[5], 3, "slice-builder", "Execute Glob-Locked Vertical Slice + 10% Smoke Gate",
-         "Implement <300L slice under glob lease, run 10% smoke gate first (EARLY_KILL if flat), then log experiment.", [ids[4]], globs, smoke_cmd),
+         "Implement <500L slice under glob lease, run 10% smoke gate first (EARLY_KILL if flat), then log experiment.", [ids[4]], globs, smoke_cmd),
     ]
     created = [
         enqueue_task(store, role=rl, title=ttl, brief=brf, wave=wv, depends_on=deps, locked_globs=lk, target_id=tgt, smoke_gate=smk, task_id=tid).to_dict()

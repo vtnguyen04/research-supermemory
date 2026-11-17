@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Raised Default Source File Ceiling to `< 500` Lines (`LAW-02`, `GATE-001`):** Updated `max_lines` default from `300` to `500` across `universal_laws.py`, `bootstrap.py`, `enforcer.py`, CLI/MCP `init` & `add_gate`, Web Studio workspace initializer, Fast-DAG slice descriptions, and subagent prompts.
+- **Release Discipline Guard (`GATE-037`, `LESSON-023`):** Added `FORBIDDEN_CMD_PATTERN` blocking automatic `git tag vX.Y.Z` release tags on routine commits so ongoing fixes accumulate under `[Unreleased]` until an explicit user-requested release.
+
+---
+
 ## [3.6.1] - 2026-11-17
 
 ### Added
@@ -199,6 +207,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **Initial Release:** SQLite WAL + FTS5 knowledge graph, `LAW-01`..`LAW-08` Constitutional Markdown compiler, `PreToolUse` CodeGate enforcer (`MAX_LINES`, `FORBIDDEN_REGEX`, `FORBIDDEN_FILENAME`, `FORBIDDEN_CMD_PATTERN`, `FROZEN_SHA256`, `AST_SYNTAX`), OpenSpec proposal state machine, and Antigravity CLI plugin package.
 
+[Unreleased]: https://github.com/vtnguyen04/research-supermemory/compare/v3.6.1...HEAD
+[3.6.1]: https://github.com/vtnguyen04/research-supermemory/compare/v3.6.0...v3.6.1
+[3.6.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.5.2...v3.6.0
 [3.5.2]: https://github.com/vtnguyen04/research-supermemory/compare/v3.5.1...v3.5.2
 [3.5.1]: https://github.com/vtnguyen04/research-supermemory/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/vtnguyen04/research-supermemory/compare/v3.4.1...v3.5.0

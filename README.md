@@ -36,7 +36,7 @@ supermemory install-plugin
 ```bash
 # 1. Initialize in any project
 cd /path/to/project
-supermemory init . --name "MyProject" --max-lines 300
+supermemory init . --name "MyProject" --max-lines 500
 
 # 2. Open the Web Studio (http://127.0.0.1:8765)
 supermemory ui

@@ -211,7 +211,7 @@ class GateEnforcer:
                     triggered.append(g.id)
 
             elif g.gate_type == GateType.MAX_LINES.value:
-                cap = int(g.config.get("max_lines") or g.pattern or 300)
+                cap = int(g.config.get("max_lines") or g.pattern or 500)
                 if len(lines) >= cap:
                     msg = f"[{g.id}/{g.law_id}] `{rel}` has {len(lines)} lines (must be < {cap}). Split into cohesive modules."
                     violations.append(msg)

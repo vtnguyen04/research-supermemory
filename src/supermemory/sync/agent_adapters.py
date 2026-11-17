@@ -48,7 +48,7 @@ def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True
     root = store.workspace_root
     meta = store.get_all_meta()
     proj = meta.get("project_name") or root.name
-    max_lines = meta.get("max_lines") or "300"
+    max_lines = meta.get("max_lines") or "500"
     laws = sorted(store.list_nodes(node_types=[NodeType.LAW.value], limit=20), key=lambda x: x.id)
 
     law_bullets = "\n".join(

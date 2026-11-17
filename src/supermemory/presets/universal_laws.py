@@ -7,7 +7,7 @@ from typing import List, Tuple
 from supermemory.models import CodeGate, EdgeType, GateType, MemoryEdge, MemoryNode, NodeType
 
 
-def build_universal_constitution(max_lines: int = 300) -> Tuple[List[MemoryNode], List[CodeGate], List[MemoryEdge]]:
+def build_universal_constitution(max_lines: int = 500) -> Tuple[List[MemoryNode], List[CodeGate], List[MemoryEdge]]:
     """Return canonical seed Laws, executable CodeGates, and ENFORCED_BY edges."""
     laws: List[MemoryNode] = [
         MemoryNode(

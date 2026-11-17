@@ -31,7 +31,7 @@ def handle_workspace_action(body: Dict[str, Any]) -> Dict[str, Any]:
     target = Path(raw_path).expanduser().resolve()
     name = str(body.get("name") or target.name).strip()
     goal = str(body.get("goal") or "").strip()
-    max_lines = int(body.get("max_lines") or 300)
+    max_lines = int(body.get("max_lines") or 500)
     zalo_src = str(body.get("import_zaloai_from") or "").strip()
 
     paths = init_workspace(target, project_name=name, max_lines=max_lines, active_goal=goal, register_in_global=True)

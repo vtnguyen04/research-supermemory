@@ -49,12 +49,12 @@
     openInitWorkspace() {
       this.open(tr("Initialize or Import SuperMemory Workspace", "Khởi tạo hoặc Import Dự án SuperMemory"),
         fld("path", tr("Absolute Project Directory Path *", "Đường dẫn tuyệt đối thư mục dự án *"), inp("path", "", "/path/to/project")) +
-        row2(fld("name", tr("Project Name", "Tên dự án"), inp("name", "", "MyResearchRepo")), fld("max_lines", tr("Max Lines / File", "Giới hạn dòng / file"), inp("max_lines", "300"))) +
+        row2(fld("name", tr("Project Name", "Tên dự án"), inp("name", "", "MyResearchRepo")), fld("max_lines", tr("Max Lines / File", "Giới hạn dòng / file"), inp("max_lines", "500"))) +
         fld("goal", tr("Initial Strategic Goal", "Mục tiêu chiến lược ban đầu"), inp("goal", "", "Achieve reproducible SOTA")) +
         fld("import_zaloai_from", tr("Optional: Import from legacy workspace", "Tùy chọn: Import dữ liệu từ workspace cũ"), inp("import_zaloai_from")),
         async (v) => {
           if (!v.path.trim()) throw new Error(tr("Please enter the project directory path.", "Vui lòng nhập đường dẫn thư mục dự án."));
-          const out = await this.postJson("/api/workspaces/init", { ...v, max_lines: Number(v.max_lines || 300) });
+          const out = await this.postJson("/api/workspaces/init", { ...v, max_lines: Number(v.max_lines || 500) });
           this.setScope(out.workspace_path); this.notify(tr(`Initialized workspace ${out.project}`, `Đã khởi tạo dự án ${out.project}`)); await this.onRefresh();
         });
     }
