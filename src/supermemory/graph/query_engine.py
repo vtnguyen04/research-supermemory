@@ -37,13 +37,14 @@ class QueryEngine:
 
         slim_results: List[Dict[str, Any]] = []
         for r in ranked[:limit]:
+            sum_cap = 165 if r["type"] == NodeType.KNOWLEDGE_NODE.value else 96
             card: Dict[str, Any] = {
                 "id": r["id"],
                 "type": r["type"],
                 "status": r["status"],
                 "score": r["score"],
                 "title": str(r["title"])[:72],
-                "summary": str(r["summary"])[:96],
+                "summary": str(r["summary"])[:sum_cap],
             }
             if r.get("hop"):
                 card["hop"] = r["hop"]

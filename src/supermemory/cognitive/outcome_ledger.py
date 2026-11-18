@@ -12,32 +12,26 @@ _PASS_SET = {"VICTORY_CONFIRMED", "KEEP"}
 
 
 def infer_metric_direction(store: GraphStore, track: str = "") -> str:
-    """Infer optimization direction (`lower_is_better` vs `higher_is_better`) from typed experiment deltas."""
+    """Infer optimization direction (`lower_is_better` vs `higher_is_better`) strictly within `track` when given."""
+    if track:
+        saved = store.get_meta(f"track_dir:{track.strip().lower()}")
+        if saved in ("lower_is_better", "higher_is_better"):
+            return saved
     exps = store.list_experiments(track=track) if track else store.list_experiments()
-    if not exps and track:
-        exps = store.list_experiments()
     neg_wins = sum(
-        1
-        for e in exps
-        if e.verdict.upper() in _PASS_SET and e.delta_vs_baseline is not None and e.delta_vs_baseline < -1e-6
+        1 for e in exps if e.verdict.upper() in _PASS_SET and e.delta_vs_baseline is not None and e.delta_vs_baseline < -1e-6
     )
     pos_wins = sum(
-        1
-        for e in exps
-        if e.verdict.upper() in _PASS_SET and e.delta_vs_baseline is not None and e.delta_vs_baseline > 1e-6
+        1 for e in exps if e.verdict.upper() in _PASS_SET and e.delta_vs_baseline is not None and e.delta_vs_baseline > 1e-6
     )
     if neg_wins != pos_wins:
         return "lower_is_better" if neg_wins > pos_wins else "higher_is_better"
 
     pos_fails = sum(
-        1
-        for e in exps
-        if e.verdict.upper() in _FAIL_SET and e.delta_vs_baseline is not None and e.delta_vs_baseline > 1e-6
+        1 for e in exps if e.verdict.upper() in _FAIL_SET and e.delta_vs_baseline is not None and e.delta_vs_baseline > 1e-6
     )
     neg_fails = sum(
-        1
-        for e in exps
-        if e.verdict.upper() in _FAIL_SET and e.delta_vs_baseline is not None and e.delta_vs_baseline < -1e-6
+        1 for e in exps if e.verdict.upper() in _FAIL_SET and e.delta_vs_baseline is not None and e.delta_vs_baseline < -1e-6
     )
     if pos_fails > neg_fails:
         return "lower_is_better"
@@ -45,45 +39,43 @@ def infer_metric_direction(store: GraphStore, track: str = "") -> str:
 
 
 def select_best_sota_experiment(store: GraphStore) -> Optional[ExperimentRecord]:
-    """Select the true SOTA experiment respecting minimization (`min`) vs maximization (`max`) tracks."""
+    """Select the primary-track SOTA experiment (`max(track_runs)`) respecting `min` vs `max` direction."""
     exps_all = store.list_experiments()
     scored = [
-        e
-        for e in exps_all
-        if e.verdict.upper() not in _FAIL_SET and (e.test_score is not None or e.cv_score is not None)
+        e for e in exps_all if e.verdict.upper() not in _FAIL_SET and (e.test_score is not None or e.cv_score is not None)
     ]
     if not scored:
         return None
     confirmed = [e for e in scored if e.verdict.upper() in _PASS_SET]
     pool = confirmed or scored
-    lead_track = pool[0].track
-    same_track = [e for e in pool if e.track == lead_track] or pool
+    by_track: Dict[str, List[ExperimentRecord]] = {}
+    for idx, e in enumerate(pool):
+        by_track.setdefault(e.track, []).append(e)
+    lead_track = max(by_track.keys(), key=lambda tr: (len(by_track[tr]), -next(i for i, x in enumerate(pool) if x.track == tr)))
+    same_track = by_track[lead_track]
     direction = infer_metric_direction(store, track=lead_track)
+    has_test = [e for e in same_track if e.test_score is not None]
+    cand_pool = has_test or same_track
 
     def _metric_val(rec: ExperimentRecord) -> float:
         return float(rec.test_score if rec.test_score is not None else (rec.cv_score or 0.0))
 
-    if direction == "lower_is_better":
-        return min(same_track, key=_metric_val)
-    return max(same_track, key=_metric_val)
+    return min(cand_pool, key=_metric_val) if direction == "lower_is_better" else max(cand_pool, key=_metric_val)
 
 
 def summarize_pass_fail_ledger(store: GraphStore, max_wins: int = 3, max_fails: int = 4) -> Dict[str, Any]:
-    """Partition all experiments & proposals into Verified Wins vs Falsified Dead-Ends via typed SQL columns."""
+    """Partition all experiments & proposals into Verified Wins vs Falsified Dead-Ends with per-track direction."""
     exps: List[ExperimentRecord] = store.list_experiments()
     passed = [e for e in exps if e.verdict.upper() in _PASS_SET]
     failed = [e for e in exps if e.verdict.upper() in _FAIL_SET]
-    rejected_nodes = [
-        n
-        for n in store.list_nodes(node_types=[NodeType.PROPOSAL.value, NodeType.IDEA.value], limit=300)
-        if n.status.upper() == "REJECTED"
-    ]
-    direction = infer_metric_direction(store)
+    rejected_nodes = store.list_nodes(node_types=[NodeType.PROPOSAL.value, NodeType.IDEA.value], status="REJECTED", limit=200)
+    dir_cache: Dict[str, str] = {}
 
     def _win_gain(rec: ExperimentRecord) -> float:
         if rec.delta_vs_baseline is None:
             return 0.0
-        return -float(rec.delta_vs_baseline) if direction == "lower_is_better" else float(rec.delta_vs_baseline)
+        tr_dir = dir_cache.setdefault(rec.track, infer_metric_direction(store, track=rec.track))
+        return -float(rec.delta_vs_baseline) if tr_dir == "lower_is_better" else float(rec.delta_vs_baseline)
 
     ranked_wins = sorted(
         passed,
@@ -105,7 +97,7 @@ def summarize_pass_fail_ledger(store: GraphStore, max_wins: int = 3, max_fails: 
     return {
         "pass_count": len(passed),
         "fail_count": len(failed) + len(rejected_nodes),
-        "metric_direction": direction,
+        "metric_direction": infer_metric_direction(store),
         "win_items": win_items,
         "fail_items": fail_items,
     }

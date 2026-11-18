@@ -10,6 +10,7 @@ from urllib.parse import unquote, urlparse
 
 from supermemory import __version__
 from supermemory.cognitive.federation import (
+    find_enclosing_workspace,
     resolve_default_workspace,
     resolve_parent_process_workspace,
     set_active_workspace,
@@ -40,21 +41,36 @@ def _read_rpc_message(stream: BinaryIO) -> Optional[Dict[str, Any]]:
                     break
             if length < 0 or length > MAX_RPC_BYTES:
                 return {"jsonrpc": "2.0", "id": None, "_parse_error": f"Invalid Content-Length: {length}."}
-            raw_body = stream.read(length)
+            chunks: list[bytes] = []
+            rem = length
+            while rem > 0:
+                part = stream.read(rem)
+                if not part:
+                    break
+                chunks.append(part)
+                rem -= len(part)
+            raw_body = b"".join(chunks)
+            use_cl = True
         else:
             raw_body = stripped
+            use_cl = False
         try:
             parsed = json.loads(raw_body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             return {"jsonrpc": "2.0", "id": None, "_parse_error": f"Parse error: {exc}"}
         if not isinstance(parsed, dict):
             return {"jsonrpc": "2.0", "id": None, "_invalid_req": "JSON-RPC payload must be an object."}
+        if use_cl:
+            parsed["_content_length_framed"] = True
         return parsed
 
 
-def _write_rpc_message(stream: BinaryIO, payload: Dict[str, Any]) -> None:
-    data = (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
-    stream.write(data)
+def _write_rpc_message(stream: BinaryIO, payload: Dict[str, Any], content_length_framed: bool = False) -> None:
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    if content_length_framed:
+        stream.write(f"Content-Length: {len(raw)}\r\n\r\n".encode("ascii") + raw)
+    else:
+        stream.write(raw + b"\n")
     stream.flush()
 
 
@@ -81,7 +97,10 @@ def handle_rpc_request(msg: Any, default_ws: Optional[Path] = None) -> Optional[
             folders = params.get("workspaceFolders") or []
             raw_uri = str((folders[0].get("uri") if folders and isinstance(folders[0], dict) else "") or params.get("rootUri") or "")
             if raw_uri.startswith("file://"):
-                cand = Path(unquote(urlparse(raw_uri).path)).resolve()
+                uri_p = unquote(urlparse(raw_uri).path)
+                if len(uri_p) >= 3 and uri_p[0] == "/" and uri_p[2] == ":":
+                    uri_p = uri_p[1:]
+                cand = Path(uri_p).resolve()
                 if cand.is_dir():
                     _CLIENT_ROOT = cand
                     set_active_workspace(cand)
@@ -108,8 +127,10 @@ def handle_rpc_request(msg: Any, default_ws: Optional[Path] = None) -> Optional[
             eff_ws = default_ws or _CLIENT_ROOT
             if eff_ws and not t_args.get("workspace"):
                 canon = t_name[12:] if t_name.startswith("supermemory_") else t_name
-                is_init = (eff_ws / ".supermemory").is_dir() or (eff_ws / "memory" / "graph_snapshot.json").is_file()
-                if is_init or canon in ("init", "recall", "status"):
+                enc_ws = find_enclosing_workspace(eff_ws)
+                if enc_ws is not None:
+                    t_args["workspace"] = str(enc_ws)
+                elif canon in ("init", "recall", "status"):
                     t_args["workspace"] = str(eff_ws)
                 else:
                     t_args.setdefault("scope", "global")
@@ -209,7 +230,8 @@ def run_mcp_stdio_server(default_ws: Optional[Path] = None) -> int:
         msg = _read_rpc_message(in_buf)
         if msg is None:
             break
+        cl_mode = bool(msg.pop("_content_length_framed", False)) if isinstance(msg, dict) else False
         resp = handle_rpc_request(msg, default_ws=eff_default)
         if resp is not None:
-            _write_rpc_message(out_buf, resp)
+            _write_rpc_message(out_buf, resp, content_length_framed=cl_mode)
     return 0

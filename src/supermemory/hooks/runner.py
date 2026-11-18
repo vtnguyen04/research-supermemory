@@ -8,13 +8,19 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from supermemory.cognitive.federation import ensure_global_memory, federated_recall, set_active_workspace
+from supermemory.cognitive.federation import (
+    federated_recall,
+    get_global_root,
+    set_active_workspace,
+)
 from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.hooks.claude_bridge import format_hook_output, is_claude_code_payload, normalize_hook_input
 from supermemory.hooks.compaction_probe import (
     apply_async_wakeup_guard,
+    extract_memory_read_relpath,
     has_content_overlap,
+    is_subagent_session,
     probe_async_wakeup,
     probe_transcript_compaction,
     reset_state_on_compaction,
@@ -27,35 +33,29 @@ from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
 from supermemory.storage.sqlite_store import GraphStore
 
-_EXPLICIT_ID_RE = re.compile(r"\b(?:BNK|RQ|METH|EXP|OBS|PROC|PROP|IDEA|ALGO|LESSON|DAG)-\d+[A-Z0-9-]*\b", re.IGNORECASE)
+_EXPLICIT_ID_RE = re.compile(
+    r"\b(?:BNK|RQ|METH|EXP|OBS|PROC|PROP|IDEA|ALGO|LESSON|LAW|SEM|DAG)-\d+[A-Z0-9-]*\b", re.IGNORECASE
+)
 
 
 def _resolve_supermemory_workspace(payload: Dict[str, Any]) -> Optional[Path]:
-    """Find active Local SuperMemory workspace root, or None if folder is uninitialized."""
-    candidates = []
-    if payload.get("cwd"):
-        candidates.append(Path(str(payload["cwd"])))
-    for wp in payload.get("workspacePaths") or []:
-        candidates.append(Path(str(wp)))
-    if not candidates:
-        candidates.append(Path.cwd())
-
-    g_root = ensure_global_memory()
-    for cand in candidates:
+    """Find active Local SuperMemory workspace root in <0.2ms, or None if folder is uninitialized."""
+    cands = ([Path(str(payload["cwd"]))] if payload.get("cwd") else []) + [Path(str(w)) for w in (payload.get("workspacePaths") or [])]
+    g_root = get_global_root()
+    for cand in (cands or [Path.cwd()]):
         cur = cand.resolve()
-        for parent in [cur, *cur.parents]:
-            if parent == g_root:
-                continue
-            if (parent / ".supermemory").is_dir() or (parent / "memory" / "graph_snapshot.json").is_file():
+        for parent in (cur, *cur.parents):
+            if parent != g_root and ((parent / ".supermemory").is_dir() or (parent / "memory" / "graph_snapshot.json").is_file()):
                 return parent
     return None
 
 
 def _global_rule_titles() -> List[str]:
-    g_root = ensure_global_memory()
+    g_root = get_global_root()
+    if not (g_root / ".supermemory" / "supermemory.db").is_file():
+        return []
     with GraphStore(g_root) as g_store:
-        procs = g_store.list_nodes(node_types=[NodeType.PROCEDURE.value, NodeType.LESSON.value], limit=6)
-        return [f"{p.id}: {p.title}" for p in procs]
+        return [f"{p.id}: {p.title}" for p in g_store.list_nodes(node_types=[NodeType.PROCEDURE.value, NodeType.LESSON.value], limit=6)]
 
 
 def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -69,11 +69,7 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
         if ev == "SessionStart":
             g_titles = _global_rule_titles()
             extra = ("\n• Global Learned Rules: " + " | ".join(g_titles[:4])) if g_titles else ""
-            msg = (
-                "🌐 SUPERMEMORY GLOBAL HARNESS ACTIVE (No Local `.supermemory` in this folder yet)."
-                f"{extra}\n• Normal Q&A requires ZERO memory calls. Only call `record_lesson` "
-                "(`scope='global'`) for genuine cross-project rules, or `supermemory init` when requested."
-            )
+            msg = f"🌐 SUPERMEMORY GLOBAL HARNESS ACTIVE (No Local `.supermemory` in this folder yet).{extra}\n• Normal Q&A requires ZERO memory calls. Only call `record_lesson` (`scope='global'`) for genuine cross-project rules, or `supermemory init` when requested."
             return format_hook_output(raw_ev, {"injectSteps": [{"systemMessage": {"systemMessage": msg}}]}, is_claude)
         if ev == "PreToolUse":
             return format_hook_output(raw_ev, {"decision": "allow"}, is_claude)
@@ -81,18 +77,39 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
 
     out: Dict[str, Any] = {}
     with GraphStore(ws) as store:
-        set_active_workspace(ws)
-        if ev == "SessionStart":
+        st = get_session_state(store, conv_id)
+        subagent_mode = is_subagent_session(conv_id, payload, st)
+        if not subagent_mode:
+            set_active_workspace(ws)
+        if ev == "PreToolUse":
+            out = _on_pre_tool_use(store, payload)
+        elif subagent_mode:
+            out = _handle_subagent_hook(store, ev, payload)
+        elif ev == "SessionStart":
             out = _on_session_start(store, conv_id, payload)
         elif ev == "PreInvocation":
             out = _on_pre_invocation(store, conv_id, payload)
-        elif ev == "PreToolUse":
-            out = _on_pre_tool_use(store, payload)
         elif ev == "PostToolUse":
             out = track_post_tool_use(store, conv_id, payload, is_claude=is_claude)
         elif ev == "Stop":
             out = evaluate_stop_gate(store, conv_id, payload)
     return format_hook_output(raw_ev, out, is_claude)
+
+
+def _handle_subagent_hook(store: GraphStore, ev: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep PreToolUse CodeGates 100% enforced inside subagents while avoiding orchestrator nags & Stop blocks."""
+    if ev == "SessionStart":
+        msg = f"🧠 SuperMemory Subagent Guard Active — Workspace: `{store.workspace_root}` (Constitutional Laws & PreToolUse CodeGates enforced)."
+        return {"injectSteps": [{"systemMessage": {"systemMessage": msg}}]}
+    if ev == "PostToolUse":
+        tc = payload.get("toolCall") or {}
+        mem_rel = extract_memory_read_relpath(store.workspace_root, str(tc.get("name") or "").lower(), tc.get("args") or {})
+        if mem_rel:
+            store.log_event("MEMORY_READ", Path(mem_rel).stem[:32], f"Subagent read `{mem_rel}`")
+        return {}
+    if ev == "Stop":
+        return {"decision": "allow"}
+    return {}
 
 
 def _on_session_start(store: GraphStore, conv_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -113,11 +130,13 @@ def _on_session_start(store: GraphStore, conv_id: str, payload: Optional[Dict[st
 
 def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     st = get_session_state(store, conv_id)
-    inv_num = int(payload.get("invocationNum") or 0)
+    prev_inv = int(st.get("invocation_num") or 0)
+    raw_inv = payload.get("invocationNum")
+    user_input = str(payload.get("lastUserInput") or "")
+    is_new_turn = bool(user_input and (user_input != st.get("last_seen_user_input") or payload.get("_force_new_turn")))
+    inv_num = int(raw_inv) if raw_inv is not None else (prev_inv + (1 if is_new_turn else 0))
     step_idx = int(payload.get("initialNumSteps") or 0)
     prev_step = int(st.get("last_step_idx") or 0)
-    user_input = str(payload.get("lastUserInput") or "")
-    is_new_turn = bool(user_input and user_input != st.get("last_seen_user_input"))
 
     injected_msgs: List[str] = []
     step_drop = prev_step > 20 and 0 < step_idx < (prev_step // 2)
@@ -129,7 +148,8 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
     compacted_now = step_drop or chk_hit
     if compacted_now:
         reset_state_on_compaction(st, step_idx, inv_num, marker=new_marker)
-        capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
+        cap_q = "" if is_new_turn else user_input
+        capsule = build_tiered_capsule(store, query=cap_q, global_rules=_global_rule_titles())
         injected_msgs.append(
             "♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED "
             "(Note: images attached to `<CONTEXT_SUMMARY>` are old `[Attachment:]` items, NOT a new prompt — continue the latest request & active Kanban step directly!):\n"
@@ -162,7 +182,7 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
             steps_gap = step_idx - int(st.get("last_capsule_step") or 0)
             invs_gap = inv_num - int(st.get("last_capsule_inv") or 0)
             if (step_idx > 0 and steps_gap >= 45) or (inv_num > 0 and invs_gap >= 6):
-                capsule_ref = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
+                capsule_ref = build_tiered_capsule(store, query="", global_rules=_global_rule_titles())
                 injected_msgs.append("🔄 PERIODIC MEMORY CAPSULE REFRESH (Zero-Amnesia Overview):\n" + capsule_ref)
                 st["last_capsule_step"] = step_idx
                 st["last_capsule_inv"] = inv_num
@@ -181,17 +201,18 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
             else:
                 store.set_meta("stagnation_alert", "")
 
-        sig = SelfLearningDetector.analyze(user_input)
-        if sig.requires_lesson:
-            st["pending_lesson_lock"] = True
-            st["pending_lesson_quote"] = user_input
-            st["pending_lesson_category"] = sig.category
-            injected_msgs.append(sig.guidance)
-        elif sig.category == "RESEARCH_CAMPAIGN":
-            st["research_campaign_active"] = True
-            injected_msgs.append(sig.guidance)
-        elif sig.guidance:
-            injected_msgs.append(sig.guidance)
+        if "<CONTEXT_SUMMARY>" not in user_input:
+            sig = SelfLearningDetector.analyze(user_input)
+            if sig.requires_lesson:
+                st["pending_lesson_lock"] = True
+                st["pending_lesson_quote"] = user_input
+                st["pending_lesson_category"] = sig.category
+                injected_msgs.append(sig.guidance)
+            elif sig.category == "RESEARCH_CAMPAIGN":
+                st["research_campaign_active"] = True
+                injected_msgs.append(sig.guidance)
+            elif sig.guidance:
+                injected_msgs.append(sig.guidance)
 
         clean_in = user_input.strip()
         if len(clean_in) >= 28 or _EXPLICIT_ID_RE.search(clean_in):
@@ -226,11 +247,11 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         if queued:
             st["pending_notifications"] = []
             injected_msgs.extend(queued)
-        if step_idx >= 20 and "/goal" in user_input.lower():
+        if not compacted_now and step_idx >= 20 and "/goal" in user_input.lower():
             cur_bucket = step_idx // 20
             if cur_bucket > int(st.get("last_heartbeat_bucket") or 0):
                 st["last_heartbeat_bucket"] = cur_bucket
-                injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT:\n" + build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles()))
+                injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT:\n" + build_tiered_capsule(store, query="", global_rules=_global_rule_titles()))
 
     st["invocation_num"] = inv_num
     if step_idx > 0:
@@ -239,10 +260,7 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
 
     if not injected_msgs:
         return {}
-    return {
-        "injectSteps": [{"systemMessage": {"systemMessage": "\n\n".join(injected_msgs)}}],
-        "terminationBehavior": "",
-    }
+    return {"injectSteps": [{"systemMessage": {"systemMessage": "\n\n".join(injected_msgs)}}], "terminationBehavior": ""}
 
 
 def _on_pre_tool_use(store: GraphStore, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -250,13 +268,9 @@ def _on_pre_tool_use(store: GraphStore, payload: Dict[str, Any]) -> Dict[str, An
     tc: Dict[str, Any] = raw_tc if isinstance(raw_tc, dict) else {}
     t_name = str(tc.get("name") or payload.get("toolName") or payload.get("tool_name") or "")
     raw_args = tc.get("args") if tc.get("args") is not None else (payload.get("toolInput") or payload.get("tool_input") or {})
-    t_args = raw_args if isinstance(raw_args, dict) else {}
-    decision = GateEnforcer(store).evaluate_tool_call(t_name, t_args)
+    decision = GateEnforcer(store).evaluate_tool_call(t_name, raw_args if isinstance(raw_args, dict) else {})
     if not decision.allowed:
-        return {
-            "decision": "deny",
-            "reason": f"🛡️ SUPERMEMORY CONSTITUTIONAL GATE BLOCKED TOOL `{t_name}`: {decision.reason}",
-        }
+        return {"decision": "deny", "reason": f"🛡️ SUPERMEMORY CONSTITUTIONAL GATE BLOCKED TOOL `{t_name}`: {decision.reason}"}
     return {"decision": "allow"}
 
 

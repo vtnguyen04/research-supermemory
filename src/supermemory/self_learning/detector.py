@@ -31,15 +31,19 @@ _EXPLAIN_ONLY_GUARD = re.compile(
     flags=re.IGNORECASE | re.UNICODE,
 )
 
-_CORRECTION_PATTERNS: List[Tuple[str, str, int]] = [
-    ("NEW_USER_RULE", _EXPLICIT_RULE_CMD_RE.pattern, 96),
-    ("HARDCODING_LEAKAGE", r"\b(?:hardcode|hard-code|trá hình|leakage|rò rỉ|vá lỗi tập test|sửa trực tiếp trên tập test|overfit)\b", 95),
-    ("CLEAN_CODE_BLOAT", r"\b(?:code rác|rác rưởi|file nháp|chạy 1 lần|over-engineer|vượt trần dòng)\b", 88),
-    ("COST_CACHE_WASTE", r"\b(?:đốt tiền|hết sạch credit|no_cache|chạy lại mấy câu đã đúng|api waste)\b", 92),
-    ("STALE_MEMORY", r"\b(?:không save vào memory|quên ghi vào memory|forgot to save|không làm theo agent\.md|lặp lại lỗi|sai đi sai lại|tái phạm)\b", 96),
-    ("COMPUTE_PLACEMENT", r"\b(?:nóng máy|sập máy|chạy trên máy tao|đưa server cho mày chi|tự ý kill)\b", 90),
-    ("ARTIFACT_CONTAMINATION", r"\b(?:phí lượt nộp|mất lượt nộp|copy từ gold|ghi đè submission)\b", 94),
-    ("GENERAL_SCOLDING", r"(?:tao đã bảo cấm|tao đã dặn|nhắc bao nhiêu lần|sai bét|ảo giác|bịa đặt|phá code|làm ăn kiểu gì|i told you not to|wrong again|hallucinat)", 86),
+_CORRECTION_PATTERNS: List[Tuple[str, str, int, bool]] = [
+    ("NEW_USER_RULE", _EXPLICIT_RULE_CMD_RE.pattern, 96, False),
+    ("HARDCODING_LEAKAGE", r"\b(?:trá hình|vá lỗi tập test|sửa trực tiếp trên tập test)\b", 95, False),
+    ("HARDCODING_LEAKAGE", r"\b(?:hardcode|hard-code|leakage|rò rỉ|overfit)\b", 92, True),
+    ("CLEAN_CODE_BLOAT", r"\b(?:code rác|rác rưởi|file nháp|vượt trần dòng)\b", 88, False),
+    ("CLEAN_CODE_BLOAT", r"\b(?:over-engineer)\b", 86, True),
+    ("COST_CACHE_WASTE", r"\b(?:đốt tiền|hết sạch credit|chạy lại mấy câu đã đúng|api waste)\b", 92, False),
+    ("COST_CACHE_WASTE", r"\b(?:no_cache)\b", 88, True),
+    ("STALE_MEMORY", r"\b(?:không save vào memory|quên ghi vào memory|forgot to save|không làm theo agent\.md|lặp lại lỗi|sai đi sai lại|tái phạm)\b", 96, False),
+    ("COMPUTE_PLACEMENT", r"\b(?:nóng máy|sập máy|chạy trên máy tao|đưa server cho mày chi|tự ý kill)\b", 90, False),
+    ("ARTIFACT_CONTAMINATION", r"\b(?:phí lượt nộp|mất lượt nộp|copy từ gold|ghi đè submission)\b", 94, False),
+    ("GENERAL_SCOLDING", r"(?:tao đã bảo cấm|tao đã dặn|nhắc bao nhiêu lần|sai bét|ảo giác|bịa đặt|phá code|làm ăn kiểu gì|i told you not to|wrong again)", 88, False),
+    ("GENERAL_SCOLDING", r"\bhallucinat", 84, True),
 ]
 
 _DIRECTIVE_PATTERNS: List[Tuple[str, str]] = [
@@ -97,7 +101,9 @@ class SelfLearningDetector:
 
         if not is_diagnostic_question:
             best_cat, best_conf = "NONE", 0
-            for cat, pat, weight in _CORRECTION_PATTERNS:
+            for cat, pat, weight, needs_intent in _CORRECTION_PATTERNS:
+                if needs_intent and not (has_explicit_rule_cmd or has_accusation):
+                    continue
                 if re.search(pat, text, flags=re.IGNORECASE | re.UNICODE) and weight > best_conf:
                     best_cat, best_conf = cat, weight
 

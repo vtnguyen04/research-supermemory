@@ -55,13 +55,15 @@ def apply_supersession_decay(
     superseded_by: Dict[str, str],
     beaten_by: Dict[str, str],
 ) -> Tuple[float, str]:
-    """Damp consolidated/superseded episodes (`0.35x`–`0.42x` floor — never 0.0) while keeping 100% of active dead-end warnings."""
+    """Damp consolidated/superseded episodes (`0.35x`–`0.42x` floor — never 0.0) while keeping 100% of dead-end warnings."""
     if nd.node_type == NodeType.LESSON.value:
+        return score, ""
+    if is_negative_warning_node(nd):
+        if nd.status == "CONSOLIDATED" or (nd.metadata or {}).get("consolidated"):
+            return score * 0.55, ""
         return score, ""
     if nd.status == "CONSOLIDATED" or (nd.metadata or {}).get("consolidated"):
         return score * 0.35, str((nd.metadata or {}).get("consolidated_into") or "SEM")
-    if is_negative_warning_node(nd):
-        return score, ""
     if nd.id in superseded_by or nd.status == "SUPERSEDED":
         return score * 0.42, superseded_by.get(nd.id, "NEWER")
     if nd.status == "ARCHIVED":
@@ -76,8 +78,8 @@ def apply_supersedes_links(
     new_ids: Iterable[str],
     supersedes: Iterable[str],
 ) -> List[str]:
-    """Wire `SUPERSEDES` edges from `new_ids` to `supersedes` and tag superseded positive insights."""
-    clean_new = [s.strip() for s in new_ids if s and s.strip()]
+    """Wire `SUPERSEDES` edges from verified `new_ids` to `supersedes` without cycles or sacred-node mutation."""
+    clean_new = [s.strip() for s in new_ids if s and s.strip() and store.get_node(s.strip()) is not None]
     clean_old = [s.strip() for s in supersedes if s and s.strip()]
     if not clean_new or not clean_old:
         return []
@@ -88,12 +90,16 @@ def apply_supersedes_links(
         if old_id == lead_new:
             continue
         old_nd = store.get_node(old_id)
-        if old_nd is None or is_negative_warning_node(old_nd) or old_nd.node_type == NodeType.LAW.value:
+        if old_nd is None or is_negative_warning_node(old_nd) or old_nd.node_type in (NodeType.LAW.value, NodeType.GATE.value):
             continue
         for new_id in clean_new:
             if new_id != old_id:
+                store.conn.execute("DELETE FROM edges WHERE source_id = ? AND target_id = ? AND relation = 'SUPERSEDES'", (old_id, new_id))
                 store.add_edge(MemoryEdge(source_id=new_id, target_id=old_id, relation=EdgeType.SUPERSEDES.value))
+        old_nd.metadata.setdefault("prior_status", old_nd.status)
+        old_nd.metadata.setdefault("prior_priority", old_nd.priority)
         old_nd.metadata["superseded_by"] = lead_new
+        old_nd.priority = min(old_nd.priority, 35)
         if old_nd.node_type == NodeType.OBSERVATION.value:
             old_nd.status = "SUPERSEDED"
         store.upsert_node(old_nd, log_event=False)

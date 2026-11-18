@@ -287,7 +287,12 @@ class LifecycleManager:
         audits.append({"audit_id": audit_id, "role": auditor_role, "verdict": clean_verdict})
         target_node.metadata["audits"] = audits
         if target_node.node_type == NodeType.PROPOSAL.value and clean_verdict == "APPROVE":
-            target_node.status = ProposalStage.AUDITED.value
+            if "challenger" in auditor_role.lower():
+                if target_node.status in ("PROPOSED", "DESIGNED", "IMPLEMENTING"):
+                    target_node.status = ProposalStage.CHALLENGED.value
+            else:
+                target_node.status = ProposalStage.AUDITED.value
+                target_node.priority = min(target_node.priority, 40)
         elif target_node.node_type == NodeType.EXPERIMENT.value and clean_verdict == "APPROVE":
             target_node.status = ExperimentVerdict.VICTORY_CONFIRMED.value
         self.store.upsert_node(target_node, log_event=False)

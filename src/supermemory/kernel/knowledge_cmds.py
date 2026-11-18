@@ -168,7 +168,8 @@ def _cmd_link_knowledge(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
         },
     },
     mutates_memory=lambda args, _res: str(args.get("mode") or "merge").lower() != "review",
-    is_readonly_research=lambda args, _res: str(args.get("mode") or "merge").lower() == "review",
+    clears_kanban_sync=True,
+    preserves_dirty_files=True,
 )
 def _cmd_consolidate(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
     mode = str(args.get("mode") or "merge").lower()

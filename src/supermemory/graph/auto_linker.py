@@ -10,7 +10,7 @@ from supermemory.models import EdgeType, MemoryEdge, MemoryNode, NodeType
 from supermemory.storage.sqlite_store import GraphStore
 
 _NODE_ID_TOKEN_RE = re.compile(
-    r"\b(?:BNK|RQ|METH|EXP|PROP|IDEA|ALGO|LESSON|LAW|SEM|PROC)-[A-Z0-9-]*\d+[A-Z0-9-]*\b",
+    r"\b(?:BNK|RQ|METH|EXP|PROP|IDEA|ALGO|LESSON|LAW|SEM|PROC|OBS)-[A-Z0-9-]*\d+[A-Z0-9-]*\b",
     re.IGNORECASE,
 )
 _CONTENT_WORD_RE = re.compile(r"[0-9a-zA-Z_\u00C0-\u1EF9]{4,}")
@@ -133,7 +133,7 @@ def _pick_fallback_anchor(store: GraphStore, node: MemoryNode, text: str) -> Opt
             reverse=True,
         )
         return open_bnks[0]
-    return anchors[0]
+    return None
 
 
 def wire_contextual_edges(

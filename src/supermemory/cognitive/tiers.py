@@ -65,18 +65,10 @@ def compute_tier_telemetry(store: GraphStore) -> Dict[str, Any]:
     capsule = build_tiered_capsule(store)
     active_prompt_tokens = _est_tokens(capsule)
     total_vault_tokens = sum(raw_tokens_by_tier.values())
-    saved_pct = (
-        round((1.0 - min(1.0, active_prompt_tokens / max(1, total_vault_tokens))) * 100.0, 1)
-        if total_vault_tokens > active_prompt_tokens
-        else 0.0
-    )
+    saved_pct = round((1.0 - min(1.0, active_prompt_tokens / max(1, total_vault_tokens))) * 100.0, 1) if total_vault_tokens > active_prompt_tokens else 0.0
     return {
-        "counts_by_tier": counts,
-        "raw_tokens_by_tier": raw_tokens_by_tier,
-        "active_prompt_tokens": active_prompt_tokens,
-        "total_vault_tokens": total_vault_tokens,
-        "context_compression_pct": saved_pct,
-        "consolidated_episodes": consolidated_count,
+        "counts_by_tier": counts, "raw_tokens_by_tier": raw_tokens_by_tier, "active_prompt_tokens": active_prompt_tokens,
+        "total_vault_tokens": total_vault_tokens, "context_compression_pct": saved_pct, "consolidated_episodes": consolidated_count,
     }
 
 
@@ -97,6 +89,11 @@ def _trim_capsule_blocks(blocks: List[tuple[int, str]], max_tokens: int) -> str:
     return out[: char_cap - 1] + "…" if len(out) > char_cap else out
 
 
+def _id_seq(nid: str) -> int:
+    m = re.search(r"(\d+)$", nid or "")
+    return int(m.group(1)) if m else 0
+
+
 def build_tiered_capsule(
     store: GraphStore,
     query: str = "",
@@ -112,7 +109,10 @@ def build_tiered_capsule(
     laws = sorted(store.list_nodes(node_types=[NodeType.LAW.value], limit=16), key=lambda x: x.id)
     procs = store.list_nodes(node_types=[NodeType.PROCEDURE.value], limit=6)
     gates = store.list_gates(enabled_only=True)
-    proposals = sorted([p for p in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=100) if p.status not in ("ARCHIVED", "REJECTED", "AUDITED", "CONSOLIDATED")], key=lambda p: p.id, reverse=True)
+    proposals = sorted(
+        store.list_nodes(node_types=[NodeType.PROPOSAL.value], exclude_statuses=["ARCHIVED", "REJECTED", "AUDITED", "CONSOLIDATED"], limit=40),
+        key=lambda p: _id_seq(p.id), reverse=True,
+    )
     bottlenecks = sorted([b for b in store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=100) if b.status not in ("RESOLVED", "ARCHIVED", "CONSOLIDATED")], key=lambda b: float(b.metadata.get("error_share_pct") or 0.0) * float(b.metadata.get("ceiling_gain") or 0.1), reverse=True)
     exps = store.list_experiments()[:2]
     sota = select_best_sota_experiment(store)
@@ -141,25 +141,22 @@ def build_tiered_capsule(
             t_done = sum(1 for x in (p.metadata.get("tasks_done") or []) if x)
             prog = f" {t_done}/{t_tot}" if t_tot else ""
             p_parts.append(f"`{p.id}`[{p.status}{prog}] {p.title[:42]}")
-        blocks.append((2, "• [L0 WORKING] Active Proposals: " + " | ".join(p_parts)))
+        blocks.append((1, "• [L0 WORKING] Active Proposals: " + " | ".join(p_parts)))
     dag_rows = store.conn.execute(
         "SELECT task_id, status, title FROM agent_tasks WHERE status IN ('RUNNING', 'QUEUED') ORDER BY status DESC, task_id DESC LIMIT 4"
     ).fetchall()
     if dag_rows:
-        blocks.append((2, "• [L0 KANBAN TASKS]: " + " | ".join(f"`{r['task_id']}`[{r['status']}] {str(r['title'])[:38]}" for r in dag_rows)))
-    mcards = [
-        m for m in store.list_nodes(node_types=[NodeType.METHOD_CARD.value], limit=6)
-        if m.status not in ("REJECTED", "ARCHIVED", "CONSOLIDATED")
-    ]
+        blocks.append((1, "• [L0 KANBAN TASKS]: " + " | ".join(f"`{r['task_id']}`[{r['status']}] {str(r['title'])[:38]}" for r in dag_rows)))
+    mcards = store.list_nodes(node_types=[NodeType.METHOD_CARD.value], exclude_statuses=["REJECTED", "ARCHIVED", "CONSOLIDATED"], limit=8)
     if mcards:
         mc_txt = " | ".join(f"`{m.id}`({m.metadata.get('venue', 'SOTA')} {m.metadata.get('year', '')}) {m.title[:38]}" for m in mcards[:3])
         blocks.append((2, f"• [L2 METHOD VAULT — Saved SOTA Cards]: {mc_txt}"))
     recent_obs = sorted(
-        [o for o in store.list_nodes(node_types=[NodeType.OBSERVATION.value], limit=40) if o.status not in ("CONSOLIDATED", "SUPERSEDED") and not (o.metadata or {}).get("consolidated")],
-        key=lambda o: (o.updated_at, o.id), reverse=True,
+        [o for o in store.list_nodes(node_types=[NodeType.OBSERVATION.value], exclude_statuses=["CONSOLIDATED", "SUPERSEDED"], limit=40) if not (o.metadata or {}).get("consolidated")],
+        key=lambda o: (o.updated_at, _id_seq(o.id)), reverse=True,
     )[:3]
     if recent_obs:
-        blocks.append((2, "• [L2 LATEST INSIGHTS]: " + " | ".join(f"`{o.id}` {o.title[:44]}" for o in recent_obs)))
+        blocks.append((1, "• [L2 LATEST INSIGHTS]: " + " | ".join(f"`{o.id}` {o.title[:44]}" for o in recent_obs)))
 
     has_agents_md = (store.workspace_root / "AGENTS.md").is_file()
     law_note = " (active in AGENTS.md)" if has_agents_md else ":"
@@ -255,8 +252,11 @@ def consolidate_nodes(
         store.add_edge(MemoryEdge(source_id=src.id, target_id=new_id, relation=EdgeType.CONSOLIDATED_INTO.value))
         can_archive = classify_tier(src) == MemoryTier.EPISODIC.value or src.node_type == NodeType.OBSERVATION.value
         if can_archive and src.node_type != NodeType.LAW.value:
+            src.metadata.setdefault("prior_status", src.status)
+            src.metadata.setdefault("prior_priority", src.priority)
             src.metadata["consolidated"] = True
             src.metadata["consolidated_into"] = new_id
+            src.priority = min(src.priority, 35)
             if src.status.upper() not in ("REVERT", "FAILED", "REJECTED", "DISCARD", "EARLY_KILLED", "FAILURE_INSIGHT"):
                 src.status = "CONSOLIDATED"
             store.upsert_node(src, log_event=False)

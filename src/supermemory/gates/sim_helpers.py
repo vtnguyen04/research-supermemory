@@ -1,8 +1,9 @@
-"""File-Edit Simulation, Multiline Regex Evaluation & Shell Frozen-File Guards."""
+"""File-Edit Simulation, Quote-Aware Shell Splitting & Shell Frozen-File Guards."""
 
 from __future__ import annotations
 
 import re
+import shlex
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -10,8 +11,11 @@ from supermemory.models import CodeGate, GateType
 
 _HASH_COMMENT_EXTS = (".py", ".sh", ".bash", ".zsh", ".yaml", ".yml", ".toml", ".rb", ".r")
 _SLASH_COMMENT_EXTS = (".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".css", ".scss", ".c", ".cpp", ".h", ".go", ".rs", ".java")
-_SHELL_MUTATE_RE = re.compile(
-    r"(?:>>?|<<|\btee\b|\bsed\s+-[a-zA-Z]*i|\bperl\s+-[a-zA-Z]*i|\b(?:cp|mv|rm|dd|truncate)\b|\.write_text\(|\.write_bytes\(|open\([^)]*['\"][wa+])"
+_BENIGN_REDIR_RE = re.compile(r"(?:\b\d*>&\d+\b|(?:1|2|&)?>>?\s*/dev/null\b)")
+_ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
+_SHELL_MUTATE_VERBS = {"tee", "cp", "mv", "rm", "dd", "truncate", "patch"}
+_INLINE_WRITE_RE = re.compile(
+    r"(?:\bsed\s+-[a-zA-Z]*i|\bperl\s+-[a-zA-Z]*i|\.write_text\(|\.write_bytes\(|\.unlink\(|\bos\.(?:remove|replace|unlink)\(|\bshutil\.|open\([^)]*['\"][wa+])"
 )
 
 
@@ -34,9 +38,58 @@ def extract_tool_file_path(tool_args: Dict[str, Any]) -> str:
         or tool_args.get("AbsolutePath")
         or tool_args.get("TargetFile")
         or tool_args.get("file_path")
+        or tool_args.get("notebook_path")
         or tool_args.get("path")
         or ""
     ).strip()
+
+
+def split_shell_commands(raw: str) -> List[Tuple[List[str], bool]]:
+    """Quote-aware shell segment splitter returning `(argv, has_file_redirect)` per command."""
+    if not raw or not raw.strip():
+        return []
+    cleaned = _BENIGN_REDIR_RE.sub(" ", raw.replace("\n", " ; "))
+    try:
+        lex = shlex.shlex(cleaned, posix=True, punctuation_chars=";&|><")
+        lex.whitespace_split = True
+        lex.commenters = ""
+        tokens = list(lex)
+    except ValueError:
+        tokens = cleaned.split()
+
+    out: List[Tuple[List[str], bool]] = []
+    cur: List[str] = []
+    has_redir = False
+
+    def _flush() -> None:
+        nonlocal cur, has_redir
+        while cur and _ENV_ASSIGN_RE.match(cur[0]):
+            cur = cur[1:]
+        if len(cur) >= 2 and Path(cur[0]).name.lower() == "uv" and cur[1] == "run":
+            cur = cur[2:]
+        if len(cur) >= 2 and Path(cur[0]).name.lower() == "rtk":
+            cur = cur[1:]
+        if cur or has_redir:
+            out.append((cur, has_redir))
+        cur = []
+        has_redir = False
+
+    skip_next = False
+    for tok in tokens:
+        if skip_next:
+            skip_next = False
+            cur.append(tok)
+            continue
+        if set(tok) <= set(";&|") and tok:
+            _flush()
+            continue
+        if any(r in tok for r in (">", ">>", "<<")) and set(tok) <= set("012><"):
+            has_redir = ">" in tok
+            skip_next = True
+            continue
+        cur.append(tok)
+    _flush()
+    return out
 
 
 def _is_comment_line(rel: str, stripped_line: str) -> bool:
@@ -51,7 +104,7 @@ def _is_comment_line(rel: str, stripped_line: str) -> bool:
 
 
 def simulate_file_text(tool_low: str, abs_p: Path, args: Dict[str, Any]) -> str:
-    """Simulate candidate file contents for write/edit/replace/multiedit tools before execution."""
+    """Simulate candidate file contents for write/edit/replace/multiedit/notebookedit tools."""
     existing = ""
     if abs_p.is_file():
         try:
@@ -62,7 +115,8 @@ def simulate_file_text(tool_low: str, abs_p: Path, args: Dict[str, Any]) -> str:
     if tool_low in ("write_file", "write"):
         content = str(args.get("Content") if args.get("Content") is not None else (args.get("content") or ""))
         return (existing + content) if args.get("Append") else content
-
+    if tool_low == "notebookedit":
+        return existing + "\n" + str(args.get("new_source") or "")
     if tool_low in ("edit_file", "edit", "replace_file_content"):
         target = str(
             args.get("Target")
@@ -76,7 +130,7 @@ def simulate_file_text(tool_low: str, abs_p: Path, args: Dict[str, Any]) -> str:
         )
         if not target or target not in existing:
             return existing
-        allow_multi = bool(args.get("AllowMultiple", True)) if tool_low == "replace_file_content" else True
+        allow_multi = bool(args.get("AllowMultiple", False)) if tool_low == "replace_file_content" else (bool(args.get("replace_all", False)) if tool_low == "edit" else True)
         return existing.replace(target, repl) if allow_multi else existing.replace(target, repl, 1)
 
     if tool_low in ("multiedit", "multi_replace_file_content"):
@@ -89,7 +143,7 @@ def simulate_file_text(tool_low: str, abs_p: Path, args: Dict[str, Any]) -> str:
                 t = str(ch.get("TargetContent") if ch.get("TargetContent") is not None else (ch.get("old_string") or ""))
                 r = str(ch.get("ReplacementContent") if ch.get("ReplacementContent") is not None else (ch.get("new_string") or ""))
                 if t and t in cur:
-                    allow_m = bool(ch.get("AllowMultiple", True)) if "TargetContent" in ch else True
+                    allow_m = bool(ch.get("AllowMultiple", False)) if "TargetContent" in ch else bool(ch.get("replace_all", False))
                     cur = cur.replace(t, r) if allow_m else cur.replace(t, r, 1)
         return cur
     return existing
@@ -108,9 +162,8 @@ def match_forbidden_regex(
     except re.error:
         return None
 
-    lines = text.splitlines()
     kept_lines: List[str] = []
-    for idx, ln in enumerate(lines, 1):
+    for idx, ln in enumerate(text.splitlines(), 1):
         stripped = ln.lstrip()
         if ignore_comments and _is_comment_line(rel, stripped):
             kept_lines.append("")
@@ -119,14 +172,11 @@ def match_forbidden_regex(
         if rx.search(ln):
             return idx, ln.strip()[:90]
 
-    needs_multi = force_multiline or any(tok in pattern for tok in ("\\n", "[\\s\\S]", "[^}]", "\\s*"))
-    if needs_multi:
+    if force_multiline or any(tok in pattern for tok in ("\\n", "[\\s\\S]", "[^}]", "\\s*")):
         joined = "\n".join(kept_lines)
         m = rx.search(joined)
         if m:
-            line_no = joined[: m.start()].count("\n") + 1
-            snippet = " ".join(m.group(0).split())[:90]
-            return line_no, snippet
+            return joined[: m.start()].count("\n") + 1, " ".join(m.group(0).split())[:90]
     return None
 
 
@@ -134,9 +184,16 @@ def check_shell_frozen_write_bypass(cmd: str, gates: List[CodeGate]) -> List[Tup
     """Block shell commands attempting to overwrite, redirect into, or delete FROZEN_SHA256 files."""
     if not cmd:
         return []
-    segments = [s.strip() for s in re.split(r"(?:&&|\|\||[;\n])", cmd) if s.strip() and _SHELL_MUTATE_RE.search(s)]
-    if not segments:
+    mut_segs: List[str] = []
+    for argv, has_redir in split_shell_commands(cmd):
+        joined = " ".join(argv)
+        prog = Path(argv[0]).name.lower() if argv else ""
+        is_git_reset = prog == "git" and len(argv) >= 2 and argv[1] in ("checkout", "restore", "rm")
+        if has_redir or prog in _SHELL_MUTATE_VERBS or is_git_reset or _INLINE_WRITE_RE.search(joined):
+            mut_segs.append(joined)
+    if not mut_segs:
         return []
+
     hits: List[Tuple[str, str]] = []
     for g in gates:
         if g.gate_type != GateType.FROZEN_SHA256.value:
@@ -145,9 +202,8 @@ def check_shell_frozen_write_bypass(cmd: str, gates: List[CodeGate]) -> List[Tup
         if not rel:
             continue
         bname = Path(rel).name
-        for seg in segments:
-            if rel in seg or (len(bname) >= 8 and re.search(rf"(?<![\w.-]){re.escape(bname)}(?![\w.-])", seg)):
-                msg = f"[{g.id}/{g.law_id or 'LAW-05'}] FROZEN FILE SHELL GUARD: command mutates SHA-256 locked `{rel}`"
-                hits.append((g.id, msg))
+        for seg in mut_segs:
+            if rel in seg or (len(bname) >= 4 and re.search(rf"(?<![\w.-]){re.escape(bname)}(?![\w.-])", seg)):
+                hits.append((g.id, f"[{g.id}/{g.law_id or 'LAW-05'}] FROZEN FILE SHELL GUARD: command mutates SHA-256 locked `{rel}`"))
                 break
     return hits

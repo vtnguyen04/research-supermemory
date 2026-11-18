@@ -21,15 +21,22 @@ from supermemory.storage.ledger_ops import (
 from supermemory.storage.schema import apply_schema
 
 MAX_EVENT_LOG_ROWS = 2000
+_FTS_STOPWORDS = {
+    "the", "and", "for", "with", "from", "into", "that", "this", "are", "was", "were", "have", "has",
+    "had", "not", "but", "you", "all", "can", "when", "what", "how", "why", "who", "our", "out", "use",
+    "của", "những", "trong", "đang", "không", "khong", "được", "cho", "với", "các", "khi", "sau", "này",
+}
 
 
 def _safe_fts_query(raw: str) -> str:
-    """Sanitize arbitrary natural language input into a safe FTS5 OR query."""
-    tokens = [t for t in re.findall(r"[\w]+", raw.lower(), flags=re.UNICODE) if len(t) >= 2]
+    """Sanitize natural language input into a stopword-free, technical-prioritized FTS5 OR query."""
+    raw_toks = [t for t in re.findall(r"[\w]+", raw.lower(), flags=re.UNICODE) if len(t) >= 2]
+    filtered = [t for t in raw_toks if t not in _FTS_STOPWORDS and (len(t) >= 3 or any(c.isdigit() for c in t))]
+    tokens = list(dict.fromkeys(filtered or raw_toks))
     if not tokens:
         return ""
-    deduped = list(dict.fromkeys(tokens))[:16]
-    return " OR ".join(f'"{tok}"*' for tok in deduped)
+    tokens.sort(key=lambda t: (any(c.isdigit() or c == "_" for c in t), min(len(t), 12)), reverse=True)
+    return " OR ".join(f'"{tok}"*' for tok in tokens[:18])
 
 
 class GraphStore:
@@ -135,19 +142,22 @@ class GraphStore:
         self,
         node_types: Optional[Sequence[str]] = None,
         status: Optional[str] = None,
+        exclude_statuses: Optional[Sequence[str]] = None,
         limit: int = 500,
     ) -> List[MemoryNode]:
         clauses: List[str] = []
         params: List[Any] = []
         if node_types:
-            placeholders = ",".join("?" for _ in node_types)
-            clauses.append(f"node_type IN ({placeholders})")
+            clauses.append(f"node_type IN ({','.join('?' for _ in node_types)})")
             params.extend(node_types)
         if status:
             clauses.append("status = ?")
             params.append(status)
+        if exclude_statuses:
+            clauses.append(f"status NOT IN ({','.join('?' for _ in exclude_statuses)})")
+            params.extend(exclude_statuses)
         where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = f"SELECT * FROM nodes {where_sql} ORDER BY priority DESC, id ASC LIMIT ?"
+        sql = f"SELECT * FROM nodes {where_sql} ORDER BY priority DESC, updated_at DESC, rowid DESC LIMIT ?"
         params.append(limit)
         return [self._row_to_node(r) for r in self.conn.execute(sql, params).fetchall()]
 
@@ -280,16 +290,9 @@ class GraphStore:
     @staticmethod
     def _row_to_node(row: sqlite3.Row) -> MemoryNode:
         return MemoryNode(
-            id=str(row["id"]),
-            node_type=str(row["node_type"]),
-            title=str(row["title"]),
-            status=str(row["status"]),
-            summary=str(row["summary"]),
-            content=str(row["content"]),
-            metadata=json.loads(row["metadata_json"] or "{}"),
-            file_path=str(row["file_path"]),
-            tags=json.loads(row["tags_json"] or "[]"),
-            priority=int(row["priority"]),
-            created_at=str(row["created_at"]),
-            updated_at=str(row["updated_at"]),
+            id=str(row["id"]), node_type=str(row["node_type"]), title=str(row["title"]),
+            status=str(row["status"]), summary=str(row["summary"]), content=str(row["content"]),
+            metadata=json.loads(row["metadata_json"] or "{}"), file_path=str(row["file_path"]),
+            tags=json.loads(row["tags_json"] or "[]"), priority=int(row["priority"]),
+            created_at=str(row["created_at"]), updated_at=str(row["updated_at"]),
         )

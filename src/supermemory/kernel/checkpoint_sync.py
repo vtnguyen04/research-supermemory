@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 from supermemory.cognitive.curator_engine import check_curation_pressure
@@ -49,7 +50,7 @@ def _mint_insight_node(
 
     existing = store.list_nodes(node_types=[ntype], limit=5000)
     for ex in existing:
-        if ex.title.strip().lower() == t_clean.lower() and ex.summary.strip().lower() == s_clean[:240].strip().lower():
+        if ex.title.strip().lower() == t_clean.lower() and (ex.content or ex.summary).strip().lower() == s_clean.strip().lower():
             wire_contextual_edges(store, ex.id, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
             return ex.to_dict()
 
@@ -159,8 +160,10 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
                 if raw_st == "DONE":
                     row = store.conn.execute("SELECT * FROM agent_tasks WHERE task_id = ?", (iid,)).fetchone()
                     if row:
-                        t_steps = extract_task_steps(_row_to_task(row).to_dict())
-                        assert_all_steps_completed(iid, [s["text"] for s in t_steps], [bool(s["done"]) for s in t_steps])
+                        t_dict = _row_to_task(row).to_dict()
+                        if "steps" in (t_dict.get("receipt") or {}):
+                            t_steps = extract_task_steps(t_dict)
+                            assert_all_steps_completed(iid, [s["text"] for s in t_steps], [bool(s["done"]) for s in t_steps])
                 move_task_stage(store, iid, raw_st, agent_name="agent")
         applied_tasks.append({"id": iid, "kind": kind})
         mutated = True
@@ -172,26 +175,29 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
             meta_changed.append(meta_key)
             mutated = True
 
-    if not mutated and str(args.get("status") or "").upper() == "CLEAN":
-        s_rows = store.conn.execute("SELECT conversation_id FROM session_state").fetchall()
+    req_status = str(args.get("status") or "").upper()
+    if not mutated and req_status == "CLEAN":
+        recent_cut = (datetime.now(timezone.utc) - timedelta(minutes=30)).replace(microsecond=0).isoformat()
+        s_rows = store.conn.execute(
+            "SELECT conversation_id FROM session_state WHERE updated_at >= ? ORDER BY updated_at DESC LIMIT 4",
+            (recent_cut,),
+        ).fetchall()
         dirty_all = [
-            f
-            for r in s_rows
-            for f in (get_session_state(store, str(r["conversation_id"])).get("dirty_files") or [])
+            f for r in s_rows for f in (get_session_state(store, str(r["conversation_id"])).get("dirty_files") or [])
         ]
         if dirty_all:
             shown = ", ".join(dict.fromkeys(dirty_all))[:120]
             raise ValueError(
                 f"LAW-07 Dirty-Edit Sync Gate: Cannot attest empty `status='CLEAN'` while workspace source files were modified (`{shown}`). "
-                "Include at least one concrete `insights=['Title: what changed & why']` or `task_updates=[...]` (or call `log_experiment`)."
+                "Include `insights=['Title: what changed & why']` / `task_updates=[...]`, or pass `status='IN_FLIGHT_WAIT'` if waiting on an async job."
             )
 
     if meta_changed and not (captured_insights or created_task or applied_tasks):
         store.log_event("CHECKPOINT_SYNCED", "L0_STATE", f"Synced L0 state ({', '.join(meta_changed)}){': ' + note[:80] if note else ''}")
     if mutated:
         MarkdownCompiler(store).compile_all()
-    kanban_touched = bool(created_task or applied_tasks or str(args.get("status") or "").upper() == "CLEAN")
-    mark_turn_memory_handled(store, clear_kanban_sync=kanban_touched)
+    kanban_touched = bool(created_task or applied_tasks or req_status in ("CLEAN", "IN_FLIGHT_WAIT"))
+    mark_turn_memory_handled(store, clear_kanban_sync=kanban_touched, include_dirty=(req_status != "IN_FLIGHT_WAIT"))
     out: Dict[str, Any] = {
         "status": "CAPTURED" if mutated else str(args.get("status") or "CLEAN"),
         "turn_memory_handled": True,

@@ -29,6 +29,9 @@ def handle_workspace_action(body: Dict[str, Any]) -> Dict[str, Any]:
     if not raw_path:
         raise ValueError("Project folder path is required.")
     target = Path(raw_path).expanduser().resolve()
+    home = Path.home().resolve()
+    if target in (Path("/"), home) or any(target.as_posix().startswith(p) for p in ("/etc", "/usr", "/var", "/proc", "/sys", "/boot")) or any(part.startswith(".") for part in target.parts[len(home.parts):] if target.is_relative_to(home)):
+        raise ValueError("Refusing to initialize SuperMemory inside root, $HOME, system, or hidden dot directories.")
     name = str(body.get("name") or target.name).strip()
     goal = str(body.get("goal") or "").strip()
     max_lines = int(body.get("max_lines") or 500)

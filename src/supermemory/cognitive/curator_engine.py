@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 import shutil
 from typing import Any, Dict, List, Set
@@ -14,7 +15,8 @@ from supermemory.storage.sqlite_store import GraphStore
 
 _SACRED_TYPES = {NodeType.LAW.value, NodeType.GATE.value}
 _ACTIVE_PROP_STATES = {"PROPOSED", "DESIGNED", "IMPLEMENTING", "CHALLENGED"}
-_DEC_NUM_RE = re.compile(r"\b\d+\.\d+\b")
+_ISO_TS_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s`]*")
+_METRIC_TOK_RE = re.compile(r"(?<![A-Za-z0-9_.-])(?:\d+\.\d{2,}|\d+(?:\.\d+)?%)(?![0-9.])")
 
 
 def _seq_num(nid: str) -> int:
@@ -22,77 +24,58 @@ def _seq_num(nid: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def _has_edge(store: GraphStore, nid: str) -> bool:
-    return store.conn.execute("SELECT 1 FROM edges WHERE source_id = ? OR target_id = ? LIMIT 1", (nid, nid)).fetchone() is not None
+def _extract_metrics(text: str) -> Set[str]:
+    clean = _ISO_TS_RE.sub(" ", text or "")
+    return {m.rstrip("0").rstrip(".") if ("." in m and not m.endswith("%")) else m for m in _METRIC_TOK_RE.findall(clean)}
 
 
-def _active_observations(all_nodes: List[MemoryNode]) -> List[MemoryNode]:
+def _unreviewed_obs_and_exps(all_nodes: List[MemoryNode]) -> tuple[List[MemoryNode], List[MemoryNode]]:
     obs = [
         n for n in all_nodes
-        if n.node_type == NodeType.OBSERVATION.value
-        and n.status not in ("CONSOLIDATED", "SUPERSEDED")
-        and not (n.metadata or {}).get("consolidated")
-        and not (n.metadata or {}).get("superseded_by")
+        if n.node_type == NodeType.OBSERVATION.value and n.status not in ("CONSOLIDATED", "SUPERSEDED")
+        and not any((n.metadata or {}).get(k) for k in ("consolidated", "superseded_by", "curator_reviewed"))
+    ]
+    exps = [
+        n for n in all_nodes
+        if n.node_type == NodeType.EXPERIMENT.value and n.status not in ("CONSOLIDATED", "VICTORY_CONFIRMED")
+        and not any((n.metadata or {}).get(k) for k in ("consolidated", "curator_reviewed"))
     ]
     obs.sort(key=lambda n: (n.created_at, _seq_num(n.id)), reverse=True)
-    return obs
+    exps.sort(key=lambda n: (n.created_at, _seq_num(n.id)), reverse=True)
+    return obs, exps
 
 
 def check_curation_pressure(store: GraphStore, mark_prompted: bool = False) -> Dict[str, Any]:
-    """O(1) non-destructive check deciding when main agent should spawn `memory-curator` subagent."""
+    """Fast SQLite check deciding when main agent should spawn `memory-curator` subagent."""
     all_nodes = store.list_nodes(limit=5000)
     total_n = len(all_nodes)
-    raw_obs = _active_observations(all_nodes)
-    raw_exps = [
-        n for n in all_nodes
-        if n.node_type == NodeType.EXPERIMENT.value
-        and n.status not in ("CONSOLIDATED", "VICTORY_CONFIRMED")
-        and not (n.metadata or {}).get("consolidated")
-    ]
+    raw_obs, raw_exps = _unreviewed_obs_and_exps(all_nodes)
     audited_props = [n for n in all_nodes if n.node_type == NodeType.PROPOSAL.value and n.status == "AUDITED"]
-    orphans = [
-        n for n in all_nodes
-        if n.node_type in (NodeType.OBSERVATION.value, NodeType.IDEA.value, NodeType.ALGORITHM.value, NodeType.KNOWLEDGE_NODE.value)
-        and not _has_edge(store, n.id)
+    linked_ids = {str(r[0]) for r in store.conn.execute("SELECT source_id FROM edges UNION SELECT target_id FROM edges").fetchall()}
+    orphans = [n for n in all_nodes if n.node_type in (NodeType.OBSERVATION.value, NodeType.IDEA.value, NodeType.ALGORITHM.value, NodeType.KNOWLEDGE_NODE.value) and n.id not in linked_ids]
+
+    reasons = [
+        lbl for cond, lbl in (
+            (len(raw_obs) >= 24, f"{len(raw_obs)} unreviewed observations"),
+            (len(raw_exps) >= 14, f"{len(raw_exps)} unreviewed episodic runs"),
+            (len(audited_props) >= 3, f"{len(audited_props)} completed AUDITED proposals"),
+            (len(orphans) >= 3, f"{len(orphans)} unlinked orphan nodes"),
+        ) if cond
     ]
-
-    reasons: List[str] = []
-    if len(raw_obs) >= 24:
-        reasons.append(f"{len(raw_obs)} unconsolidated observations")
-    if len(raw_exps) >= 14:
-        reasons.append(f"{len(raw_exps)} unconsolidated episodic runs")
-    if len(audited_props) >= 3:
-        reasons.append(f"{len(audited_props)} completed AUDITED proposals")
-    if len(orphans) >= 3:
-        reasons.append(f"{len(orphans)} unlinked orphan nodes")
-
     last_prompt_n = int(store.get_meta("last_curation_prompt_nodes") or "0")
     needs = bool(reasons) and ((last_prompt_n == 0) or ((total_n - last_prompt_n) >= 10))
     if needs and mark_prompted:
         store.set_meta("last_curation_prompt_nodes", str(total_n))
-
     ws_str = str(store.workspace_root)
     prompt = (
         f"Curate SuperMemory in workspace `{ws_str}` with ZERO data loss: "
-        f"1) Call `consolidate(mode='review', workspace='{ws_str}')` to inspect candidate duplicate groups, "
-        f"verbose observation/experiment clusters, completed specs, and orphans. "
-        f"2) Read the full `.md` files (`read_file` or `recall(node_id=...)`) before deciding — NEVER merge observations "
-        f"from different slices, cities, seeds, or hyperparameters! "
-        f"3) Author rich syntheses preserving ALL concrete metrics/thresholds/configs and submit via "
-        f"`consolidate(mode='apply_plan', workspace='{ws_str}', operations=[...])`, then run `audit_gates`."
+        f"1) Call `consolidate(mode='review', workspace='{ws_str}')` to inspect candidate duplicates, batches, specs, and orphans. "
+        f"2) Read full `.md` files first — NEVER merge distinct slices/cities/seeds (use `op='keep_distinct'` for verified distinct slices)! "
+        f"3) Preserve ALL concrete metrics in `merge` and commit via `consolidate(mode='apply_plan', workspace='{ws_str}', operations=[...])`."
     )
     return {
-        "needs_curation": needs,
-        "reasons": reasons,
-        "metrics": {
-            "total_nodes": total_n,
-            "raw_observations": len(raw_obs),
-            "unconsolidated_runs": len(raw_exps),
-            "audited_proposals": len(audited_props),
-            "orphan_nodes": len(orphans),
-        },
-        "subagent_type": "memory-curator",
-        "subagent_prompt": prompt if needs else "",
+        "needs_curation": needs, "reasons": reasons, "subagent_type": "memory-curator", "subagent_prompt": prompt if needs else "",
+        "metrics": {"total_nodes": total_n, "raw_observations": len(raw_obs), "unconsolidated_runs": len(raw_exps), "audited_proposals": len(audited_props), "orphan_nodes": len(orphans)},
     }
 
 
@@ -100,12 +83,18 @@ def build_curation_review_packet(store: GraphStore) -> Dict[str, Any]:
     """Read-only semantic dossier for `memory-curator` (`consolidate(mode='review')` — 0 mutations)."""
     all_nodes = store.list_nodes(limit=5000)
     edges = store.list_edges()
+    exp_anchor: Dict[str, str] = {}
     anchor_of: Dict[str, str] = {}
+    for ed in edges:
+        if ed.source_id.startswith("EXP-") and ed.target_id.startswith(("BNK-", "PROP-")):
+            exp_anchor.setdefault(ed.source_id, ed.target_id)
     for ed in edges:
         if ed.target_id.startswith(("BNK-", "PROP-", "METH-", "ALGO-")):
             anchor_of.setdefault(ed.source_id, ed.target_id)
+        elif ed.target_id in exp_anchor:
+            anchor_of.setdefault(ed.source_id, exp_anchor[ed.target_id])
 
-    active_obs = _active_observations(all_nodes)
+    active_obs, raw_exps = _unreviewed_obs_and_exps(all_nodes)
     dup_groups: List[Dict[str, Any]] = []
     seen_pairs: Set[tuple[str, str]] = set()
     for obs in active_obs[:80]:
@@ -113,29 +102,34 @@ def build_curation_review_packet(store: GraphStore) -> Dict[str, Any]:
         if not peers:
             continue
         sims = compute_hybrid_similarity(f"{obs.title} {obs.summary}", peers)
-        matches = [
-            p for p in peers
-            if sims.get(p.id, 0.0) >= 0.52 and (min(obs.id, p.id), max(obs.id, p.id)) not in seen_pairs
-        ]
+        matches = [p for p in peers if sims.get(p.id, 0.0) >= 0.52 and (min(obs.id, p.id), max(obs.id, p.id)) not in seen_pairs]
         if matches:
             top_m = sorted(matches, key=lambda x: sims.get(x.id, 0.0), reverse=True)[:3]
             for m in top_m:
                 seen_pairs.add((min(obs.id, m.id), max(obs.id, m.id)))
             dup_groups.append({
                 "similarity_top": round(sims.get(top_m[0].id, 0.0), 3),
-                "warning": "Read full `file_path` first! Keep BOTH if they measure different slices, buildings, seeds, or hyperparameters.",
+                "warning": "Read full `file_path` first! Use `op='keep_distinct'` if they measure different slices, cities, seeds, or hyperparameters.",
                 "nodes": [{"id": x.id, "title": x.title, "status": x.status, "summary": x.summary, "file_path": x.file_path} for x in [obs, *top_m]],
             })
         if len(dup_groups) >= 12:
             break
 
     by_anchor: Dict[str, List[MemoryNode]] = {}
-    for nd in active_obs[8:]:
+    for nd in active_obs[6:]:
         key = anchor_of.get(nd.id) or str((nd.metadata or {}).get("track") or "GENERAL").upper()
         by_anchor.setdefault(f"{nd.status}:{key}", []).append(nd)
     obs_batches = [
         {"group_key": k, "count": len(items), "nodes": [{"id": x.id, "title": x.title, "summary": x.summary, "file_path": x.file_path} for x in items[:15]]}
-        for k, items in by_anchor.items() if len(items) >= 5
+        for k, items in by_anchor.items() if len(items) >= 3
+    ]
+
+    by_track: Dict[str, List[MemoryNode]] = {}
+    for ex_n in raw_exps[4:]:
+        by_track.setdefault(str((ex_n.metadata or {}).get("track") or "main").upper(), []).append(ex_n)
+    exp_batches = [
+        {"track": tr, "count": len(items), "nodes": [{"id": x.id, "title": x.title, "status": x.status, "summary": x.summary, "file_path": x.file_path} for x in items[:15]]}
+        for tr, items in by_track.items() if len(items) >= 4
     ]
 
     resolved_bnks = {b.id for b in all_nodes if b.node_type == NodeType.BOTTLENECK.value and b.status == "RESOLVED"}
@@ -152,23 +146,19 @@ def build_curation_review_packet(store: GraphStore) -> Dict[str, Any]:
             if rq_n is not None and rq_n.status == "OPEN":
                 lifecycle_items.append({"id": rq_n.id, "type": "RESEARCH_QUESTION", "current_status": "OPEN", "suggested_status": "ANSWERED", "title": rq_n.title})
 
+    linked_ids = {ed.source_id for ed in edges} | {ed.target_id for ed in edges}
     orphans = [
         {"id": n.id, "type": n.node_type, "title": n.title, "summary": n.summary[:140]}
-        for n in all_nodes
-        if n.node_type in (NodeType.OBSERVATION.value, NodeType.IDEA.value, NodeType.ALGORITHM.value, NodeType.KNOWLEDGE_NODE.value)
-        and not _has_edge(store, n.id)
+        for n in all_nodes if n.node_type in (NodeType.OBSERVATION.value, NodeType.IDEA.value, NodeType.ALGORITHM.value, NodeType.KNOWLEDGE_NODE.value) and n.id not in linked_ids
     ]
     return {
         "mode": "REVIEW_PACKET",
         "zero_loss_rules": [
-            "NEVER merge observations from distinct slices, buildings, seeds, datasets, or hyperparameters.",
-            "Every `merge` operation MUST preserve all concrete decimal metrics, thresholds, and configs inside `content`.",
-            "Original nodes & `.md` files are NEVER deleted; `restore` reverses any consolidation in 1 call.",
+            "NEVER merge observations from distinct slices, buildings, seeds, datasets, or hyperparameters (`op='keep_distinct'`).",
+            "Every `merge` operation MUST preserve concrete decimal/percentage metrics from source nodes inside `summary`/`content`.",
         ],
-        "duplicate_candidate_groups": dup_groups,
-        "consolidation_candidate_batches": obs_batches,
-        "lifecycle_review_items": lifecycle_items[:20],
-        "orphan_nodes": orphans[:20],
+        "duplicate_candidate_groups": dup_groups, "consolidation_candidate_batches": obs_batches,
+        "experiment_candidate_batches": exp_batches, "lifecycle_review_items": lifecycle_items[:20], "orphan_nodes": orphans[:20],
     }
 
 
@@ -186,8 +176,8 @@ def _assert_curatable_source(nd: MemoryNode) -> None:
 def apply_curated_plan(store: GraphStore, operations: List[Dict[str, Any]], archive_cold_files: bool = False) -> Dict[str, Any]:
     """Execute LLM-reviewed curation plan from `memory-curator` under strict Zero-Loss Guardrails."""
     if not operations:
-        raise ValueError("`operations` list must contain at least one reviewed curation operation.")
-    merged_ids, superseded_ids, transitioned, linked, restored = [], [], [], [], []
+        raise ValueError("`operations` list must contain at least one reviewed curation operation (use `op='keep_distinct'` if keeping all separate).")
+    merged_ids, superseded_ids, transitioned, linked, restored, kept_distinct = [], [], [], [], [], []
 
     for op in operations:
         kind = str(op.get("op") or "").strip().lower()
@@ -201,27 +191,36 @@ def apply_curated_plan(store: GraphStore, operations: List[Dict[str, Any]], arch
             ttl, summ, body = str(op.get("title") or "").strip(), str(op.get("summary") or "").strip(), str(op.get("content") or "").strip()
             if len(ttl) < 10 or len(summ) < 40 or len(body) < 80:
                 raise ValueError("Zero-Loss Curation Gate: `merge` requires substantive `title` (>=10), `summary` (>=40), and `content` (>=80 chars).")
-            src_nums = {m for sn in src_nodes for m in _DEC_NUM_RE.findall(f"{sn.title} {sn.summary}")}
-            if src_nums and not _DEC_NUM_RE.search(f"{summ} {body}"):
-                raise ValueError(
-                    f"Zero-Loss Curation Gate: Source nodes contain quantitative metrics ({sorted(src_nums)[:4]}), "
-                    "but your synthesized `summary`/`content` preserved ZERO numbers. Preserve concrete metrics!"
-                )
+            src_metrics = {m for sn in src_nodes for m in _extract_metrics(f"{sn.title} {sn.summary} {sn.content}")}
+            dst_metrics = _extract_metrics(f"{ttl} {summ} {body}")
+            if src_metrics:
+                req_cnt = len(src_metrics) if len(src_metrics) <= 4 else math.ceil(len(src_metrics) * 0.75)
+                kept_cnt = len(src_metrics & dst_metrics)
+                if kept_cnt < req_cnt:
+                    missing = sorted(src_metrics - dst_metrics)[:6]
+                    raise ValueError(
+                        f"Zero-Loss Curation Gate: Synthesis dropped source metrics {missing} "
+                        f"(preserved {kept_cnt}/{len(src_metrics)}). Preserve all key quantitative metrics!"
+                    )
             res = consolidate_nodes(store, src_ids, str(op.get("target_tier") or MemoryTier.SEMANTIC.value), ttl, summ, body)
             new_id = str(res["created_node"]["id"])
-            if any(sn.status.upper() in DEAD_END_STATUSES or sn.status == "FAILURE_INSIGHT" for sn in src_nodes):
+            dead_flags = [sn.status.upper() in DEAD_END_STATUSES or sn.status == "FAILURE_INSIGHT" for sn in src_nodes]
+            if any(dead_flags):
                 sem_nd = store.get_node(new_id)
                 if sem_nd is not None:
-                    sem_nd.status = "FAILURE_INSIGHT"
-                    sem_nd.metadata["is_dead_end_digest"] = True
+                    if all(dead_flags):
+                        sem_nd.status = "FAILURE_INSIGHT"
+                        sem_nd.metadata["is_dead_end_digest"] = True
+                    else:
+                        sem_nd.metadata["has_dead_end_warnings"] = True
                     store.upsert_node(sem_nd, log_event=False)
             merged_ids.append(new_id)
         elif kind == "supersede":
             newer_id = str(op.get("newer_id") or "").strip()
             older_ids = [str(x).strip() for x in (op.get("older_ids") or []) if str(x).strip()]
             reason = str(op.get("reason") or "").strip()
-            if not newer_id or not older_ids or len(reason) < 10:
-                raise ValueError("Zero-Loss Curation Gate: `supersede` requires `newer_id`, `older_ids`, and semantic `reason` (>=10 chars).")
+            if not newer_id or store.get_node(newer_id) is None or not older_ids or len(reason) < 10:
+                raise ValueError("Zero-Loss Curation Gate: `supersede` requires existing `newer_id`, `older_ids`, and semantic `reason` (>=10 chars).")
             for oid in older_ids:
                 old_n = store.get_node(oid)
                 if old_n is not None:
@@ -229,6 +228,13 @@ def apply_curated_plan(store: GraphStore, operations: List[Dict[str, Any]], arch
                     if old_n.status.upper() in DEAD_END_STATUSES or old_n.status == "FAILURE_INSIGHT":
                         raise ValueError(f"Zero-Loss Curation Gate: Dead-end warning `{oid}` cannot be superseded into silence; use `merge` to preserve warning.")
             superseded_ids.extend(apply_supersedes_links(store, [newer_id], older_ids))
+        elif kind in ("keep_distinct", "mark_reviewed"):
+            for kid in [str(x).strip() for x in (op.get("node_ids") or []) if str(x).strip()]:
+                kn = store.get_node(kid)
+                if kn is not None:
+                    kn.metadata["curator_reviewed"] = True
+                    store.upsert_node(kn, log_event=False)
+                    kept_distinct.append(kid)
         elif kind == "transition_status":
             nid, nxt = str(op.get("node_id") or "").strip(), str(op.get("new_status") or "").strip().upper()
             nd = store.get_node(nid)
@@ -236,6 +242,8 @@ def apply_curated_plan(store: GraphStore, operations: List[Dict[str, Any]], arch
                 raise ValueError(f"Invalid `transition_status` target `{nid}` -> `{nxt}`.")
             _assert_curatable_source(nd)
             nd.status = nxt
+            if nxt == "ARCHIVED":
+                nd.priority = min(nd.priority, 35)
             store.upsert_node(nd, log_event=False)
             transitioned.append(f"{nid}->{nxt}")
         elif kind == "link":
@@ -250,33 +258,36 @@ def apply_curated_plan(store: GraphStore, operations: List[Dict[str, Any]], arch
                 rn = store.get_node(rid)
                 if rn is None:
                     continue
+                prior_st = str(rn.metadata.pop("prior_status", "") or rn.metadata.get("verdict") or rn.metadata.get("kind") or "")
+                prior_pr = rn.metadata.pop("prior_priority", None)
                 for k_drop in ("consolidated", "consolidated_into", "superseded_by"):
                     rn.metadata.pop(k_drop, None)
-                rn.status = str(rn.metadata.get("kind") or ("SCIENTIFIC_INSIGHT" if rn.node_type == NodeType.OBSERVATION.value else "ACTIVE"))
+                rn.status = prior_st or ("SCIENTIFIC_INSIGHT" if rn.node_type == NodeType.OBSERVATION.value else "ACTIVE")
+                rn.priority = int(prior_pr) if prior_pr is not None else 88
                 fp = (rn.file_path or "").replace("\\", "/")
-                if fp.startswith("memory/archive/06_KNOWLEDGE_NODES/") and (store.workspace_root / fp).is_file():
-                    dst_rel = f"memory/06_KNOWLEDGE_NODES/{(store.workspace_root / fp).name}"
+                if fp.startswith("memory/archive/") and (store.workspace_root / fp).is_file():
+                    dst_rel = "memory/" + fp.removeprefix("memory/archive/")
+                    (store.workspace_root / dst_rel).parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(store.workspace_root / fp), str(store.workspace_root / dst_rel))
                     rn.file_path = dst_rel
                 store.conn.execute("DELETE FROM edges WHERE target_id = ? AND relation = 'SUPERSEDES'", (rid,))
                 store.upsert_node(rn, log_event=False)
                 restored.append(rid)
         else:
-            raise ValueError(f"Unknown curation op `{kind}` (expected merge|supersede|transition_status|link|restore).")
+            raise ValueError(f"Unknown curation op `{kind}` (expected merge|supersede|keep_distinct|transition_status|link|restore).")
 
     archived_files = 0
     if archive_cold_files:
-        arch_dir = store.mem_dir / "archive" / "06_KNOWLEDGE_NODES"
-        for nd in store.list_nodes(node_types=[NodeType.OBSERVATION.value], limit=5000):
+        for nd in store.list_nodes(node_types=[NodeType.OBSERVATION.value, NodeType.KNOWLEDGE_NODE.value], limit=5000):
             fp = (nd.file_path or "").replace("\\", "/")
             if nd.status in ("CONSOLIDATED", "SUPERSEDED") and fp.startswith("memory/06_KNOWLEDGE_NODES/") and (store.workspace_root / fp).is_file():
-                arch_dir.mkdir(parents=True, exist_ok=True)
                 dst_rel = f"memory/archive/06_KNOWLEDGE_NODES/{(store.workspace_root / fp).name}"
+                (store.workspace_root / dst_rel).parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(store.workspace_root / fp), str(store.workspace_root / dst_rel))
                 nd.file_path = dst_rel
                 store.upsert_node(nd, log_event=False)
                 archived_files += 1
 
     store.set_meta("last_curation_prompt_nodes", str(len(store.list_nodes(limit=5000))))
-    store.log_event("SUBAGENT_CURATION_APPLIED", "MEMORY_CURATOR", f"Applied reviewed plan: merged={merged_ids}, superseded={superseded_ids}, status={transitioned}, restored={restored}")
-    return {"merged_nodes": merged_ids, "superseded_ids": superseded_ids, "transitioned": transitioned, "linked": linked, "restored": restored, "archived_files": archived_files}
+    store.log_event("SUBAGENT_CURATION_APPLIED", "MEMORY_CURATOR", f"Applied reviewed plan: merged={merged_ids}, superseded={superseded_ids}, kept={len(kept_distinct)}, status={transitioned}, restored={restored}")
+    return {"merged_nodes": merged_ids, "superseded_ids": superseded_ids, "kept_distinct": kept_distinct, "transitioned": transitioned, "linked": linked, "restored": restored, "archived_files": archived_files}

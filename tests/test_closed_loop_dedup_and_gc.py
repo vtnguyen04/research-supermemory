@@ -48,11 +48,11 @@ def test_async_wakeup_persistent_stop_dirty_clean_guard_and_one_call_exp(tmp_pat
     with pytest.raises(ValueError, match="Dirty-Edit Sync Gate"):
         execute_command("checkpoint", {"workspace": w, "status": "CLEAN"})
 
-    # 2. 2-Strike Persistent Stop Gate: 1st Stop blocks AND does NOT clear dirty_files; 2nd Stop ALSO blocks!
+    # 2. 1-Strike Max Stop Gate: 1st Stop blocks reminding sync; 2nd consecutive Stop releases cleanly (zero deadlock)!
     s1 = dispatch_hook("Stop", {"conversationId": "c-async", "cwd": w, "terminationReason": "NO_TOOL_CALL"})
     assert s1["decision"] == "continue"
     s2 = dispatch_hook("Stop", {"conversationId": "c-async", "cwd": w, "terminationReason": "NO_TOOL_CALL"})
-    assert s2["decision"] == "continue"
+    assert s2["decision"] == "allow"
 
     # Real checkpoint with insight clears dirty lock
     execute_command(
@@ -208,7 +208,7 @@ def test_subagent_curator_review_zero_loss_gates_damped_recall_and_restore(tmp_p
     # Hard Zero-Loss Gates block Sacred Nodes AND block lazy summaries that drop quantitative metrics!
     with pytest.raises(ValueError, match="Sacred node"):
         execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "merge", "source_ids": ["LAW-01", "OBS-001"], "title": "Illegal Law Merge", "summary": "Attempting to merge sacred law node into semantic digest 0.100", "content": "Detailed body text attempting to fold LAW-01 into a summary with metric 0.100 which must fail."}]})
-    with pytest.raises(ValueError, match="preserved ZERO numbers"):
+    with pytest.raises(ValueError, match="dropped source metrics"):
         execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "merge", "source_ids": ["OBS-001", "OBS-002"], "title": "Lazy Prose Summary", "summary": "Everything worked nicely across several buildings without concrete numbers.", "content": "General prose summary that lazily omits all concrete decimal regret scores from the underlying runs."}]})
 
     # Valid LLM-reviewed plan preserves metrics, archives cold files safely, and stays 100% searchable & reversible!

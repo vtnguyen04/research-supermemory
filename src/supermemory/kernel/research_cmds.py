@@ -65,6 +65,7 @@ def _split_items(raw: Any, sep: str = ",") -> List[str]:
         },
     },
     mutates_memory=lambda args, _res: str(args.get("action") or "diagnose").lower() not in ("rank", "score_occam"),
+    clears_kanban_sync=True,
 )
 def _cmd_diagnose_bottleneck(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
     act = str(args.get("action") or "diagnose").lower()
@@ -151,6 +152,7 @@ def _scout_mutated(args: Dict[str, Any], res: Dict[str, Any] | None) -> bool:
         },
     },
     mutates_memory=_scout_mutated,
+    clears_kanban_sync=True,
     is_readonly_research=lambda args, res: not _scout_mutated(args, res),
 )
 def _cmd_scout_sota(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:

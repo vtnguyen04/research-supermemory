@@ -35,6 +35,8 @@ def normalize_hook_input(event_name: str, payload: Dict[str, Any]) -> Tuple[str,
         prompt_txt = str(payload.get("prompt") or payload.get("user_prompt") or "")
         if prompt_txt and not norm.get("lastUserInput"):
             norm["lastUserInput"] = prompt_txt
+        if raw_ev == "UserPromptSubmit":
+            norm["_force_new_turn"] = True
 
     if norm_ev in ("PreToolUse", "PostToolUse") and not norm.get("toolCall"):
         t_name = str(payload.get("tool_name") or "")

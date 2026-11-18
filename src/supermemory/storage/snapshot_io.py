@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict
 
-from supermemory.models import CodeGate, ExperimentRecord, MemoryEdge, MemoryNode, utc_now_iso
+from supermemory.models import CodeGate, ExperimentRecord, MemoryEdge, MemoryNode, NodeType, utc_now_iso
 
 if TYPE_CHECKING:
     from supermemory.storage.sqlite_store import GraphStore
 
 
-def _compact_node_for_snapshot(store: GraphStore, n: MemoryNode) -> Dict[str, Any]:
+def _serialize_node_for_snapshot(n: MemoryNode) -> Dict[str, Any]:
     d = n.to_dict()
-    if n.status in ("CONSOLIDATED", "SUPERSEDED") and n.file_path and (store.workspace_root / n.file_path).is_file():
-        d["content"] = (n.content or "")[:320]
+    if n.node_type == NodeType.AGENT_RUN.value and len(d.get("content") or "") > 600:
+        d["content"] = str(d["content"])[:600]
     return d
 
 
@@ -39,7 +40,7 @@ def export_snapshot(store: GraphStore, target_path: Path | None = None) -> Path:
     payload = {
         "schema_version": "3.0.0",
         "project_meta": store.get_all_meta(),
-        "nodes": [_compact_node_for_snapshot(store, n) for n in store.list_nodes(limit=10000)],
+        "nodes": [_serialize_node_for_snapshot(n) for n in store.list_nodes(limit=10000)],
         "edges": [e.to_dict() for e in store.list_edges()],
         "gates": [g.to_dict() for g in store.list_gates()],
         "experiments": [x.to_dict() for x in store.list_experiments()],
@@ -59,11 +60,6 @@ def import_snapshot(store: GraphStore, source_path: Path) -> Dict[str, int]:
     for nd in nodes:
         rel_fp = str(nd.get("file_path") or "")
         body = str(nd.get("content") or "")
-        if rel_fp and len(body) <= 325 and (store.workspace_root / rel_fp).is_file():
-            try:
-                body = (store.workspace_root / rel_fp).read_text(encoding="utf-8")
-            except OSError:
-                pass
         store.upsert_node(
             MemoryNode(
                 id=nd["id"], node_type=nd["node_type"], title=nd["title"],
@@ -231,7 +227,7 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
     return out
 
 
-def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
+def save_session_state(store: GraphStore, state: Dict[str, Any], commit: bool = True) -> None:
     """Persist hook session tracking state atomically."""
     extra_envelope: Dict[str, Any] = {"cmds": list(state.get("unlogged_exp_cmds") or [])}
     for k, dv in _EXTRA_DEFAULTS.items():
@@ -265,19 +261,31 @@ def save_session_state(store: GraphStore, state: Dict[str, Any]) -> None:
             utc_now_iso(),
         ),
     )
-    store.conn.commit()
+    if commit:
+        store.conn.commit()
 
 
 def mark_turn_memory_handled(
-    store: GraphStore, clear_lesson_lock: bool = False, clear_kanban_sync: bool = False
+    store: GraphStore,
+    clear_lesson_lock: bool = False,
+    clear_kanban_sync: bool = False,
+    include_dirty: bool = True,
 ) -> None:
-    """Mark all active conversation sessions in this store as having persisted/attested memory."""
-    rows = store.conn.execute("SELECT conversation_id FROM session_state").fetchall()
+    """Mark recently active main sessions as handled (`1` commit, pruning >24h zombie rows & preserving dirty_files on background curation)."""
+    now = datetime.now(timezone.utc)
+    stale_cut = (now - timedelta(hours=24)).replace(microsecond=0).isoformat()
+    active_cut = (now - timedelta(minutes=45)).replace(microsecond=0).isoformat()
+    store.conn.execute("DELETE FROM session_state WHERE updated_at < ?", (stale_cut,))
+    rows = store.conn.execute(
+        "SELECT conversation_id FROM session_state WHERE updated_at >= ? ORDER BY updated_at DESC LIMIT 6",
+        (active_cut,),
+    ).fetchall()
     for r in rows:
         st = get_session_state(store, str(r["conversation_id"]))
         st["turn_memory_handled"] = True
         st["stop_block_streak"] = 0
-        st["dirty_files"] = []
+        if include_dirty:
+            st["dirty_files"] = []
         st["pending_sync_reason"] = ""
         st["unsynced_work_steps"] = 0
         st["pending_notifications"] = []
@@ -285,4 +293,5 @@ def mark_turn_memory_handled(
             st["pending_lesson_lock"] = False
         if clear_kanban_sync:
             st["pending_kanban_sync"] = False
-        save_session_state(store, st)
+        save_session_state(store, st, commit=False)
+    store.conn.commit()

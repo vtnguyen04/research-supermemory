@@ -212,7 +212,7 @@ def federated_recall(
                 s_rec = QueryEngine(sib_store).recall(query, limit=3, hops=1, compact=compact)
                 _collect([r for r in s_rec["results"] if r.get("type") in _SIBLING_REUSABLE_TYPES], f"SIBLING:{sib_name}")
 
-    merged.sort(key=lambda x: (x.get("hop", 0) == 0, x["scope"] == "LOCAL", float(x.get("score") or 0.0)), reverse=True)
+    merged.sort(key=lambda x: float(x.get("score") or 0.0) + (0.04 if x["scope"] == "LOCAL" else 0.0), reverse=True)
     dedup_warn = [w[:120] for w in dict.fromkeys(warnings)]
     cap = limit if compact else (limit + 8)
     return {
@@ -239,10 +239,24 @@ def set_active_workspace(workspace_root: Path) -> None:
     )
 
 
+def find_enclosing_workspace(start: Path) -> Optional[Path]:
+    """Walk `start` and its `.parents` to find an initialized `.supermemory` / `graph_snapshot.json` root."""
+    try:
+        cur = start.resolve()
+    except OSError:
+        return None
+    g_root = get_global_root()
+    for p in (cur, *cur.parents):
+        if p == g_root:
+            continue
+        if (p / ".supermemory" / "supermemory.db").is_file() or (p / "memory" / "graph_snapshot.json").is_file():
+            return p
+    return None
+
+
 def resolve_parent_process_workspace() -> Optional[Path]:
-    """Walk parent process CWDs (`/proc/<ppid>/cwd`) so each `agy` MCP child binds to its exact repo."""
-    home = Path.home().resolve()
-    root_fs = Path("/")
+    """Walk parent process CWDs (`/proc/<ppid>/cwd`, with `Path.cwd()` fallback) so each MCP child binds to its repo."""
+    home, root_fs = Path.home().resolve(), Path("/")
     pid = os.getppid()
     for _ in range(3):
         if pid <= 1:
@@ -250,32 +264,35 @@ def resolve_parent_process_workspace() -> Optional[Path]:
         try:
             p_cwd = Path(os.readlink(f"/proc/{pid}/cwd")).resolve()
             if p_cwd not in (home, root_fs) and "plugins/supermemory" not in p_cwd.as_posix() and p_cwd.is_dir():
-                return p_cwd
+                return find_enclosing_workspace(p_cwd) or p_cwd
             stat_txt = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
             pid = int(stat_txt.rsplit(")", 1)[1].split()[1])
         except (OSError, ValueError, IndexError):
             break
+    cwd = Path.cwd().resolve()
+    if cwd not in (home, root_fs) and "plugins/supermemory" not in cwd.as_posix():
+        return find_enclosing_workspace(cwd) or cwd
     return None
 
 
 def resolve_default_workspace(explicit_ws: str = "") -> Path:
-    """Resolve target workspace cleanly, avoiding plugin install and $HOME directories when `workspace` is omitted."""
+    """Resolve target workspace cleanly (walking `.parents`), avoiding plugin install and $HOME misrouting."""
     if explicit_ws and explicit_ws.strip():
-        return Path(explicit_ws.strip()).expanduser().resolve()
+        cand_exp = Path(explicit_ws.strip()).expanduser().resolve()
+        return find_enclosing_workspace(cand_exp) or cand_exp
     cwd = Path.cwd().resolve()
     home = Path.home().resolve()
-    if (
-        cwd != home
-        and "plugins/supermemory" not in cwd.as_posix()
-        and ((cwd / ".supermemory" / "supermemory.db").is_file() or (cwd / "memory" / "graph_snapshot.json").is_file())
-    ):
+    if cwd != home and "plugins/supermemory" not in cwd.as_posix():
+        enc = find_enclosing_workspace(cwd)
+        if enc is not None:
+            return enc
         return cwd
     act_file = get_global_root() / "active_workspace.json"
     if act_file.is_file():
         try:
             cand = Path(str(json.loads(act_file.read_text(encoding="utf-8")).get("path") or "")).resolve()
             if cand.is_dir() and cand != home and "plugins/supermemory" not in cand.as_posix():
-                return cand
+                return find_enclosing_workspace(cand) or cand
         except (ValueError, OSError):
             pass
-    return ensure_global_memory() if (cwd == home or "plugins/supermemory" in cwd.as_posix()) else cwd
+    return ensure_global_memory()

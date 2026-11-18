@@ -136,6 +136,7 @@ def _cmd_manage_proposal(store: GraphStore, args: Dict[str, Any]) -> Dict[str, A
         "required": ["title", "hypothesis"],
     },
     mutates_memory=True,
+    clears_kanban_sync=False,
 )
 def _cmd_log_experiment(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
     raw_cv = args.get("cv_score") if args.get("cv_score") not in (None, "") else args.get("score")
@@ -170,9 +171,12 @@ def _cmd_log_experiment(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
     )
     if prop_id and args.get("done_steps"):
         from supermemory.research.kanban_ops import toggle_subtask
+        from supermemory.storage.snapshot_io import mark_turn_memory_handled
 
+        k_kind = "PROPOSAL" if prop_id.upper().startswith("PROP-") else "TASK"
         for s_idx in args.get("done_steps") or []:
-            toggle_subtask(store, "PROPOSAL", prop_id, int(s_idx), done=True)
+            toggle_subtask(store, k_kind, prop_id, int(s_idx), done=True)
+        mark_turn_memory_handled(store, clear_kanban_sync=True)
     for m_key in ("current_phase", "next_actions"):
         if args.get(m_key) is not None and str(args[m_key]).strip():
             store.set_meta(m_key, str(args[m_key]).strip())
@@ -185,7 +189,7 @@ def _cmd_log_experiment(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
     input_schema={
         "type": "object",
         "properties": {
-            "status": {"type": "string", "enum": ["CLEAN", "CAPTURED"], "default": "CAPTURED"},
+            "status": {"type": "string", "enum": ["CLEAN", "CAPTURED", "IN_FLIGHT_WAIT"], "default": "CAPTURED"},
             "note": {"type": "string"},
             "insights": {
                 "type": "array",

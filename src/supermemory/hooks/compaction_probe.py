@@ -1,4 +1,4 @@
-"""O(1) Tail Transcript Compaction Probe, Content-Overlap Guard & Memory-Read Telemetry."""
+"""O(1) Tail Transcript Compaction Probe, Subagent Detector & Async Wakeup Guard."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ _FUNC_WORDS = {
     "this", "that", "with", "from", "have", "what", "when", "where", "which", "there", "their", "about",
     "những", "được", "không", "trong", "đang", "phải", "nhiều", "nhưng", "chưa", "xem", "hiện",
 }
+_WAKEUP_SENDER_RE = re.compile(r"\[Message\][^\n]*?\bsender=([^\s]+)")
 
 
 def has_content_overlap(query: str, hit: Dict[str, Any]) -> bool:
@@ -34,9 +35,7 @@ def _resolve_transcript_file(conv_id: str, transcript_path: str = "") -> Optiona
         if cand.is_file():
             return cand
     env_brain = os.environ.get("SUPERMEMORY_BRAIN_DIR", "").strip()
-    roots: List[Path] = []
-    if env_brain:
-        roots.append(Path(env_brain))
+    roots: List[Path] = [Path(env_brain)] if env_brain else []
     home_gem = Path.home() / ".gemini"
     for prod in ("antigravity-cli", "antigravity", "antigravity-ide"):
         roots.append(home_gem / prod / "brain")
@@ -47,18 +46,37 @@ def _resolve_transcript_file(conv_id: str, transcript_path: str = "") -> Optiona
     return None
 
 
+def is_subagent_session(conv_id: str, payload: Dict[str, Any], st: Dict[str, Any]) -> bool:
+    """Detect whether the current conversation is a delegated subagent rather than a main user session."""
+    if any(payload.get(k) for k in ("agent_id", "agent_type", "parent_session_id", "parentConversationId")):
+        return True
+    if payload.get("lastUserInput") or st.get("last_seen_user_input"):
+        return False
+    t_file = _resolve_transcript_file(conv_id, str(payload.get("transcriptPath") or ""))
+    if t_file is None:
+        return False
+    try:
+        with t_file.open("rb") as fh:
+            head = fh.read(16384).decode("utf-8", errors="replace")
+    except OSError:
+        return False
+    if '"USER_INPUT"' in head or '"USER_EXPLICIT"' in head or f"sender={conv_id}/" in head or "/task-" in head:
+        return False
+    return "<subagent_reminder>" in head or ('"step_index": 1' in head or '"step_index":1' in head) and "[Message]" in head
+
+
 def probe_transcript_compaction(
     conv_id: str,
     prev_marker: str,
     transcript_path: str = "",
 ) -> Tuple[bool, str]:
-    """Read last 64KB of `transcript.jsonl` (<1ms) to detect Antigravity & Claude Code compactions."""
+    """Read last 196KB of `transcript.jsonl` (<1.5ms) to detect Antigravity & Claude Code compactions."""
     t_file = _resolve_transcript_file(conv_id, transcript_path)
     if t_file is None:
         return False, prev_marker or "NONE"
     try:
         size = t_file.stat().st_size
-        offset = max(0, size - 65536)
+        offset = max(0, size - 196608)
         with t_file.open("rb") as fh:
             if offset > 0:
                 fh.seek(offset)
@@ -67,7 +85,7 @@ def probe_transcript_compaction(
         return False, prev_marker or "NONE"
 
     lines = chunk.splitlines()
-    if offset > 0 and lines:
+    if offset > 0 and lines and not lines[0].lstrip().startswith("{"):
         lines = lines[1:]
 
     for idx_from_end, raw_ln in enumerate(reversed(lines)):
@@ -79,8 +97,7 @@ def probe_transcript_compaction(
             continue
         if not isinstance(obj, dict):
             continue
-        otype = str(obj.get("type") or "")
-        subtype = str(obj.get("subtype") or "")
+        otype, subtype = str(obj.get("type") or ""), str(obj.get("subtype") or "")
         if otype != "CHECKPOINT" and subtype != "compact_boundary" and otype != "summary":
             continue
         marker = f"{obj.get('step_index', obj.get('uuid', len(lines) - idx_from_end))}:{obj.get('created_at', obj.get('timestamp', ''))}"
@@ -114,12 +131,8 @@ def extract_memory_read_relpath(workspace_root: Path, tool_name: str, tool_args:
     if tool_name not in ("read_file", "view_file", "read"):
         return ""
     raw_p = str(
-        tool_args.get("Path")
-        or tool_args.get("AbsolutePath")
-        or tool_args.get("TargetFile")
-        or tool_args.get("file_path")
-        or tool_args.get("path")
-        or ""
+        tool_args.get("Path") or tool_args.get("AbsolutePath") or tool_args.get("TargetFile")
+        or tool_args.get("file_path") or tool_args.get("path") or ""
     ).strip()
     if not raw_p:
         return ""
@@ -130,12 +143,7 @@ def extract_memory_read_relpath(workspace_root: Path, tool_name: str, tool_args:
     if not abs_p.is_relative_to(workspace_root):
         return ""
     parts = abs_p.relative_to(workspace_root).parts
-    if parts and parts[0] == "memory":
-        return "/".join(parts)
-    return ""
-
-
-_WAKEUP_SENDER_RE = re.compile(r"\[Message\][^\n]*?\bsender=([^\s]+)")
+    return "/".join(parts) if (parts and parts[0] == "memory") else ""
 
 
 def probe_async_wakeup(
@@ -143,13 +151,13 @@ def probe_async_wakeup(
     prev_wakeup: str,
     transcript_path: str = "",
 ) -> Tuple[bool, str, str]:
-    """Detect Antigravity async background task or subagent wakeup messages in last 32KB (<1ms)."""
+    """Detect unread async background task/subagent wakeup messages arrived since the last model step."""
     t_file = _resolve_transcript_file(conv_id, transcript_path)
     if t_file is None:
         return False, prev_wakeup or "NONE", ""
     try:
         size = t_file.stat().st_size
-        offset = max(0, size - 32768)
+        offset = max(0, size - 65536)
         with t_file.open("rb") as fh:
             if offset > 0:
                 fh.seek(offset)
@@ -158,33 +166,34 @@ def probe_async_wakeup(
         return False, prev_wakeup or "NONE", ""
 
     lines = chunk.splitlines()
-    if offset > 0 and lines:
+    if offset > 0 and lines and not lines[0].lstrip().startswith("{"):
         lines = lines[1:]
 
     for idx_from_end, raw_ln in enumerate(reversed(lines)):
         if idx_from_end > 8:
             break
-        if "[Message]" not in raw_ln or "sender=" not in raw_ln:
-            continue
         try:
             obj = json.loads(raw_ln)
         except ValueError:
             continue
-        if not isinstance(obj, dict) or str(obj.get("type") or "") != "SYSTEM_MESSAGE":
+        if not isinstance(obj, dict):
+            continue
+        otype = str(obj.get("type") or "")
+        if otype == "PLANNER_RESPONSE":
+            break
+        if otype != "SYSTEM_MESSAGE":
             continue
         content = str(obj.get("content") or "")
         m = _WAKEUP_SENDER_RE.search(content)
         if not m:
             continue
         sender = m.group(1).strip()
-        if sender == "system":
+        if sender == "system" or "Zero-Loss Curation Receipt" in content:
             continue
         short_sender = sender.rsplit("/", 1)[-1]
         marker = f"{obj.get('step_index', len(lines) - idx_from_end)}:{obj.get('created_at', '')}:{short_sender}"
         if marker == prev_wakeup:
             return False, marker, short_sender
-        if not prev_wakeup:
-            return (idx_from_end <= 2), marker, short_sender
         return True, marker, short_sender
     return False, prev_wakeup or "NONE", ""
 
@@ -196,7 +205,7 @@ def apply_async_wakeup_guard(
     transcript_path: str,
     has_unchecked_kanban: bool,
 ) -> str:
-    """Arm same-turn sync state & return injection notice when a background task/subagent wakes the agent."""
+    """Arm same-turn sync state when a background task/subagent wakes the main agent."""
     hit, marker, short_sender = probe_async_wakeup(
         conv_id, str(st.get("last_wakeup_marker") or ""), transcript_path
     )
@@ -215,7 +224,7 @@ def apply_async_wakeup_guard(
         f"🔔 [SuperMemory Async Wakeup — `{short_sender}` Finished] "
         "Same-turn ledger sync required before stopping: quantitative run (KEEP or DISCARD) -> `log_experiment`; "
         "error slice -> `diagnose_bottleneck`; root-cause/insight -> `checkpoint(insights=[...], task_updates=[...])`; "
-        "or non-empirical poll -> `checkpoint(status='CLEAN')`."
+        "or mid-run poll / diagnostic -> `checkpoint(status='IN_FLIGHT_WAIT' | 'CLEAN')`."
     )
 
 

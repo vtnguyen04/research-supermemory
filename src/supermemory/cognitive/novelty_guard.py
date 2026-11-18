@@ -90,16 +90,17 @@ def extract_mechanism_signature(text: str, bottleneck_id: str = "") -> Dict[str,
     }
 
 
-def _structural_context_boost(sig_a: Dict[str, Any], sig_b: Dict[str, Any], text_cos: float) -> float:
-    """Boost similarity when two candidates modify the exact same module on the same bottleneck."""
-    if text_cos < 0.20:
+def _structural_context_boost(sig_a: Dict[str, Any], sig_b: Dict[str, Any], text_cos: float, is_dead_end: bool = False) -> float:
+    """Boost similarity strongly against dead-ends on same BNK+module, moderately on positive iterations."""
+    min_cos = 0.20 if is_dead_end else 0.36
+    if text_cos < min_cos:
         return text_cos
     bnk_same = bool(set(sig_a.get("bottlenecks") or []) & set(sig_b.get("bottlenecks") or []))
     mod_same = bool(set(sig_a.get("modules") or []) & set(sig_b.get("modules") or []))
     if bnk_same and mod_same:
-        return min(0.96, text_cos + 0.24)
+        return min(0.96, text_cos + (0.24 if is_dead_end else 0.10))
     if mod_same or bnk_same:
-        return min(0.94, text_cos + 0.08)
+        return min(0.94, text_cos + (0.08 if is_dead_end else 0.05))
     return text_cos
 
 
@@ -161,11 +162,10 @@ def enforce_novelty_against_history(
         past_sig = (past.metadata or {}).get("mechanism_fingerprint") or extract_mechanism_signature(
             f"{past.title} {past.summary}", bottleneck_id=past_bnk
         )
-        sim = round(_structural_context_boost(cand_sig, past_sig, raw_cos), 3)
+        is_dead_end = true_status in _DEAD_END_STATUSES
+        sim = round(_structural_context_boost(cand_sig, past_sig, raw_cos, is_dead_end=is_dead_end), 3)
         if sim < dead_end_threshold:
             continue
-
-        is_dead_end = true_status in _DEAD_END_STATUSES
         matches.append(
             {
                 "id": past.id,

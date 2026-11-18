@@ -122,8 +122,6 @@ def compute_utility_priors(store: GraphStore, nodes: List[MemoryNode], edges: Li
             base += 0.12
         elif nd.node_type in (NodeType.LAW.value, NodeType.GATE.value):
             base += 0.10
-        if nd.status == "CONSOLIDATED":
-            base -= 0.25
         priors[nd.id] = base
     return priors
 
@@ -191,7 +189,11 @@ def rank_hybrid_graph(
     for nd, sc in valid_fts:
         fts_map[nd.id] = max(0.05, sc / max_fts)
 
-    sim_map = compute_hybrid_similarity(query, nodes)
+    cos_pool = nodes
+    if len(nodes) > 450:
+        keep_ids = set(fts_map.keys()) | {n.id for n in nodes[:450]}
+        cos_pool = [n for n in nodes if n.id in keep_ids or n.id.upper() in q_up]
+    sim_map = compute_hybrid_similarity(query, cos_pool)
     priors = compute_utility_priors(store, nodes, edges)
     superseded_by, beaten_by = resolve_supersession_maps(store, nodes, edges)
 
@@ -257,5 +259,5 @@ def rank_hybrid_graph(
             item["via_relation"] = via_rel[nid]
         scored_items.append(item)
 
-    scored_items.sort(key=lambda x: (x["hop"] == 0, float(x["score"])), reverse=True)
+    scored_items.sort(key=lambda x: float(x["score"]), reverse=True)
     return scored_items[: limit + 8], traversed_edges[:30]

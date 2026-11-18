@@ -34,6 +34,8 @@ class CommandSpec:
     requires_store: bool = True
     mutates_memory: bool | MutationPredicate = True
     clears_lesson_lock: bool = False
+    clears_kanban_sync: bool = False
+    preserves_dirty_files: bool = False
     is_readonly_research: MutationPredicate | None = None
     fallback_to_global_if_uninit: bool = False
 
@@ -65,6 +67,8 @@ class CommandRegistry:
         requires_store: bool = True,
         mutates_memory: bool | MutationPredicate = True,
         clears_lesson_lock: bool = False,
+        clears_kanban_sync: bool = False,
+        preserves_dirty_files: bool = False,
         is_readonly_research: MutationPredicate | None = None,
         fallback_to_global_if_uninit: bool = False,
     ) -> Callable[[Any], Any]:
@@ -77,6 +81,8 @@ class CommandRegistry:
                 requires_store=requires_store,
                 mutates_memory=mutates_memory,
                 clears_lesson_lock=clears_lesson_lock,
+                clears_kanban_sync=clears_kanban_sync,
+                preserves_dirty_files=preserves_dirty_files,
                 is_readonly_research=is_readonly_research,
                 fallback_to_global_if_uninit=fallback_to_global_if_uninit,
             )
@@ -134,7 +140,12 @@ class CommandRegistry:
         if store is not None:
             res = dict(spec.handler(store, args))
             if spec.check_mutated(args, res):
-                mark_turn_memory_handled(store, clear_lesson_lock=spec.clears_lesson_lock)
+                mark_turn_memory_handled(
+                    store,
+                    clear_lesson_lock=spec.clears_lesson_lock,
+                    clear_kanban_sync=spec.clears_kanban_sync,
+                    include_dirty=not spec.preserves_dirty_files,
+                )
                 MarkdownCompiler(store).compile_all()
             return res
 
@@ -142,7 +153,12 @@ class CommandRegistry:
         with GraphStore(target_root) as managed_store:
             res = dict(spec.handler(managed_store, args))
             if spec.check_mutated(args, res):
-                mark_turn_memory_handled(managed_store, clear_lesson_lock=spec.clears_lesson_lock)
+                mark_turn_memory_handled(
+                    managed_store,
+                    clear_lesson_lock=spec.clears_lesson_lock,
+                    clear_kanban_sync=spec.clears_kanban_sync,
+                    include_dirty=not spec.preserves_dirty_files,
+                )
                 MarkdownCompiler(managed_store).compile_all()
             return res
 

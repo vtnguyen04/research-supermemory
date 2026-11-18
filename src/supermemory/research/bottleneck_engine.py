@@ -118,6 +118,9 @@ def diagnose_bottleneck(
         )
     )
     store.add_edge(MemoryEdge(source_id=rq_id, target_id=bnk_id, relation=EdgeType.DIAGNOSES.value))
+    from supermemory.research.stagnation_guard import record_verified_scout_cursor
+
+    record_verified_scout_cursor(store, "VERIFIED_EXTERNAL", bottleneck_id=bnk_id)
     return {
         "bottleneck": bnk_node.to_dict(),
         "research_question": rq_node.to_dict(),

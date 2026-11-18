@@ -49,7 +49,11 @@ def collect_active_kanban_items(store: GraphStore) -> List[Dict[str, Any]]:
     stage_rank = {"IMPLEMENTING": 0, "CHALLENGED": 1, "DESIGNED": 2, "PROPOSED": 3}
     props = [
         p
-        for p in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=40)
+        for p in store.list_nodes(
+            node_types=[NodeType.PROPOSAL.value],
+            exclude_statuses=["ARCHIVED", "AUDITED", "REJECTED", "CONSOLIDATED"],
+            limit=80,
+        )
         if p.status.upper() in stage_rank
     ]
     props.sort(key=lambda p: (stage_rank.get(p.status.upper(), 9), -_id_num(p.id)))
