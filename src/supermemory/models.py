@@ -102,8 +102,15 @@ class ExperimentVerdict(str, Enum):
     VICTORY_CONFIRMED = "VICTORY_CONFIRMED"
     KEEP = "KEEP"
     REVERT = "REVERT"
+    DISCARD = "DISCARD"
+    EARLY_KILLED = "EARLY_KILLED"
     PARK = "PARK"
     FAILED = "FAILED"
+
+
+DEAD_END_STATUSES = frozenset(
+    {"REJECTED", "REVERT", "FAILED", "DISCARD", "EARLY_KILLED", "FAILURE_INSIGHT"}
+)
 
 
 @dataclass

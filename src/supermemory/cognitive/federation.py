@@ -106,36 +106,20 @@ def promote_node_to_global(local_store: GraphStore, node_id: str) -> Dict[str, A
     global_id = node.id if node.id.startswith("LAW-") else f"GLB-{proj_name[:8].upper()}-{node.id}"
 
     with GraphStore(g_root) as g_store:
-        meta = dict(node.metadata or {})
-        meta["promoted_from_workspace"] = str(local_store.workspace_root)
-        meta["promoted_from_project"] = proj_name
-        meta["memory_tier"] = classify_tier(node)
+        meta = {**(node.metadata or {}), "promoted_from_workspace": str(local_store.workspace_root), "promoted_from_project": proj_name, "memory_tier": classify_tier(node)}
         promoted = g_store.upsert_node(
             MemoryNode(
-                id=global_id,
-                node_type=node.node_type,
-                title=node.title,
-                status="ACTIVE",
-                summary=f"[{proj_name}] {node.summary}"[:240],
-                content=node.content,
-                tags=list(set([*(node.tags or []), "global", "promoted"])),
-                priority=max(node.priority, 90),
-                metadata=meta,
+                id=global_id, node_type=node.node_type, title=node.title, status="ACTIVE",
+                summary=f"[{proj_name}] {node.summary}"[:240], content=node.content,
+                tags=list(set([*(node.tags or []), "global", "promoted"])), priority=max(node.priority, 90), metadata=meta,
             )
         )
-        # If local node was a CodeGate (not FROZEN_SHA256 repo-specific file), promote gate too
-        local_gates = [g for g in local_store.list_gates() if g.id == node_id or g.lesson_id == node_id]
-        for lg in local_gates:
+        for lg in [g for g in local_store.list_gates() if g.id == node_id or g.lesson_id == node_id]:
             if lg.gate_type != "FROZEN_SHA256":
                 g_store.upsert_gate(
                     CodeGate(
-                        id=f"GLB-{lg.id}",
-                        gate_type=lg.gate_type,
-                        name=f"[Global] {lg.name}",
-                        law_id=lg.law_id or "LAW-08",
-                        target_glob=lg.target_glob,
-                        pattern=lg.pattern,
-                        config=lg.config,
+                        id=f"GLB-{lg.id}", gate_type=lg.gate_type, name=f"[Global] {lg.name}",
+                        law_id=lg.law_id or "LAW-08", target_glob=lg.target_glob, pattern=lg.pattern, config=lg.config,
                     )
                 )
         MarkdownCompiler(g_store).compile_all()
@@ -145,14 +129,7 @@ def promote_node_to_global(local_store: GraphStore, node_id: str) -> Dict[str, A
     return {"local_id": node.id, "global_id": global_id, "global_node": promoted.to_dict()}
 
 
-_SIBLING_REUSABLE_TYPES = {
-    "METHOD_CARD",
-    "ALGORITHM",
-    "OBSERVATION",
-    "PROCEDURE",
-    "KNOWLEDGE_NODE",
-    "LAW",
-}
+_SIBLING_REUSABLE_TYPES = {"METHOD_CARD", "ALGORITHM", "OBSERVATION", "PROCEDURE", "KNOWLEDGE_NODE", "LAW"}
 
 
 def _inspect_federated_node(node_id: str, local_ws: Optional[Path], include_global: bool, include_siblings: bool) -> Dict[str, Any]:
@@ -262,6 +239,25 @@ def set_active_workspace(workspace_root: Path) -> None:
         json.dumps({"path": str(ws), "updated_at": utc_now_iso()}, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+
+
+def resolve_parent_process_workspace() -> Optional[Path]:
+    """Walk parent process CWDs (`/proc/<ppid>/cwd`) so each `agy` MCP child binds to its exact repo."""
+    home = Path.home().resolve()
+    root_fs = Path("/")
+    pid = os.getppid()
+    for _ in range(3):
+        if pid <= 1:
+            break
+        try:
+            p_cwd = Path(os.readlink(f"/proc/{pid}/cwd")).resolve()
+            if p_cwd not in (home, root_fs) and "plugins/supermemory" not in p_cwd.as_posix() and p_cwd.is_dir():
+                return p_cwd
+            stat_txt = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+            pid = int(stat_txt.rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            break
+    return None
 
 
 def resolve_default_workspace(explicit_ws: str = "") -> Path:

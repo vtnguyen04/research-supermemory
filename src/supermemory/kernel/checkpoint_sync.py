@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
-from supermemory.graph.auto_linker import find_near_duplicate_insights, wire_contextual_edges
+from supermemory.graph.auto_linker import find_exact_or_duplicate_insights, wire_contextual_edges
 from supermemory.graph.supersession import apply_supersedes_links
 from supermemory.lifecycle.manager import LifecycleManager
 from supermemory.lifecycle.validators import assert_all_steps_completed, validate_insight_schema
@@ -18,7 +18,7 @@ from supermemory.research.kanban_ops import (
     toggle_subtask,
 )
 from supermemory.research.orchestrator import _row_to_task, enqueue_task
-from supermemory.storage.snapshot_io import mark_turn_memory_handled
+from supermemory.storage.snapshot_io import get_session_state, mark_turn_memory_handled
 from supermemory.storage.sqlite_store import GraphStore
 from supermemory.sync.markdown_compiler import MarkdownCompiler
 
@@ -58,11 +58,24 @@ def _mint_insight_node(
             wire_contextual_edges(store, ex.id, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
             return ex.to_dict()
 
-    auto_dups = (
-        find_near_duplicate_insights(store, t_clean, s_clean)
+    merge_id, auto_dups = (
+        find_exact_or_duplicate_insights(store, t_clean, s_clean)
         if ntype == NodeType.OBSERVATION.value
-        else []
+        else ("", [])
     )
+    if merge_id:
+        ex_m = store.get_node(merge_id)
+        if ex_m is not None:
+            ex_m.title = t_clean
+            ex_m.summary = s_clean[:240]
+            ex_m.content = s_clean
+            ex_m.status = "SCIENTIFIC_INSIGHT"
+            ex_m.metadata.pop("superseded_by", None)
+            store.upsert_node(ex_m, log_event=True)
+            wire_contextual_edges(store, ex_m.id, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
+            if auto_dups:
+                apply_supersedes_links(store, [ex_m.id], auto_dups)
+            return ex_m.to_dict()
     nums = [int(m.group(1)) for x in existing for m in [re.match(rf"^{pref}-(\d+)$", x.id)] if m]
     nid = f"{pref}-{(max(nums) + 1) if nums else 1:03d}"
     kn_dir = store.mem_dir / "06_KNOWLEDGE_NODES"
@@ -182,13 +195,27 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
             meta_changed.append(meta_key)
             mutated = True
 
+    if not mutated and str(args.get("status") or "").upper() == "CLEAN":
+        s_rows = store.conn.execute("SELECT conversation_id FROM session_state").fetchall()
+        dirty_all = [
+            f
+            for r in s_rows
+            for f in (get_session_state(store, str(r["conversation_id"])).get("dirty_files") or [])
+        ]
+        if dirty_all:
+            shown = ", ".join(dict.fromkeys(dirty_all))[:120]
+            raise ValueError(
+                f"LAW-07 Dirty-Edit Sync Gate: Cannot attest empty `status='CLEAN'` while workspace source files were modified (`{shown}`). "
+                "Include at least one concrete `insights=['Title: what changed & why']` or `task_updates=[...]` (or call `log_experiment`)."
+            )
+
     if meta_changed and not (captured_insights or created_task or applied_tasks):
         store.log_event("CHECKPOINT_SYNCED", "L0_STATE", f"Synced L0 state ({', '.join(meta_changed)}){': ' + note[:80] if note else ''}")
     if mutated:
         MarkdownCompiler(store).compile_all()
     kanban_touched = bool(created_task or applied_tasks or str(args.get("status") or "").upper() == "CLEAN")
     mark_turn_memory_handled(store, clear_kanban_sync=kanban_touched)
-    return {
+    out: Dict[str, Any] = {
         "status": "CAPTURED" if mutated else str(args.get("status") or "CLEAN"),
         "turn_memory_handled": True,
         "captured": captured_insights[0] if len(captured_insights) == 1 else captured_insights or None,
@@ -196,6 +223,12 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
         "created_task": created_task,
         "updated_tasks": applied_tasks,
     }
+    if captured_insights and any(re.search(r"[+-]\d+\.\d+%|\b0\.\d{3,}\b", str(c.get("summary") or "")) for c in captured_insights):
+        out["experiment_reminder"] = (
+            "If this insight came from a quantitative benchmark/ablation run (KEEP or DISCARD), "
+            "ensure it is also logged in `log_experiment` so `03_EXPERIMENTS_REGISTRY.md` & SOTA tracking stay complete."
+        )
+    return out
 
 
 def execute_kanban_orchestrate_ext(act: str, store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any] | None:

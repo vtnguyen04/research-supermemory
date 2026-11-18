@@ -13,13 +13,15 @@ from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.hooks.claude_bridge import format_hook_output, is_claude_code_payload, normalize_hook_input
 from supermemory.hooks.compaction_probe import (
+    apply_async_wakeup_guard,
     has_content_overlap,
+    probe_async_wakeup,
     probe_transcript_compaction,
     reset_state_on_compaction,
 )
 from supermemory.hooks.turn_tracker import evaluate_stop_gate, track_post_tool_use
 from supermemory.models import NodeType
-from supermemory.research.kanban_digest import build_kanban_board_digest
+from supermemory.research.kanban_digest import build_kanban_board_digest, has_unchecked_kanban_items
 from supermemory.research.stagnation_guard import evaluate_stagnation_state
 from supermemory.self_learning.detector import SelfLearningDetector
 from supermemory.storage.snapshot_io import get_session_state, save_session_state
@@ -98,9 +100,12 @@ def _on_session_start(store: GraphStore, conv_id: str, payload: Optional[Dict[st
     st = get_session_state(store, conv_id)
     t_path = str((payload or {}).get("transcriptPath") or "")
     _, m0 = probe_transcript_compaction(conv_id, "", t_path)
+    _, w0, _ = probe_async_wakeup(conv_id, "", t_path)
     st["last_compaction_marker"] = m0 or "NONE"
+    st["last_wakeup_marker"] = w0 or "NONE"
     st["last_capsule_step"] = 0
     st["last_capsule_inv"] = 0
+    st["stop_block_streak"] = 0
     save_session_state(store, st)
     store.log_event("HOOK_SESSION_START", conv_id, "Injected tiered SuperMemory capsule")
     return {"injectSteps": [{"systemMessage": {"systemMessage": capsule}}]}
@@ -151,6 +156,7 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         st["unsynced_work_steps"] = 0
         st["pending_notifications"] = []
         st["last_read_mem"] = ""
+        st["stop_block_streak"] = 0
 
         if not compacted_now:
             steps_gap = step_idx - int(st.get("last_capsule_step") or 0)
@@ -189,20 +195,10 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
 
         clean_in = user_input.strip()
         if len(clean_in) >= 28 or _EXPLICIT_ID_RE.search(clean_in):
-            rec = federated_recall(
-                clean_in,
-                local_ws=store.workspace_root,
-                include_global=True,
-                include_siblings=bool(st.get("research_campaign_active")),
-                limit=5,
-                hops=1,
-                compact=True,
-            )
+            rec = federated_recall(clean_in, local_ws=store.workspace_root, include_global=True, include_siblings=bool(st.get("research_campaign_active")), limit=5, hops=1, compact=True)
             results = rec.get("results") or []
             seen_warns = set(st.get("recalled_warnings") or [])
-            if rec.get("anti_repeat_warnings") and any(
-                float(r.get("score") or 0.0) >= 0.28 and has_content_overlap(clean_in, r) for r in results
-            ):
+            if rec.get("anti_repeat_warnings") and any(float(r.get("score") or 0.0) >= 0.28 and has_content_overlap(clean_in, r) for r in results):
                 fresh_warns = [w for w in rec["anti_repeat_warnings"] if w not in seen_warns][:3]
                 if fresh_warns:
                     injected_msgs.append("⚠️ SUPERMEMORY ANTI-REPEAT RECALL:\n" + "\n".join(f"  • {w}" for w in fresh_warns))
@@ -210,39 +206,31 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
 
             seen_ids = set(st.get("recalled_node_ids") or [])
             fresh_hits = [
-                r
-                for r in results
-                if float(r.get("score") or 0.0) >= 0.30
-                and has_content_overlap(clean_in, r)
-                and not r.get("superseded_by")
-                and r.get("status") not in ("SUPERSEDED", "CONSOLIDATED")
-                and r.get("type") not in ("LAW", "GATE")
-                and str(r.get("id")) not in seen_ids
+                r for r in results
+                if float(r.get("score") or 0.0) >= 0.30 and has_content_overlap(clean_in, r) and not r.get("superseded_by")
+                and r.get("status") not in ("SUPERSEDED", "CONSOLIDATED") and r.get("type") not in ("LAW", "GATE") and str(r.get("id")) not in seen_ids
             ][:3]
             if fresh_hits:
-                lines = [
-                    f"  • [{h['type']}] `{h['id']}` ({h.get('scope', 'LOCAL')}): {h['title']} — {h['summary']}"
-                    for h in fresh_hits
-                ]
-                injected_msgs.append(
-                    "⚡ SUPERMEMORY AUTO-RECALL (0-Turn Context — call `recall(node_id=...)` only if full detail needed):\n"
-                    + "\n".join(lines)
-                )
+                lines = [f"  • [{h['type']}] `{h['id']}` ({h.get('scope', 'LOCAL')}): {h['title']} — {h['summary']}" for h in fresh_hits]
+                injected_msgs.append("⚡ SUPERMEMORY AUTO-RECALL (0-Turn Context — call `recall(node_id=...)` only if full detail needed):\n" + "\n".join(lines))
                 hit_ids = [str(h["id"]) for h in fresh_hits]
                 st["recalled_node_ids"] = list(seen_ids | set(hit_ids))[-80:]
                 store.log_event("HOOK_AUTO_RECALL", hit_ids[0], f"0-Turn Auto-Recall injected {hit_ids}")
     else:
+        wake_msg = apply_async_wakeup_guard(
+            store, conv_id, st, str(payload.get("transcriptPath") or ""), has_unchecked_kanban_items(store)
+        )
+        if wake_msg:
+            injected_msgs.append(wake_msg)
         queued = list(st.get("pending_notifications") or [])
         if queued:
             st["pending_notifications"] = []
             injected_msgs.extend(queued)
         if step_idx >= 20 and "/goal" in user_input.lower():
             cur_bucket = step_idx // 20
-            prev_bucket = int(st.get("last_heartbeat_bucket") or 0)
-            if cur_bucket > prev_bucket:
+            if cur_bucket > int(st.get("last_heartbeat_bucket") or 0):
                 st["last_heartbeat_bucket"] = cur_bucket
-                capsule = build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles())
-                injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT (ANTI-DRIFT & ANTI-REPEAT):\n" + capsule)
+                injected_msgs.append("⏱️ LONG-HORIZON `/goal` MEMORY HEARTBEAT:\n" + build_tiered_capsule(store, query=user_input, global_rules=_global_rule_titles()))
 
     st["invocation_num"] = inv_num
     if step_idx > 0:

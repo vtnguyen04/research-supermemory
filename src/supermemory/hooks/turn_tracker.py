@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from supermemory.gates.sim_helpers import extract_tool_file_path
-from supermemory.hooks.compaction_probe import extract_memory_read_relpath
+from supermemory.hooks.compaction_probe import extract_memory_read_relpath, recall_module_dead_ends
 from supermemory.kernel import classify_mcp_call
 from supermemory.lifecycle.validators import summarize_active_task_focus
 from supermemory.models import NodeType
@@ -148,6 +148,7 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
 
     if not err and (sm_mutated or cmd_kind == "SM_MUTATION"):
         st["turn_memory_handled"] = True
+        st["stop_block_streak"] = 0
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
         st["unsynced_work_steps"] = 0
@@ -161,8 +162,9 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
                 "Tick completed step(s) or move QUEUED task via `checkpoint(task_updates=[{'id': '...', 'stage': 'IN_PROGRESS', 'done_steps': [...]}])` "
                 "(or pass `checkpoint(status='CLEAN')` if current step is still midway)."
             )
-    elif not err and cmd_kind == "SUBSTANTIVE_EXEC":
-        st["pending_sync_reason"] = f"Substantive execution `{cmd[:55]}` completed"
+    elif not err and (cmd_kind == "SUBSTANTIVE_EXEC" or t_name in ("invoke_subagent", "run_workflow")):
+        desc = f"Subagent/workflow `{t_name}`" if t_name in ("invoke_subagent", "run_workflow") else f"Substantive execution `{cmd[:55]}`"
+        st["pending_sync_reason"] = f"{desc} completed"
         st["turn_memory_handled"] = False
         work_bumped = True
         if has_unchecked_kanban_items(store):
@@ -172,8 +174,8 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
             focus = _active_task_focus_line(store)
             focus_hint = f" Active Task: {focus}." if focus else ""
             notifications.append(
-                f"🔔 [SuperMemory Save Notification] Execution `{cmd[:45]}` finished.{focus_hint} "
-                "Semantic self-triage: quantitative result -> `log_experiment`; error slice -> `diagnose_bottleneck`; "
+                f"🔔 [SuperMemory Save Notification] {desc} finished.{focus_hint} "
+                "Semantic self-triage: quantitative result (KEEP or DISCARD) -> `log_experiment`; error slice -> `diagnose_bottleneck`; "
                 "technical insight -> `checkpoint(insights=[...])`; verified task step -> `checkpoint(task_updates=[...])`; "
                 "purely diagnostic check -> `checkpoint(status='CLEAN')`."
             )
@@ -210,46 +212,41 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
                     if not st.get("notified_edit"):
                         st["notified_edit"] = True
                         focus = _active_task_focus_line(store)
+                        mod_warns = recall_module_dead_ends(store, rel)
+                        warn_sfx = (" ⚠️ Past Dead-Ends on module: " + " | ".join(mod_warns)) if mod_warns else ""
                         if focus:
-                            notifications.append(
-                                f"🔔 [SuperMemory Task-List Notification] Editing `{rel}` — Active spec: {focus}. "
-                                "Execute steps in order, and sync completed steps + concrete insights via `checkpoint(task_updates=[...], insights=[...])` before finishing."
-                            )
+                            notifications.append(f"🔔 [SuperMemory Task-List Notification] Editing `{rel}` — Active spec: {focus}.{warn_sfx} Execute steps in order, and sync completed steps + concrete insights via `checkpoint(task_updates=[...], insights=[...])` before finishing.")
                         else:
-                            notifications.append(
-                                f"🔔 [SuperMemory Spec Notification] Editing `{rel}` without an active Proposal/Kanban task. "
-                                "For non-trivial features, register a structured Proposal (`manage_proposal` with `why`, `what_changes`, `tasks`) or `checkpoint(new_task={...})` and sync insights before finishing."
-                            )
+                            notifications.append(f"🔔 [SuperMemory Spec Notification] Editing `{rel}` without an active Proposal/Kanban task.{warn_sfx} For non-trivial features, register a structured Proposal (`manage_proposal` with `why`, `what_changes`, `tasks`) or `checkpoint(new_task={{...}})` and sync insights before finishing.")
 
     if work_bumped:
         cnt = int(st.get("unsynced_work_steps") or 0) + 1
         st["unsynced_work_steps"] = cnt
         if cnt >= 12 and cnt % 12 == 0:
             focus = _active_task_focus_line(store)
-            notifications.append(
-                f"⏱️ [SuperMemory Incremental Sync — {cnt} Unsynced Steps]{f' ({focus})' if focus else ''} "
-                "Flush intermediate findings/metrics via `checkpoint(insights=[...], task_updates=[...])` or `log_experiment` before context compacts."
-            )
+            notifications.append(f"⏱️ [SuperMemory Incremental Sync — {cnt} Unsynced Steps]{f' ({focus})' if focus else ''} Flush intermediate findings/metrics via `checkpoint(insights=[...], task_updates=[...])` or `log_experiment` before context compacts.")
             store.log_event("INCREMENTAL_SYNC_PULSE", conv_id, f"Emitted checkpoint pulse at {cnt} unsynced steps")
     if err:
         store.log_event("TOOL_ERROR_OBSERVED", t_name, f"Tool {t_name} errored: {err[:140]}")
     if notifications and not is_claude:
         st["pending_notifications"] = (list(st.get("pending_notifications") or []) + notifications)[-6:]
     save_session_state(store, st)
-    if notifications:
-        return {"injectSteps": [{"systemMessage": {"systemMessage": "\n".join(notifications)}}]}
-    return {}
+    return {"injectSteps": [{"systemMessage": {"systemMessage": "\n".join(notifications)}}]} if notifications else {}
 
 
 def evaluate_stop_gate(store: GraphStore, conv_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Final backstop when the AI ignores in-flight notifications (0 overhead on Q&A)."""
+    """Final backstop when the AI ignores in-flight notifications (2-strike persistent gate + 0 overhead on Q&A)."""
     if payload.get("continuationActive") or str(payload.get("terminationReason") or "") != "NO_TOOL_CALL":
         return {"decision": "allow"}
 
     st = get_session_state(store, conv_id)
+    streak = int(st.get("stop_block_streak") or 0)
+    release = streak >= 1
     if st.get("pending_lesson_lock"):
-        st["pending_lesson_lock"] = False
-        st["turn_memory_handled"] = True
+        st["stop_block_streak"] = streak + 1
+        if release:
+            st["pending_lesson_lock"] = False
+            st["turn_memory_handled"] = True
         save_session_state(store, st)
         store.log_event("STOP_GATE_ENFORCED", "LAW-08", "Stop hook required autonomous self-learning lesson + CodeGate commit")
         return {"decision": "continue", "reason": "🛡️ SUPERMEMORY SELF-LEARNING COMMIT REQUIRED (LAW-08): Persist the explicit lesson/rule + CodeGate via MCP `record_lesson` (`supermemory learn`) before finishing."}
@@ -259,26 +256,32 @@ def evaluate_stop_gate(store: GraphStore, conv_id: str, payload: Dict[str, Any])
 
     if not st.get("turn_memory_handled") and st.get("pending_sync_reason"):
         reason_txt = str(st.get("pending_sync_reason"))
-        st["turn_memory_handled"] = True
-        st["pending_sync_reason"] = ""
-        st["dirty_files"] = []
+        st["stop_block_streak"] = streak + 1
+        if release:
+            st["turn_memory_handled"] = True
+            st["pending_sync_reason"] = ""
+            st["dirty_files"] = []
         save_session_state(store, st)
         store.log_event("STOP_GATE_ENFORCED", "LAW-07", f"Stop hook required result/research sync: {reason_txt[:95]}")
         if "Research/literature" in reason_txt:
             return {"decision": "continue", "reason": f"🔬 SUPERMEMORY RESEARCH VAULT COMMIT REQUIRED (LAW-06 / LAW-07): {reason_txt}.{focus_suffix} Save distilled findings via `diagnose_bottleneck`, `scout_sota(save_top_k>=1)`, `propose_idea`, or `checkpoint(insights=[...])` before replying."}
-        return {"decision": "continue", "reason": f"🧪 SUPERMEMORY RESULT & INSIGHT SYNC REQUIRED: {reason_txt} without updating memory.{focus_suffix} Triage and sync now: quantitative metric -> `log_experiment`; error slice -> `diagnose_bottleneck`; technical insight / task step -> `checkpoint(insights=[...], task_updates=[...])`; or diagnostic-only -> `checkpoint(status='CLEAN')`."}
+        return {"decision": "continue", "reason": f"🧪 SUPERMEMORY RESULT & INSIGHT SYNC REQUIRED: {reason_txt} without updating memory.{focus_suffix} Triage and sync now: quantitative metric (KEEP or DISCARD) -> `log_experiment`; error slice -> `diagnose_bottleneck`; technical insight / task step -> `checkpoint(insights=[...], task_updates=[...])`; or diagnostic-only -> `checkpoint(status='CLEAN')`."}
 
     dirty = list(st.get("dirty_files") or [])
     if not st.get("turn_memory_handled") and dirty:
         shown = ", ".join(dirty[:4]) + (f" +{len(dirty) - 4} more" if len(dirty) > 4 else "")
-        st["turn_memory_handled"] = True
-        st["dirty_files"] = []
+        st["stop_block_streak"] = streak + 1
+        if release:
+            st["turn_memory_handled"] = True
+            st["dirty_files"] = []
         save_session_state(store, st)
         store.log_event("STOP_GATE_ENFORCED", "LAW-07", f"Stop hook intercepted unsynced workspace edits ({shown[:95]})")
-        return {"decision": "continue", "reason": f"⚡ SUPERMEMORY AUTO-SYNC REQUIRED (LAW-07): Workspace files modified (`{shown}`) without updating memory/tasks.{focus_suffix} Call MCP `checkpoint` in 1 atomic call (`insights=[...]`, `task_updates=[...]`, `new_task={...}`, `next_actions='...'`) or `log_experiment` / `manage_proposal` (pass `status='CLEAN'` only if purely cosmetic)."}
+        return {"decision": "continue", "reason": f"⚡ SUPERMEMORY AUTO-SYNC REQUIRED (LAW-07): Workspace files modified (`{shown}`) without updating memory/tasks.{focus_suffix} Call MCP `checkpoint` with concrete `insights=[...]` / `task_updates=[...]` or `log_experiment` / `manage_proposal`."}
 
     if st.get("pending_kanban_sync") and has_unchecked_kanban_items(store):
-        st["pending_kanban_sync"] = False
+        st["stop_block_streak"] = streak + 1
+        if release:
+            st["pending_kanban_sync"] = False
         save_session_state(store, st)
         store.log_event("STOP_GATE_ENFORCED", "LAW-07", "Stop hook required Kanban subtask sync after work execution")
         return {"decision": "continue", "reason": f"📋 SUPERMEMORY KANBAN SUBTASK SYNC REQUIRED (LAW-07): Work executed without syncing active Kanban steps ({focus}). Tick completed step(s) or claim QUEUED task via `checkpoint(task_updates=[{{'id': '...', 'stage': 'IN_PROGRESS', 'done_steps': [...]}}])` (or attest `checkpoint(status='CLEAN')` if no checklist step completed yet)."}

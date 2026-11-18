@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
+from supermemory.cognitive.gc_hygiene import run_memory_hygiene_gc
 from supermemory.cognitive.outcome_ledger import (
     build_split_consolidation_digest,
     collect_observation_consolidation_batches,
@@ -12,7 +13,15 @@ from supermemory.cognitive.outcome_ledger import (
     select_best_sota_experiment,
 )
 from supermemory.graph.auto_linker import repair_orphan_nodes, wire_contextual_edges
-from supermemory.models import EdgeType, MemoryEdge, MemoryNode, MemoryTier, NodeType, utc_now_iso
+from supermemory.models import (
+    DEAD_END_STATUSES,
+    EdgeType,
+    MemoryEdge,
+    MemoryNode,
+    MemoryTier,
+    NodeType,
+    utc_now_iso,
+)
 from supermemory.storage.sqlite_store import GraphStore
 
 _PROCEDURAL_TYPES = {NodeType.LAW.value, NodeType.PROCEDURE.value, NodeType.GATE.value, NodeType.ALGORITHM.value}
@@ -104,36 +113,27 @@ def build_tiered_capsule(
     laws = sorted(store.list_nodes(node_types=[NodeType.LAW.value], limit=16), key=lambda x: x.id)
     procs = store.list_nodes(node_types=[NodeType.PROCEDURE.value], limit=6)
     gates = store.list_gates(enabled_only=True)
-    proposals = [
-        p
-        for p in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=100)
-        if p.status not in ("ARCHIVED", "REJECTED", "AUDITED", "CONSOLIDATED")
-    ]
-    proposals.sort(key=lambda p: p.id, reverse=True)
-    bottlenecks = [b for b in store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=100) if b.status not in ("RESOLVED", "ARCHIVED", "CONSOLIDATED")]
-    bottlenecks.sort(key=lambda b: float(b.metadata.get("error_share_pct") or 0.0) * float(b.metadata.get("ceiling_gain") or 0.1), reverse=True)
+    proposals = sorted([p for p in store.list_nodes(node_types=[NodeType.PROPOSAL.value], limit=100) if p.status not in ("ARCHIVED", "REJECTED", "AUDITED", "CONSOLIDATED")], key=lambda p: p.id, reverse=True)
+    bottlenecks = sorted([b for b in store.list_nodes(node_types=[NodeType.BOTTLENECK.value], limit=100) if b.status not in ("RESOLVED", "ARCHIVED", "CONSOLIDATED")], key=lambda b: float(b.metadata.get("error_share_pct") or 0.0) * float(b.metadata.get("ceiling_gain") or 0.1), reverse=True)
     exps = store.list_experiments()[:2]
     sota = select_best_sota_experiment(store)
-    dead_end_count = sum(1 for n in store.list_nodes(limit=2000) if n.status in ("REJECTED", "REVERT", "FAILED"))
+    dead_end_count = sum(
+        1 for n in store.list_nodes(limit=3000)
+        if n.node_type in (NodeType.EXPERIMENT.value, NodeType.PROPOSAL.value, NodeType.IDEA.value, NodeType.ALGORITHM.value)
+        and n.status.upper() in DEAD_END_STATUSES
+    )
 
     blocks: List[tuple[int, str]] = [
-        (0, f"🧠 SUPERMEMORY CONSTITUTIONAL HARNESS ACTIVE — Project: `{proj}`"),
+        (0, f"🧠 SUPERMEMORY CONSTITUTIONAL HARNESS ACTIVE — Project: `{proj}` (`workspace=\"{store.workspace_root}\"`):"),
         (0, f"• [L0 WORKING] Goal: {goal}"),
         (0, f"• [L0 WORKING] Next: {next_act}"),
     ]
     if sota or dead_end_count:
-        sota_txt = (
-            f"🏆 Best SOTA: `{sota.exp_id}` ({sota.track} = {sota.test_score if sota.test_score is not None else sota.cv_score})"
-            if sota
-            else "🏆 Best SOTA: None yet"
-        )
+        sota_txt = f"🏆 Best SOTA: `{sota.exp_id}` ({sota.track} = {sota.test_score if sota.test_score is not None else sota.cv_score})" if sota else "🏆 Best SOTA: None yet"
         blocks.append((0, f"• [L0 SCOREBOARD] {sota_txt} | Falsified Dead-Ends (Never Repeat): {dead_end_count}"))
         blocks.extend(format_capsule_outcome_blocks(store))
     if bottlenecks:
-        bnk_txt = " | ".join(
-            f"`{b.id}`({b.metadata.get('error_share_pct', 0)}% err, +{b.metadata.get('ceiling_gain', 0)} ceil) {b.title[:40]}"
-            for b in bottlenecks[:3]
-        )
+        bnk_txt = " | ".join(f"`{b.id}`({b.metadata.get('error_share_pct', 0)}% err, +{b.metadata.get('ceiling_gain', 0)} ceil) {b.title[:40]}" for b in bottlenecks[:3])
         blocks.append((1, f"• [L0 BOTTLENECKS — Fix Highest Pareto First]: {bnk_txt}"))
     if proposals:
         p_parts = []
@@ -290,4 +290,7 @@ def auto_consolidate_episodic(store: GraphStore, min_cluster_size: int = 3, repa
     for ttl, summ, body, obs_ids in collect_observation_consolidation_batches(store, min_cluster_size=max(3, min_cluster_size)):
         res = consolidate_nodes(store, obs_ids, MemoryTier.SEMANTIC.value, ttl, summ, body)
         created.append(res["created_node"]["id"])
-    return {"created_semantic_nodes": created, "count": len(created), "repaired_orphans": orph["repaired_count"]}
+    gc_rep = run_memory_hygiene_gc(store, archive_disk_files=repair_fallback)
+    created.extend(gc_rep["failure_digests"])
+    created.extend(gc_rep["macro_sems"])
+    return {"created_semantic_nodes": created, "count": len(created), "repaired_orphans": orph["repaired_count"], "gc": gc_rep}

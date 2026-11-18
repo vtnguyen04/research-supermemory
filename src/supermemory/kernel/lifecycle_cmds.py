@@ -61,6 +61,7 @@ def _cmd_propose_idea(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]
             "what_changes": {"type": "string"},
             "design_notes": {"type": "string"},
             "tasks": {"type": "array", "items": {"type": "string"}},
+            "idea_ids": {"type": "array", "items": {"type": "string"}},
             "novelty_diff": {"type": "string"},
             "bottleneck_id": {"type": "string"},
             "kill_criterion": {"type": "string"},
@@ -84,12 +85,15 @@ def _cmd_manage_proposal(store: GraphStore, args: Dict[str, Any]) -> Dict[str, A
         ).to_dict()
     raw_tasks = args.get("tasks")
     tasks = [t.strip() for t in raw_tasks.splitlines() if t.strip()] if isinstance(raw_tasks, str) else list(raw_tasks or [])
+    raw_iids = args.get("idea_ids")
+    iids = [i.strip() for i in raw_iids.split(",") if i.strip()] if isinstance(raw_iids, str) else list(raw_iids or [])
     return lm.create_proposal(
         title=str(args.get("title") or ""),
         why=str(args.get("why") or ""),
         what_changes=str(args.get("what_changes") or ""),
         design_notes=str(args.get("design_notes") or ""),
         tasks=tasks or None,
+        idea_ids=iids or None,
         proposal_id=str(args.get("proposal_id") or ""),
         novelty_diff=str(args.get("novelty_diff") or ""),
         bottleneck_id=str(args.get("bottleneck_id") or ""),
@@ -121,40 +125,58 @@ def _cmd_manage_proposal(store: GraphStore, args: Dict[str, Any]) -> Dict[str, A
             "runtime_summary": {"type": "string"},
             "verdict": {"type": "string", "default": "KEEP"},
             "post_mortem": {"type": "string"},
+            "notes": {"type": "string"},
             "insights": {"type": "array", "items": {"type": "string"}},
             "supersedes": {"type": "array", "items": {"type": "string"}, "description": "Optional outdated OBS/EXP IDs superseded by this result."},
+            "done_steps": {"type": "array", "items": {"type": "integer"}, "description": "Optional Proposal checklist step indices completed by this experiment."},
+            "current_phase": {"type": "string", "description": "Optional L0 current_phase update synced atomically with this experiment."},
+            "next_actions": {"type": "string", "description": "Optional L0 next_actions update synced atomically with this experiment."},
             "workspace": {"type": "string"},
         },
-        "required": ["title", "hypothesis", "single_var_diff"],
+        "required": ["title", "hypothesis"],
     },
     mutates_memory=True,
 )
 def _cmd_log_experiment(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
-    cv_val = float(args["cv_score"]) if args.get("cv_score") not in (None, "") else None
+    raw_cv = args.get("cv_score") if args.get("cv_score") not in (None, "") else args.get("score")
+    cv_val = float(raw_cv) if raw_cv not in (None, "") else None
     ts_val = float(args["test_score"]) if args.get("test_score") not in (None, "") else None
     raw_ins = args.get("insights") or []
     ins_list = [s.strip() for s in raw_ins.splitlines() if s.strip()] if isinstance(raw_ins, str) else list(raw_ins)
     raw_sup = args.get("supersedes") or []
     sup_list = [s.strip() for s in raw_sup.split(",") if s.strip()] if isinstance(raw_sup, str) else list(raw_sup)
-    return LifecycleManager(store).log_experiment(
+    diff_str = str(args.get("single_var_diff") or args.get("diff") or args.get("what_changes") or "").strip()
+    stack_str = str(args.get("model_stack") or args.get("architecture_notes") or args.get("stack") or "").strip()
+    pm_str = str(args.get("post_mortem") or args.get("notes") or "").strip()
+    prop_id = str(args.get("proposal_id") or "").strip()
+    res = LifecycleManager(store).log_experiment(
         track=str(args.get("track") or "main"),
         exp_id=str(args.get("exp_id") or ""),
         title=str(args["title"]),
         hypothesis=str(args["hypothesis"]),
-        single_var_diff=str(args["single_var_diff"]),
-        model_stack=str(args.get("model_stack") or ""),
+        single_var_diff=diff_str,
+        model_stack=stack_str,
         baseline_id=str(args.get("baseline_id") or ""),
-        proposal_id=str(args.get("proposal_id") or ""),
+        proposal_id=prop_id,
         cv_score=cv_val,
-        cv_summary=str(args.get("cv_summary") or ""),
+        cv_summary=str(args.get("cv_summary") or args.get("summary") or ""),
         test_score=ts_val,
         test_summary=str(args.get("test_summary") or ""),
         runtime_summary=str(args.get("runtime_summary") or ""),
         verdict=str(args.get("verdict") or "KEEP"),
-        post_mortem=str(args.get("post_mortem") or ""),
+        post_mortem=pm_str,
         insights=ins_list,
         supersedes=sup_list,
     )
+    if prop_id and args.get("done_steps"):
+        from supermemory.research.kanban_ops import toggle_subtask
+
+        for s_idx in args.get("done_steps") or []:
+            toggle_subtask(store, "PROPOSAL", prop_id, int(s_idx), done=True)
+    for m_key in ("current_phase", "next_actions"):
+        if args.get(m_key) is not None and str(args[m_key]).strip():
+            store.set_meta(m_key, str(args[m_key]).strip())
+    return res
 
 
 @REGISTRY.register(

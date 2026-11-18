@@ -9,6 +9,7 @@ from supermemory.cognitive.federation import (
     promote_node_to_global,
     resolve_default_workspace,
 )
+from supermemory.cognitive.gc_hygiene import run_memory_hygiene_gc
 from supermemory.cognitive.tiers import auto_consolidate_episodic, consolidate_nodes
 from supermemory.kernel.registry import REGISTRY, SCOPE_SCHEMA_PROP
 from supermemory.models import MemoryEdge, MemoryNode, MemoryTier, NodeType
@@ -145,7 +146,7 @@ def _cmd_link_knowledge(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
     input_schema={
         "type": "object",
         "properties": {
-            "mode": {"type": "string", "enum": ["merge", "auto", "promote"], "default": "merge"},
+            "mode": {"type": "string", "enum": ["merge", "auto", "promote", "gc"], "default": "merge"},
             "source_ids": {"type": "array", "items": {"type": "string"}},
             "target_tier": {"type": "string", "enum": ["SEMANTIC", "PROCEDURAL"], "default": "SEMANTIC"},
             "title": {"type": "string"},
@@ -162,6 +163,8 @@ def _cmd_consolidate(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
     mode = str(args.get("mode") or "merge").lower()
     if mode == "promote":
         return promote_node_to_global(store, str(args["promote_node_id"]))
+    if mode == "gc":
+        return run_memory_hygiene_gc(store, archive_disk_files=True)
     if mode == "auto":
         return auto_consolidate_episodic(store, min_cluster_size=int(args.get("min_cluster_size") or 3))
     return consolidate_nodes(

@@ -6,7 +6,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from supermemory.cognitive.outcome_ledger import infer_metric_direction
-from supermemory.graph.auto_linker import wire_contextual_edges
+from supermemory.graph.auto_linker import find_near_duplicate_insights, wire_contextual_edges
 from supermemory.graph.supersession import apply_supersedes_links
 from supermemory.lifecycle.validators import (
     assert_safe_subpath,
@@ -14,6 +14,7 @@ from supermemory.lifecycle.validators import (
     validate_safe_entity_id,
 )
 from supermemory.models import (
+    DEAD_END_STATUSES,
     EdgeType,
     ExperimentRecord,
     ExperimentVerdict,
@@ -94,11 +95,7 @@ def record_scientific_experiment(
                     regression_detected = True
 
     clean_insights = [s.strip() for s in (insights or []) if s and s.strip()]
-    is_failure = clean_verdict in (
-        ExperimentVerdict.REVERT.value,
-        ExperimentVerdict.FAILED.value,
-        "REJECTED",
-    ) or regression_detected
+    is_failure = clean_verdict in DEAD_END_STATUSES or regression_detected
 
     if is_failure and len((post_mortem or "").strip()) < 10 and not clean_insights:
         raise ValueError(
@@ -183,12 +180,15 @@ def record_scientific_experiment(
         store.add_edge(MemoryEdge(source_id=exp_id, target_id=proposal_id, relation=EdgeType.TESTS_HYPOTHESIS.value))
 
     observation_ids: List[str] = []
+    auto_sup_ids: List[str] = []
     obs_dir = store.mem_dir / "06_KNOWLEDGE_NODES"
     obs_dir.mkdir(parents=True, exist_ok=True)
     for ins_text in clean_insights:
         obs_id = _next_obs_id(store)
         obs_rel = f"memory/06_KNOWLEDGE_NODES/{obs_id}.md"
         obs_kind = "FAILURE_INSIGHT" if is_failure else "SCIENTIFIC_INSIGHT"
+        obs_title = f"[{obs_kind}] {_clip(ins_text, 84)}"
+        obs_dups = [] if is_failure else find_near_duplicate_insights(store, obs_title, ins_text)
         obs_md = (
             f"# {obs_id}: Insight from `{exp_id}` ({clean_track})\n\n"
             f"- **Source Experiment:** `{exp_id}` (`{clean_verdict}`)\n"
@@ -198,28 +198,19 @@ def record_scientific_experiment(
         (store.workspace_root / obs_rel).write_text(obs_md, encoding="utf-8")
         store.upsert_node(
             MemoryNode(
-                id=obs_id,
-                node_type=NodeType.OBSERVATION.value,
-                title=f"[{obs_kind}] {_clip(ins_text, 84)}",
-                status=obs_kind,
-                summary=f"(From {exp_id}) {_clip(ins_text, 220)}",
-                content=obs_md,
-                file_path=obs_rel,
-                tags=["observation", clean_track, obs_kind.lower()],
-                priority=87,
+                id=obs_id, node_type=NodeType.OBSERVATION.value, title=obs_title, status=obs_kind,
+                summary=f"(From {exp_id}) {_clip(ins_text, 220)}", content=obs_md, file_path=obs_rel,
+                tags=["observation", clean_track, obs_kind.lower()], priority=87,
                 metadata={"source_exp_id": exp_id, "track": clean_track, "kind": obs_kind},
             )
         )
         store.add_edge(MemoryEdge(source_id=obs_id, target_id=exp_id, relation=EdgeType.DERIVED_FROM.value))
-        wire_contextual_edges(
-            store,
-            obs_id,
-            ins_text,
-            context_ids=[exp_id, proposal_id] if proposal_id else [exp_id],
-        )
+        wire_contextual_edges(store, obs_id, ins_text, context_ids=[exp_id, proposal_id] if proposal_id else [exp_id])
+        if obs_dups:
+            auto_sup_ids.extend(apply_supersedes_links(store, [obs_id], obs_dups))
         observation_ids.append(obs_id)
 
-    superseded_ids = apply_supersedes_links(store, observation_ids or [exp_id], supersedes or [])
+    superseded_ids = list(dict.fromkeys([*auto_sup_ids, *apply_supersedes_links(store, observation_ids or [exp_id], supersedes or [])]))
 
     # Autonomous REM-sleep consolidation on long-horizon runs (>= 6 unconsolidated episodic runs/track)
     from supermemory.cognitive.tiers import auto_consolidate_episodic

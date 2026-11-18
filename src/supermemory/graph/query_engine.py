@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from supermemory.graph.hybrid_ranker import rank_hybrid_graph
-from supermemory.models import ExperimentVerdict, MemoryNode, NodeType
+from supermemory.models import DEAD_END_STATUSES, ExperimentVerdict, MemoryNode, NodeType
 from supermemory.storage.sqlite_store import GraphStore
 
 
@@ -138,17 +138,14 @@ class QueryEngine:
         for item in ranked_items:
             nid = item["id"]
             ntype = item["type"]
-            status = item["status"]
+            status = str(item["status"] or "").upper()
             if ntype == NodeType.LESSON.value:
                 warnings.append(f"PAST MISTAKE `{nid}` ({item['title']}): {item['summary'][:150]}")
-            elif ntype in (NodeType.IDEA.value, NodeType.PROPOSAL.value) and status == "REJECTED":
+            elif ntype in (NodeType.IDEA.value, NodeType.ALGORITHM.value, NodeType.PROPOSAL.value) and status == "REJECTED":
                 warnings.append(f"DEAD-END {ntype} `{nid}` was previously REJECTED: {item['summary'][:150]}")
-            elif ntype == NodeType.EXPERIMENT.value and status in (
-                ExperimentVerdict.REVERT.value,
-                ExperimentVerdict.FAILED.value,
-            ):
-                warnings.append(f"FAILED/REVERTED EXPERIMENT `{nid}` ({item['title']}): {item['summary'][:150]}")
-            elif ntype == NodeType.OBSERVATION.value and status == "FAILURE_INSIGHT":
+            elif ntype == NodeType.EXPERIMENT.value and status in DEAD_END_STATUSES:
+                warnings.append(f"FAILED/{status} EXPERIMENT `{nid}` ({item['title']}): {item['summary'][:150]}")
+            elif status == "FAILURE_INSIGHT" or (ntype in (NodeType.OBSERVATION.value, NodeType.KNOWLEDGE_NODE.value) and status in DEAD_END_STATUSES):
                 warnings.append(f"FAILURE INSIGHT `{nid}`: {item['summary'][:160]}")
         return warnings
 
@@ -176,7 +173,5 @@ class QueryEngine:
             "verified_victories": sum(
                 1 for e in exps if e.verdict in (ExperimentVerdict.VICTORY_CONFIRMED.value, ExperimentVerdict.KEEP.value)
             ),
-            "reverted_experiments": sum(
-                1 for e in exps if e.verdict in (ExperimentVerdict.REVERT.value, ExperimentVerdict.FAILED.value)
-            ),
+            "reverted_experiments": sum(1 for e in exps if e.verdict.upper() in DEAD_END_STATUSES),
         }

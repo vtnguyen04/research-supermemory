@@ -12,41 +12,41 @@ if TYPE_CHECKING:
     from supermemory.storage.sqlite_store import GraphStore
 
 
+def _compact_node_for_snapshot(store: GraphStore, n: MemoryNode) -> Dict[str, Any]:
+    d = n.to_dict()
+    if n.status in ("CONSOLIDATED", "SUPERSEDED") and n.file_path and (store.workspace_root / n.file_path).is_file():
+        d["content"] = (n.content or "")[:320]
+    return d
+
+
 def export_snapshot(store: GraphStore, target_path: Path | None = None) -> Path:
-    """Export deterministic Git-committable JSON snapshot of the Knowledge Graph."""
+    """Export deterministic compact JSON snapshot of the Knowledge Graph."""
     out_path = target_path or store.snapshot_path
     out_path.parent.mkdir(parents=True, exist_ok=True)
     task_rows = store.conn.execute("SELECT * FROM agent_tasks ORDER BY wave ASC, task_id ASC").fetchall()
     tasks_export = [
         {
-            "task_id": str(r["task_id"]),
-            "wave": int(r["wave"]),
-            "role": str(r["role"]),
-            "title": str(r["title"]),
-            "brief": str(r["brief"]),
-            "status": str(r["status"]),
+            "task_id": str(r["task_id"]), "wave": int(r["wave"]), "role": str(r["role"]),
+            "title": str(r["title"]), "brief": str(r["brief"]), "status": str(r["status"]),
             "depends_on": json.loads(str(r["depends_on_json"] or "[]")),
             "locked_globs": json.loads(str(r["locked_globs_json"] or "[]")),
-            "target_id": str(r["target_id"] or ""),
-            "claimed_by": str(r["claimed_by"] or ""),
-            "smoke_gate": str(r["smoke_gate"] or ""),
-            "receipt": json.loads(str(r["receipt_json"] or "{}")),
-            "created_at": str(r["created_at"]),
-            "updated_at": str(r["updated_at"]),
+            "target_id": str(r["target_id"] or ""), "claimed_by": str(r["claimed_by"] or ""),
+            "smoke_gate": str(r["smoke_gate"] or ""), "receipt": json.loads(str(r["receipt_json"] or "{}")),
+            "created_at": str(r["created_at"]), "updated_at": str(r["updated_at"]),
         }
         for r in task_rows
     ]
     payload = {
         "schema_version": "3.0.0",
         "project_meta": store.get_all_meta(),
-        "nodes": [n.to_dict() for n in store.list_nodes(limit=10000)],
+        "nodes": [_compact_node_for_snapshot(store, n) for n in store.list_nodes(limit=10000)],
         "edges": [e.to_dict() for e in store.list_edges()],
         "gates": [g.to_dict() for g in store.list_gates()],
         "experiments": [x.to_dict() for x in store.list_experiments()],
         "agent_tasks": tasks_export,
-        "events": store.list_events(limit=100),
+        "events": store.list_events(limit=80),
     }
-    out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    out_path.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     return out_path
 
 
@@ -57,20 +57,20 @@ def import_snapshot(store: GraphStore, source_path: Path) -> Dict[str, int]:
         store.set_meta(str(k), v)
     nodes = raw.get("nodes") or []
     for nd in nodes:
+        rel_fp = str(nd.get("file_path") or "")
+        body = str(nd.get("content") or "")
+        if rel_fp and len(body) <= 325 and (store.workspace_root / rel_fp).is_file():
+            try:
+                body = (store.workspace_root / rel_fp).read_text(encoding="utf-8")
+            except OSError:
+                pass
         store.upsert_node(
             MemoryNode(
-                id=nd["id"],
-                node_type=nd["node_type"],
-                title=nd["title"],
-                status=nd.get("status", "ACTIVE"),
-                summary=nd.get("summary", ""),
-                content=nd.get("content", ""),
-                metadata=nd.get("metadata") or {},
-                file_path=nd.get("file_path", ""),
-                tags=nd.get("tags") or [],
+                id=nd["id"], node_type=nd["node_type"], title=nd["title"],
+                status=nd.get("status", "ACTIVE"), summary=nd.get("summary", ""), content=body,
+                metadata=nd.get("metadata") or {}, file_path=rel_fp, tags=nd.get("tags") or [],
                 priority=int(nd.get("priority", 50)),
-                created_at=nd.get("created_at", utc_now_iso()),
-                updated_at=nd.get("updated_at", utc_now_iso()),
+                created_at=nd.get("created_at", utc_now_iso()), updated_at=nd.get("updated_at", utc_now_iso()),
             ),
             log_event=False,
         )
@@ -174,6 +174,7 @@ _EXTRA_DEFAULTS: Dict[str, Any] = {
     "notified_edit": False, "notified_exec": False, "notified_research": False,
     "unsynced_work_steps": 0, "pending_notifications": [], "last_compaction_marker": "",
     "last_capsule_step": 0, "last_capsule_inv": 0, "last_read_mem": "",
+    "last_wakeup_marker": "", "stop_block_streak": 0,
 }
 
 
@@ -275,6 +276,7 @@ def mark_turn_memory_handled(
     for r in rows:
         st = get_session_state(store, str(r["conversation_id"]))
         st["turn_memory_handled"] = True
+        st["stop_block_streak"] = 0
         st["dirty_files"] = []
         st["pending_sync_reason"] = ""
         st["unsynced_work_steps"] = 0

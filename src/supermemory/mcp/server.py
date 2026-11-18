@@ -9,7 +9,11 @@ from typing import Any, BinaryIO, Dict, Optional
 from urllib.parse import unquote, urlparse
 
 from supermemory import __version__
-from supermemory.cognitive.federation import resolve_default_workspace, set_active_workspace
+from supermemory.cognitive.federation import (
+    resolve_default_workspace,
+    resolve_parent_process_workspace,
+    set_active_workspace,
+)
 from supermemory.mcp.tool_defs import MCP_TOOLS, execute_mcp_tool
 
 _CLIENT_ROOT: Optional[Path] = None
@@ -103,7 +107,12 @@ def handle_rpc_request(msg: Any, default_ws: Optional[Path] = None) -> Optional[
             t_args = dict(params.get("arguments") or {})
             eff_ws = default_ws or _CLIENT_ROOT
             if eff_ws and not t_args.get("workspace"):
-                t_args["workspace"] = str(eff_ws)
+                canon = t_name[12:] if t_name.startswith("supermemory_") else t_name
+                is_init = (eff_ws / ".supermemory").is_dir() or (eff_ws / "memory" / "graph_snapshot.json").is_file()
+                if is_init or canon in ("init", "recall", "status"):
+                    t_args["workspace"] = str(eff_ws)
+                else:
+                    t_args.setdefault("scope", "global")
             out = execute_mcp_tool(t_name, t_args)
             txt = json.dumps(out, ensure_ascii=False, indent=2)
             if len(txt) > 3200:
@@ -193,13 +202,14 @@ def handle_rpc_request(msg: Any, default_ws: Optional[Path] = None) -> Optional[
 
 def run_mcp_stdio_server(default_ws: Optional[Path] = None) -> int:
     """Main loop reading JSON-RPC over stdin.buffer and writing responses to stdout.buffer."""
+    eff_default = default_ws or resolve_parent_process_workspace()
     in_buf = sys.stdin.buffer
     out_buf = sys.stdout.buffer
     while True:
         msg = _read_rpc_message(in_buf)
         if msg is None:
             break
-        resp = handle_rpc_request(msg, default_ws=default_ws)
+        resp = handle_rpc_request(msg, default_ws=eff_default)
         if resp is not None:
             _write_rpc_message(out_buf, resp)
     return 0

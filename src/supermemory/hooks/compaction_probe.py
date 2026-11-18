@@ -133,3 +133,99 @@ def extract_memory_read_relpath(workspace_root: Path, tool_name: str, tool_args:
     if parts and parts[0] == "memory":
         return "/".join(parts)
     return ""
+
+
+_WAKEUP_SENDER_RE = re.compile(r"\[Message\][^\n]*?\bsender=([^\s]+)")
+
+
+def probe_async_wakeup(
+    conv_id: str,
+    prev_wakeup: str,
+    transcript_path: str = "",
+) -> Tuple[bool, str, str]:
+    """Detect Antigravity async background task or subagent wakeup messages in last 32KB (<1ms)."""
+    t_file = _resolve_transcript_file(conv_id, transcript_path)
+    if t_file is None:
+        return False, prev_wakeup or "NONE", ""
+    try:
+        size = t_file.stat().st_size
+        offset = max(0, size - 32768)
+        with t_file.open("rb") as fh:
+            if offset > 0:
+                fh.seek(offset)
+            chunk = fh.read().decode("utf-8", errors="replace")
+    except OSError:
+        return False, prev_wakeup or "NONE", ""
+
+    lines = chunk.splitlines()
+    if offset > 0 and lines:
+        lines = lines[1:]
+
+    for idx_from_end, raw_ln in enumerate(reversed(lines)):
+        if idx_from_end > 8:
+            break
+        if "[Message]" not in raw_ln or "sender=" not in raw_ln:
+            continue
+        try:
+            obj = json.loads(raw_ln)
+        except ValueError:
+            continue
+        if not isinstance(obj, dict) or str(obj.get("type") or "") != "SYSTEM_MESSAGE":
+            continue
+        content = str(obj.get("content") or "")
+        m = _WAKEUP_SENDER_RE.search(content)
+        if not m:
+            continue
+        sender = m.group(1).strip()
+        if sender == "system":
+            continue
+        short_sender = sender.rsplit("/", 1)[-1]
+        marker = f"{obj.get('step_index', len(lines) - idx_from_end)}:{obj.get('created_at', '')}:{short_sender}"
+        if marker == prev_wakeup:
+            return False, marker, short_sender
+        if not prev_wakeup:
+            return (idx_from_end <= 2), marker, short_sender
+        return True, marker, short_sender
+    return False, prev_wakeup or "NONE", ""
+
+
+def apply_async_wakeup_guard(
+    store: Any,
+    conv_id: str,
+    st: Dict[str, Any],
+    transcript_path: str,
+    has_unchecked_kanban: bool,
+) -> str:
+    """Arm same-turn sync state & return injection notice when a background task/subagent wakes the agent."""
+    hit, marker, short_sender = probe_async_wakeup(
+        conv_id, str(st.get("last_wakeup_marker") or ""), transcript_path
+    )
+    if marker:
+        st["last_wakeup_marker"] = marker
+    if not hit:
+        return ""
+    st["turn_memory_handled"] = False
+    st["stop_block_streak"] = 0
+    st["notified_exec"] = False
+    st["pending_sync_reason"] = f"Async background task/subagent `{short_sender}` finished with output"
+    if has_unchecked_kanban:
+        st["pending_kanban_sync"] = True
+    store.log_event("ASYNC_WAKEUP_TRACKED", short_sender[:32], f"Armed same-turn sync on wakeup `{short_sender}`")
+    return (
+        f"🔔 [SuperMemory Async Wakeup — `{short_sender}` Finished] "
+        "Same-turn ledger sync required before stopping: quantitative run (KEEP or DISCARD) -> `log_experiment`; "
+        "error slice -> `diagnose_bottleneck`; root-cause/insight -> `checkpoint(insights=[...], task_updates=[...])`; "
+        "or non-empirical poll -> `checkpoint(status='CLEAN')`."
+    )
+
+
+def recall_module_dead_ends(store: Any, rel_path: str) -> List[str]:
+    """Return up to 2 dead-end / failure warnings specifically matching the edited module stem."""
+    stem = Path(rel_path).stem.strip()
+    if len(stem) < 4 or stem in ("__init__", "main", "index", "utils", "conftest"):
+        return []
+    from supermemory.graph.query_engine import QueryEngine
+
+    rec = QueryEngine(store).recall(stem, limit=5, hops=1, compact=True)
+    stem_low = stem.lower()
+    return [w for w in (rec.get("anti_repeat_warnings") or []) if stem_low in w.lower()][:2]

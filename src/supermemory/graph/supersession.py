@@ -4,19 +4,22 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, List, Tuple
 
-from supermemory.models import EdgeType, ExperimentVerdict, MemoryEdge, MemoryNode, NodeType
+from supermemory.models import (
+    DEAD_END_STATUSES,
+    EdgeType,
+    ExperimentVerdict,
+    MemoryEdge,
+    MemoryNode,
+    NodeType,
+)
 from supermemory.storage.sqlite_store import GraphStore
 
 
 def is_negative_warning_node(nd: MemoryNode) -> bool:
-    """Never decay mistakes, failed runs, or rejected dead-ends so anti-repeat stays 100% intact."""
+    """Never decay mistakes, failed/discarded runs, or rejected dead-ends so anti-repeat stays 100% intact."""
     if nd.node_type == NodeType.LESSON.value:
         return True
-    if nd.node_type in (NodeType.IDEA.value, NodeType.PROPOSAL.value) and nd.status == "REJECTED":
-        return True
-    if nd.node_type == NodeType.EXPERIMENT.value and nd.status in ("REVERT", "FAILED"):
-        return True
-    return nd.node_type == NodeType.OBSERVATION.value and nd.status == "FAILURE_INSIGHT"
+    return nd.status.upper() in DEAD_END_STATUSES or bool((nd.metadata or {}).get("is_dead_end_digest"))
 
 
 def resolve_supersession_maps(

@@ -174,15 +174,25 @@ def rank_hybrid_graph(
     hops: int = 1,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Fuse FTS5 BM25, char/word TF-IDF cosine, empirical utility, and Personalized PageRank."""
-    nodes = store.list_nodes(limit=3000)
-    if not nodes:
+    all_nodes = store.list_nodes(limit=5000)
+    if not all_nodes:
         return [], []
+    q_up = (query or "").upper()
+    nodes = [
+        n
+        for n in all_nodes
+        if (n.status not in ("CONSOLIDATED", "ARCHIVED") and n.node_type != NodeType.AGENT_RUN.value)
+        or n.id.upper() in q_up
+    ]
+    if not nodes:
+        nodes = all_nodes
     by_id = {n.id: n for n in nodes}
-    edges = store.list_edges()
+    edges = [e for e in store.list_edges() if e.source_id in by_id and e.target_id in by_id]
 
     fts_map: Dict[str, float] = {}
-    max_fts = max((sc for _, sc in fts_hits), default=1.0) or 1.0
-    for nd, sc in fts_hits:
+    valid_fts = [(nd, sc) for nd, sc in fts_hits if nd.id in by_id]
+    max_fts = max((sc for _, sc in valid_fts), default=1.0) or 1.0
+    for nd, sc in valid_fts:
         fts_map[nd.id] = max(0.05, sc / max_fts)
 
     sim_map = compute_hybrid_similarity(query, nodes)

@@ -148,6 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_cons.add_argument("--summary", default="")
     p_cons.add_argument("--content", default="")
     p_cons.add_argument("--auto", action="store_true")
+    p_cons.add_argument("--gc", action="store_true", help="Run 5-stage long-horizon GC, Macro-SEM merge & archive sweep")
     p_cons.add_argument("--min-cluster", type=int, default=3)
     p_cons.add_argument("-w", "--workspace", default=".")
     p_cons.add_argument("-g", "--global", dest="use_global", action="store_true")
