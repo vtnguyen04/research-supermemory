@@ -191,9 +191,9 @@ def test_subagent_curator_review_zero_loss_gates_damped_recall_and_restore(tmp_p
         bnk_nd.status = "RESOLVED"
         st_b.upsert_node(bnk_nd, log_event=False)
 
-    # Accumulate 24 raw observations -> triggers `curation_needed` for `memory-curator` subagent!
+    # Accumulate 25 raw observations -> triggers `curation_needed` for `memory-curator` subagent!
     last_chk = {}
-    for i in range(24):
+    for i in range(25):
         last_chk = execute_command(
             "checkpoint",
             {"workspace": w, "insights": [f"Zone Ablation #{i}: On {bid}, unique_token_{i} achieved 0.{100 + i:03d} regret on building_{i}"]},

@@ -177,15 +177,19 @@ def test_strict_metric_gate_keep_distinct_challenger_stage_ml_detector_and_subdi
     with pytest.raises(ValueError, match="dropped source metrics"):
         execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "merge", "source_ids": [o1, o2], "title": "Synthesized v1.0 Controller Summary", "summary": "Controller v1.0 worked across warm climates with decent stability.", "content": "Detailed multi-sentence architectural overview of controller v1.0 across warm climates that lazily omits both city regret numbers."}]})
 
-    # C3 / F-15: `keep_distinct` marks distinct slices reviewed, and `restore` on DISCARD exp preserves `DISCARD`!
+    # C3 / LESSON-025: `keep_distinct` preserves valuable slices; `EXPERIMENT`s are SACRED; stale progress notes merge & `restore`!
     kd = execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "keep_distinct", "node_ids": [o1, o2], "reason": "Different climate slices"}]})
     assert kd["kept_distinct"] == [o1, o2]
     e1 = execute_command("log_experiment", {"workspace": w, "track": "ablation", "title": "Hard Valve Clip 1", "hypothesis": "Hard clipping valve reduces overshoot", "diff": "clip=1", "score": 0.12, "verdict": "DISCARD", "notes": "Degraded comfort significantly"})["exp_id"]
-    e2 = execute_command("log_experiment", {"workspace": w, "track": "ablation", "title": "Hard Valve Clip 2", "hypothesis": "Tighter hard clipping reduces overshoot", "diff": "clip=2", "score": 0.14, "verdict": "DISCARD", "notes": "Degraded comfort even more"})["exp_id"]
-    execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "merge", "source_ids": [e1, e2], "title": "Dead-End Clip Sweep (0.12 - 0.14)", "summary": "Hard clipping scored 0.12 and 0.14 regret (both DISCARD).", "content": "Reviewed dead-end valve clipping sweep: clip=1 scored 0.12 and clip=2 scored 0.14, both degrading zone comfort."}]})
-    execute_command("consolidate", {"workspace": w, "mode": "restore", "source_ids": [e1]})
+    with pytest.raises(ValueError, match="Sacred node"):
+        execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "merge", "source_ids": [e1, o1], "title": "Illegal Experiment Consolidation", "summary": "Trying to merge an experiment record 0.12 0.0038.", "content": "Attempting to merge sacred experiment record 0.12 and slice 0.0038 must be hard-blocked."}]})
+
+    s1 = execute_command("checkpoint", {"workspace": w, "insights": ["Stale Progress Note 1: Job task-101 still running warmup steps"]})["captured"]["id"]
+    s2 = execute_command("checkpoint", {"workspace": w, "insights": ["Stale Progress Note 2: Job task-101 finished warmup and started eval"]})["captured"]["id"]
+    execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "merge", "source_ids": [s1, s2], "title": "Archived Warmup Progress Notes (task-101)", "summary": "Consolidated transient task-101 warmup/eval progress chatter after completion.", "content": "Archived transient progress breadcrumbs for task-101 warmup and evaluation start once final run completed."}]})
+    execute_command("consolidate", {"workspace": w, "mode": "restore", "source_ids": [s1]})
     with GraphStore(ws) as st:
-        assert st.get_node(e1).status == "DISCARD"  # type: ignore[union-attr]
+        assert st.get_node(s1).status == "SCIENTIFIC_INSIGHT"  # type: ignore[union-attr]
 
     # F-11: Challenger APPROVE -> CHALLENGED (stays active!), VictoryAuditor APPROVE -> AUDITED
     p_id = execute_command("manage_proposal", {"workspace": w, "action": "create", "title": "Tube MPC Controller", "why": "Cut peak afternoon cooling power demand", "what_changes": "Add polytopic invariant tube in mpc.py", "tasks": ["Implement polytopic tube in mpc.py"]})["proposal_id"]

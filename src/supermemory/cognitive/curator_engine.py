@@ -13,7 +13,13 @@ from supermemory.graph.supersession import apply_supersedes_links
 from supermemory.models import DEAD_END_STATUSES, EdgeType, MemoryEdge, MemoryNode, MemoryTier, NodeType
 from supermemory.storage.sqlite_store import GraphStore
 
-_SACRED_TYPES = {NodeType.LAW.value, NodeType.GATE.value}
+_SACRED_TYPES = {
+    NodeType.LAW.value,
+    NodeType.GATE.value,
+    NodeType.EXPERIMENT.value,
+    NodeType.LESSON.value,
+    NodeType.METHOD_CARD.value,
+}
 _ACTIVE_PROP_STATES = {"PROPOSED", "DESIGNED", "IMPLEMENTING", "CHALLENGED"}
 _ISO_TS_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s`]*")
 _METRIC_TOK_RE = re.compile(r"(?<![A-Za-z0-9_.-])(?:\d+\.\d{2,}|\d+(?:\.\d+)?%)(?![0-9.])")
@@ -29,53 +35,47 @@ def _extract_metrics(text: str) -> Set[str]:
     return {m.rstrip("0").rstrip(".") if ("." in m and not m.endswith("%")) else m for m in _METRIC_TOK_RE.findall(clean)}
 
 
-def _unreviewed_obs_and_exps(all_nodes: List[MemoryNode]) -> tuple[List[MemoryNode], List[MemoryNode]]:
+def _unreviewed_observations(all_nodes: List[MemoryNode]) -> List[MemoryNode]:
     obs = [
         n for n in all_nodes
         if n.node_type == NodeType.OBSERVATION.value and n.status not in ("CONSOLIDATED", "SUPERSEDED")
         and not any((n.metadata or {}).get(k) for k in ("consolidated", "superseded_by", "curator_reviewed"))
     ]
-    exps = [
-        n for n in all_nodes
-        if n.node_type == NodeType.EXPERIMENT.value and n.status not in ("CONSOLIDATED", "VICTORY_CONFIRMED")
-        and not any((n.metadata or {}).get(k) for k in ("consolidated", "curator_reviewed"))
-    ]
     obs.sort(key=lambda n: (n.created_at, _seq_num(n.id)), reverse=True)
-    exps.sort(key=lambda n: (n.created_at, _seq_num(n.id)), reverse=True)
-    return obs, exps
+    return obs
 
 
 def check_curation_pressure(store: GraphStore, mark_prompted: bool = False) -> Dict[str, Any]:
-    """Fast SQLite check deciding when main agent should spawn `memory-curator` subagent."""
+    """Fast SQLite check deciding when `memory-curator` should sweep stale/redundant transient notes (never experiments!)."""
     all_nodes = store.list_nodes(limit=5000)
     total_n = len(all_nodes)
-    raw_obs, raw_exps = _unreviewed_obs_and_exps(all_nodes)
+    raw_obs = _unreviewed_observations(all_nodes)
     audited_props = [n for n in all_nodes if n.node_type == NodeType.PROPOSAL.value and n.status == "AUDITED"]
     linked_ids = {str(r[0]) for r in store.conn.execute("SELECT source_id FROM edges UNION SELECT target_id FROM edges").fetchall()}
     orphans = [n for n in all_nodes if n.node_type in (NodeType.OBSERVATION.value, NodeType.IDEA.value, NodeType.ALGORITHM.value, NodeType.KNOWLEDGE_NODE.value) and n.id not in linked_ids]
 
     reasons = [
         lbl for cond, lbl in (
-            (len(raw_obs) >= 24, f"{len(raw_obs)} unreviewed observations"),
-            (len(raw_exps) >= 14, f"{len(raw_exps)} unreviewed episodic runs"),
+            (len(raw_obs) >= 25, f"{len(raw_obs)} unreviewed working observations"),
             (len(audited_props) >= 3, f"{len(audited_props)} completed AUDITED proposals"),
             (len(orphans) >= 3, f"{len(orphans)} unlinked orphan nodes"),
         ) if cond
     ]
     last_prompt_n = int(store.get_meta("last_curation_prompt_nodes") or "0")
-    needs = bool(reasons) and ((last_prompt_n == 0) or ((total_n - last_prompt_n) >= 10))
+    needs = bool(reasons) and ((last_prompt_n == 0) or ((total_n - last_prompt_n) >= 12))
     if needs and mark_prompted:
         store.set_meta("last_curation_prompt_nodes", str(total_n))
     ws_str = str(store.workspace_root)
     prompt = (
-        f"Curate SuperMemory in workspace `{ws_str}` with ZERO data loss: "
-        f"1) Call `consolidate(mode='review', workspace='{ws_str}')` to inspect candidate duplicates, batches, specs, and orphans. "
-        f"2) Read full `.md` files first — NEVER merge distinct slices/cities/seeds (use `op='keep_distinct'` for verified distinct slices)! "
-        f"3) Preserve ALL concrete metrics in `merge` and commit via `consolidate(mode='apply_plan', workspace='{ws_str}', operations=[...])`."
+        f"Curate ONLY stale/obsolete/duplicate transient notes in `{ws_str}` (NEVER touch experiments or valuable empirical results!): "
+        f"1) Call `consolidate(mode='review', workspace='{ws_str}')` and read full `.md` files. "
+        f"2) Keep ALL real empirical results, slice metrics, and scientific findings intact via `op='keep_distinct'`. "
+        f"3) Only `supersede` outdated draft/progress notes replaced by final results, `merge` redundant duplicate remarks, "
+        f"and archive completed `AUDITED` specs via `consolidate(mode='apply_plan', workspace='{ws_str}', operations=[...])`."
     )
     return {
         "needs_curation": needs, "reasons": reasons, "subagent_type": "memory-curator", "subagent_prompt": prompt if needs else "",
-        "metrics": {"total_nodes": total_n, "raw_observations": len(raw_obs), "unconsolidated_runs": len(raw_exps), "audited_proposals": len(audited_props), "orphan_nodes": len(orphans)},
+        "metrics": {"total_nodes": total_n, "raw_observations": len(raw_obs), "audited_proposals": len(audited_props), "orphan_nodes": len(orphans)},
     }
 
 
@@ -94,7 +94,7 @@ def build_curation_review_packet(store: GraphStore) -> Dict[str, Any]:
         elif ed.target_id in exp_anchor:
             anchor_of.setdefault(ed.source_id, exp_anchor[ed.target_id])
 
-    active_obs, raw_exps = _unreviewed_obs_and_exps(all_nodes)
+    active_obs = _unreviewed_observations(all_nodes)
     dup_groups: List[Dict[str, Any]] = []
     seen_pairs: Set[tuple[str, str]] = set()
     for obs in active_obs[:80]:
@@ -124,14 +124,6 @@ def build_curation_review_packet(store: GraphStore) -> Dict[str, Any]:
         for k, items in by_anchor.items() if len(items) >= 3
     ]
 
-    by_track: Dict[str, List[MemoryNode]] = {}
-    for ex_n in raw_exps[4:]:
-        by_track.setdefault(str((ex_n.metadata or {}).get("track") or "main").upper(), []).append(ex_n)
-    exp_batches = [
-        {"track": tr, "count": len(items), "nodes": [{"id": x.id, "title": x.title, "status": x.status, "summary": x.summary, "file_path": x.file_path} for x in items[:15]]}
-        for tr, items in by_track.items() if len(items) >= 4
-    ]
-
     resolved_bnks = {b.id for b in all_nodes if b.node_type == NodeType.BOTTLENECK.value and b.status == "RESOLVED"}
     lifecycle_items: List[Dict[str, Any]] = [
         {"id": p.id, "type": "PROPOSAL", "current_status": p.status, "suggested_status": "ARCHIVED", "title": p.title}
@@ -154,11 +146,12 @@ def build_curation_review_packet(store: GraphStore) -> Dict[str, Any]:
     return {
         "mode": "REVIEW_PACKET",
         "zero_loss_rules": [
-            "NEVER merge observations from distinct slices, buildings, seeds, datasets, or hyperparameters (`op='keep_distinct'`).",
-            "Every `merge` operation MUST preserve concrete decimal/percentage metrics from source nodes inside `summary`/`content`.",
+            "EXPERIMENTS (`EXP-*`), LESSONS, METHOD_CARDS, LAWS, GATES & real empirical findings are SACRED — NEVER merge, supersede, or hide them!",
+            "ONLY curate low-value/obsolete transient clutter (stale progress polls, superseded draft notes, exact/redundant duplicate remarks).",
+            "Mark valuable distinct empirical observations with `op='keep_distinct'` so they remain permanently first-class.",
         ],
         "duplicate_candidate_groups": dup_groups, "consolidation_candidate_batches": obs_batches,
-        "experiment_candidate_batches": exp_batches, "lifecycle_review_items": lifecycle_items[:20], "orphan_nodes": orphans[:20],
+        "lifecycle_review_items": lifecycle_items[:20], "orphan_nodes": orphans[:20],
     }
 
 
