@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from supermemory.cognitive.curator_engine import apply_curated_plan, build_curation_review_packet
 from supermemory.cognitive.federation import (
     federated_recall,
     promote_node_to_global,
     resolve_default_workspace,
 )
-from supermemory.cognitive.gc_hygiene import run_memory_hygiene_gc
 from supermemory.cognitive.tiers import auto_consolidate_episodic, consolidate_nodes
 from supermemory.kernel.registry import REGISTRY, SCOPE_SCHEMA_PROP
 from supermemory.models import MemoryEdge, MemoryNode, MemoryTier, NodeType
@@ -142,11 +142,21 @@ def _cmd_link_knowledge(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
 
 @REGISTRY.register(
     name="consolidate",
-    description="Consolidate/merge Episodic nodes into compact Semantic/Procedural memory, auto-compact tracks, or promote Local -> Global.",
+    description="Subagent-reviewed zero-loss memory curation (`review` -> `apply_plan` / `restore`), single semantic merge (`merge`), or Global `promote`.",
     input_schema={
         "type": "object",
         "properties": {
-            "mode": {"type": "string", "enum": ["merge", "auto", "promote", "gc"], "default": "merge"},
+            "mode": {
+                "type": "string",
+                "enum": ["merge", "review", "apply_plan", "restore", "auto", "promote"],
+                "default": "merge",
+            },
+            "operations": {
+                "type": "array",
+                "items": {"type": "object"},
+                "description": "Reviewed operations (`merge`, `supersede`, `transition_status`, `link`, `restore`) for `mode='apply_plan'`.",
+            },
+            "archive_cold_files": {"type": "boolean", "default": False},
             "source_ids": {"type": "array", "items": {"type": "string"}},
             "target_tier": {"type": "string", "enum": ["SEMANTIC", "PROCEDURAL"], "default": "SEMANTIC"},
             "title": {"type": "string"},
@@ -157,14 +167,23 @@ def _cmd_link_knowledge(store: GraphStore, args: Dict[str, Any]) -> Dict[str, An
             "workspace": {"type": "string"},
         },
     },
-    mutates_memory=True,
+    mutates_memory=lambda args, _res: str(args.get("mode") or "merge").lower() != "review",
+    is_readonly_research=lambda args, _res: str(args.get("mode") or "merge").lower() == "review",
 )
 def _cmd_consolidate(store: GraphStore, args: Dict[str, Any]) -> Dict[str, Any]:
     mode = str(args.get("mode") or "merge").lower()
+    if mode == "review":
+        return build_curation_review_packet(store)
+    if mode == "apply_plan":
+        return apply_curated_plan(
+            store,
+            operations=list(args.get("operations") or []),
+            archive_cold_files=bool(args.get("archive_cold_files", False)),
+        )
+    if mode == "restore":
+        return apply_curated_plan(store, operations=[{"op": "restore", "node_ids": list(args.get("source_ids") or [])}])
     if mode == "promote":
         return promote_node_to_global(store, str(args["promote_node_id"]))
-    if mode == "gc":
-        return run_memory_hygiene_gc(store, archive_disk_files=True)
     if mode == "auto":
         return auto_consolidate_episodic(store, min_cluster_size=int(args.get("min_cluster_size") or 3))
     return consolidate_nodes(

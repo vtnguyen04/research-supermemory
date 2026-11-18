@@ -75,6 +75,7 @@ def test_structural_provenance_and_lossless_consolidation(
             },
         )
 
+    execute_command("consolidate", {"workspace": w, "mode": "auto", "min_cluster_size": 4})
     sem_detail = execute_command("recall", {"workspace": w, "node_id": "SEM-001"})
     assert "Verified Wins" in sem_detail["node"]["content"] and "Falsified Dead-Ends" in sem_detail["node"]["content"]
     with pytest.raises(ValueError, match="Anti-Repeat Gate"):

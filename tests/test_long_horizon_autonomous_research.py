@@ -106,8 +106,8 @@ def test_week_long_world_model_goal_campaign_guarantees(tmp_path: Path, monkeypa
     )
     assert pivoted["proposal_id"] == "PROP-001"
 
-    # Day 6: Run 5 more track experiments -> Auto REM-Sleep Consolidation fires on the 6th unconsolidated run!
-    auto_consolidated: list[str] = []
+    # Day 6: Run 5 more track experiments (zero blind auto-consolidation!) -> `memory-curator` reviews & synthesizes SEM-001!
+    exp_ids: list[str] = []
     for idx in range(3, 8):
         out_exp = execute_mcp_tool(
             "supermemory_log_experiment",
@@ -121,8 +121,24 @@ def test_week_long_world_model_goal_campaign_guarantees(tmp_path: Path, monkeypa
                 "verdict": "KEEP",
             },
         )
-        auto_consolidated.extend(out_exp.get("auto_consolidated_nodes", []))
-    assert auto_consolidated == ["SEM-001"]
+        exp_ids.append(out_exp["exp_id"])
+    cur_out = execute_mcp_tool(
+        "supermemory_consolidate",
+        {
+            "workspace": str(ws),
+            "mode": "apply_plan",
+            "operations": [
+                {
+                    "op": "merge",
+                    "source_ids": exp_ids[:4],
+                    "title": "Bisimulation Horizon Sweep H=15..30 (82.0 - 85.0 CV)",
+                    "summary": "Imagination horizons H=15..30 monotonically improved CV from 82.0 to 85.0.",
+                    "content": "Reviewed RSSM horizon sweep: H=15 (82.0), H=20 (83.0), H=25 (84.0), H=30 (85.0) before H=35 peak (86.0).",
+                }
+            ],
+        },
+    )
+    assert cur_out["merged_nodes"] == ["SEM-001"]
 
     # Day 7: Context Compaction drops step count from 21 -> 3; capsule stays lean (<850 tokens) and preserves SOTA!
     comp = dispatch_hook(

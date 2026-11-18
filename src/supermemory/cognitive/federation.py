@@ -179,8 +179,6 @@ def federated_recall(
 
     def _collect(items: List[Dict[str, Any]], scope_tag: str) -> None:
         for r in items:
-            if r.get("status") == "CONSOLIDATED":
-                continue
             key = (scope_tag, str(r["id"]))
             if key not in seen_keys:
                 seen_keys.add(key)

@@ -46,27 +46,13 @@ def find_near_duplicate_insights(
     title: str,
     summary: str,
     exclude_id: str = "",
-    threshold: float = 0.46,
+    threshold: float = 0.58,
 ) -> List[str]:
-    """Find active positive OBSERVATION nodes strongly overlapped by a newer insight."""
-    _, sup_ids = find_exact_or_duplicate_insights(store, title, summary, exclude_id=exclude_id, threshold=threshold)
-    return sup_ids
-
-
-def find_exact_or_duplicate_insights(
-    store: GraphStore,
-    title: str,
-    summary: str,
-    exclude_id: str = "",
-    threshold: float = 0.46,
-    in_place_threshold: float = 0.82,
-) -> tuple[str, List[str]]:
-    """Return `(in_place_merge_id, supersede_ids)` for active OBSERVATION deduplication."""
+    """Return read-only candidate `OBS-*` IDs with high lexical overlap for agent/`memory-curator` review (never auto-merged)."""
     query_txt = f"{title} {summary}".strip()
     q_words = _content_words(query_txt)
-    t_words = _content_words(title)
     if len(q_words) < 2:
-        return "", []
+        return []
     candidates = [
         n
         for n in store.list_nodes(node_types=[NodeType.OBSERVATION.value], limit=600)
@@ -76,25 +62,18 @@ def find_exact_or_duplicate_insights(
         and not (n.metadata or {}).get("superseded_by")
     ]
     if not candidates:
-        return "", []
+        return []
     sim_map = compute_hybrid_similarity(query_txt, candidates)
     by_id = {c.id: c for c in candidates}
-    ranked = sorted(sim_map.items(), key=lambda kv: kv[1], reverse=True)
-    merge_id = ""
     dups: List[str] = []
-    for cid, sc in ranked:
+    for cid, sc in sorted(sim_map.items(), key=lambda kv: kv[1], reverse=True):
         cand = by_id[cid]
-        c_title_w = _content_words(cand.title)
-        title_jacc = (len(t_words & c_title_w) / max(1, len(t_words | c_title_w))) if (t_words and c_title_w) else 0.0
         shared = q_words & _content_words(f"{cand.title} {cand.summary}")
-        if sc >= in_place_threshold and len(shared) >= 3 and not merge_id:
-            merge_id = cid
-            continue
-        if (sc >= threshold and len(shared) >= 3) or (sc >= 0.60 and len(shared) >= 2) or (title_jacc >= 0.56 and len(shared) >= 2):
+        if sc >= threshold and len(shared) >= 3:
             dups.append(cid)
         if len(dups) >= 3:
             break
-    return merge_id, dups
+    return dups
 
 
 def _wire_typed_pair(store: GraphStore, src: MemoryNode, dst: MemoryNode) -> None:

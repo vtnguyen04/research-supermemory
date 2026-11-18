@@ -11,6 +11,7 @@ from supermemory.models import ExperimentVerdict, MemoryEdge, MemoryNode, NodeTy
 from supermemory.storage.sqlite_store import GraphStore
 
 _EDGE_WEIGHT_BOOST: Dict[str, float] = {
+    "CONSOLIDATED_INTO": 1.50,
     "SUPERSEDES": 1.45,
     "CANDIDATE_FOR": 1.45,
     "DIAGNOSES": 1.40,
@@ -178,12 +179,7 @@ def rank_hybrid_graph(
     if not all_nodes:
         return [], []
     q_up = (query or "").upper()
-    nodes = [
-        n
-        for n in all_nodes
-        if (n.status not in ("CONSOLIDATED", "ARCHIVED") and n.node_type != NodeType.AGENT_RUN.value)
-        or n.id.upper() in q_up
-    ]
+    nodes = [n for n in all_nodes if n.node_type != NodeType.AGENT_RUN.value or n.id.upper() in q_up]
     if not nodes:
         nodes = all_nodes
     by_id = {n.id: n for n in nodes}

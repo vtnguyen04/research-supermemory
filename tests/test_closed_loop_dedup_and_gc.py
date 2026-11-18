@@ -150,43 +150,37 @@ def test_discard_warnings_pre_edit_module_recall_and_obs_dedup(tmp_path: Path) -
     )
     assert "EXP-ABLATI-001" in notif["hookSpecificOutput"]["additionalContext"]
 
-    # 3. Near-duplicate evolving OBS auto-supersedes older OBS, and >=0.82 near-identical merges in-place!
+    # 3. Distinct slice observations (>80% shared words: phoenix_7 vs singapore_2) NEVER overwrite or auto-supersede!
     c1 = execute_command(
         "checkpoint",
-        {"workspace": w, "insights": ["Soon Pressure Cap 250Pa: Capping pre-occupancy AHU static pressure to 250Pa cuts fairbanks_8 regret by -4.25%"]},
+        {"workspace": w, "insights": ["ThermoGraph v9.4 Cooling Slice: Scored 0.003832 regret on phoenix_7 giant VAV cooling slice"]},
     )
     c2 = execute_command(
         "checkpoint",
-        {"workspace": w, "insights": ["Soon Pressure Cap 250Pa: Capping pre-occupancy AHU static pressure to 250Pa cuts fairbanks_8 regret by -4.28%"]},
+        {"workspace": w, "insights": ["ThermoGraph v9.4 Cooling Slice: Scored 0.006120 regret on singapore_2 giant VAV cooling slice"]},
     )
-    assert c2["captured"]["id"] == c1["captured"]["id"]  # In-place update, zero duplicate node!
-
-    c3 = execute_command(
-        "checkpoint",
-        {"workspace": w, "insights": ["Soon Pressure Cap 260Pa Guarded: Capping pre-occupancy AHU static pressure to 260Pa beats baseline on Panorama-9 (-2.50%)"]},
-    )
-    assert c3["captured"]["id"] != c1["captured"]["id"]
+    assert c2["captured"]["id"] != c1["captured"]["id"]
+    assert c1["captured"]["id"] in c2["related_existing_insights"]
     with GraphStore(ws) as store:
-        old_obs = store.get_node(c1["captured"]["id"])
-        assert old_obs is not None and old_obs.status == "SUPERSEDED"
+        n1, n2 = store.get_node(c1["captured"]["id"]), store.get_node(c2["captured"]["id"])
+        assert n1 is not None and n1.status == "SCIENTIFIC_INSIGHT"
+        assert n2 is not None and n2.status == "SCIENTIFIC_INSIGHT"
 
 
-def test_five_stage_gc_failure_digests_macro_sems_archive_and_active_ranker(tmp_path: Path) -> None:
-    """Verify O(log N) Macro-SEM merge, FAILURE_INSIGHT digests, archive sweep & Active-Set ranker."""
-    ws = tmp_path / "gc_proj"
-    init_workspace(ws, project_name="LongHorizonGC")
+def test_subagent_curator_review_zero_loss_gates_damped_recall_and_restore(tmp_path: Path) -> None:
+    """Verify `memory-curator` trigger, read-only `review`, Zero-Loss `apply_plan` gates, 0.35x fallback & `restore`."""
+    ws = tmp_path / "curator_proj"
+    init_workspace(ws, project_name="SubagentCurator")
     w = str(ws)
 
     bnk = execute_command(
         "diagnose_bottleneck",
         {"workspace": w, "title": "Giant Zone Starvation", "evidence_slice": "z > 400m2", "error_share_pct": 65, "ceiling_gain": 0.08, "falsifiable_rq": "Does log-area scaling fix giant zones?"},
     )
-    bid = bnk["bottleneck"]["id"]
-    rq_id = bnk["research_question"]["id"]
-    idea = execute_command("propose_idea", {"workspace": w, "bottleneck_id": bid, "title": "Log-Area VAV Scaling", "summary": "Scale VAV gain by log(zone_area)"})
+    bid, rq_id = bnk["bottleneck"]["id"], bnk["research_question"]["id"]
     prop = execute_command(
         "manage_proposal",
-        {"workspace": w, "action": "create", "bottleneck_id": bid, "idea_ids": [idea["node"]["id"]], "title": "Ship Log-Area VAV Scaling", "why": "Fixes 65% giant-zone slice", "what_changes": "Add log_area factor in vav.py", "tasks": ["Add log_area factor in vav.py"]},
+        {"workspace": w, "action": "create", "bottleneck_id": bid, "title": "Ship Log-Area VAV Scaling", "why": "Fixes 65% giant-zone slice", "what_changes": "Add log_area factor in vav.py", "tasks": ["Add log_area factor in vav.py"]},
     )
     pid = prop["proposal_id"]
     execute_command("checkpoint", {"workspace": w, "task_updates": [{"id": pid, "done_steps": [0]}]})
@@ -197,58 +191,63 @@ def test_five_stage_gc_failure_digests_macro_sems_archive_and_active_ranker(tmp_
         bnk_nd.status = "RESOLVED"
         st_b.upsert_node(bnk_nd, log_event=False)
 
-    # Generate 22 FAILURE_INSIGHT observations + 22 SEM digests to trigger both Failure Digest & 2nd-order Macro-SEM GC
-    for i in range(22):
-        with GraphStore(ws) as st:
-            from supermemory.models import MemoryNode, NodeType
+    # Accumulate 24 raw observations -> triggers `curation_needed` for `memory-curator` subagent!
+    last_chk = {}
+    for i in range(24):
+        last_chk = execute_command(
+            "checkpoint",
+            {"workspace": w, "insights": [f"Zone Ablation #{i}: On {bid}, unique_token_{i} achieved 0.{100 + i:03d} regret on building_{i}"]},
+        )
+    assert last_chk["curation_needed"]["needs_curation"] is True
+    assert last_chk["curation_needed"]["subagent_type"] == "memory-curator"
 
-            obs_p = f"memory/06_KNOWLEDGE_NODES/OBS-F{i:02d}.md"
-            (ws / obs_p).parent.mkdir(parents=True, exist_ok=True)
-            (ws / obs_p).write_text(f"# OBS-F{i:02d}\nDead-end variant {i} on thermal_valve_{i}\n", encoding="utf-8")
-            st.upsert_node(
-                MemoryNode(
-                    id=f"OBS-F{i:02d}", node_type=NodeType.OBSERVATION.value,
-                    title=f"[FAILURE_INSIGHT] Valve failure mode {i}", status="FAILURE_INSIGHT",
-                    summary=f"Dead-end variant {i} on thermal_valve_{i} regressed comfort", content="...",
-                    file_path=obs_p, metadata={"track": "ablation"},
-                ),
-                log_event=False,
-            )
-            sem_p = f"memory/06_KNOWLEDGE_NODES/SEM-{i + 1:03d}.md"
-            (ws / sem_p).write_text(f"# SEM-{i + 1:03d}\nSynthesis batch {i}\n", encoding="utf-8")
-            st.upsert_node(
-                MemoryNode(
-                    id=f"SEM-{i + 1:03d}", node_type=NodeType.KNOWLEDGE_NODE.value,
-                    title=f"Distilled Synthesis #{i + 1}", status="ACTIVE",
-                    summary=f"Distilled batch {i + 1} findings on latent rollout_{i}", content="Full body",
-                    file_path=sem_p, metadata={"memory_tier": "SEMANTIC"},
-                ),
-                log_event=False,
-            )
+    review = execute_command("consolidate", {"workspace": w, "mode": "review"})
+    assert review["mode"] == "REVIEW_PACKET"
+    assert any(it["id"] == pid for it in review["lifecycle_review_items"])
 
-    gc_out = execute_command("consolidate", {"workspace": w, "mode": "gc"})
-    assert len(gc_out["failure_digests"]) >= 1
-    assert len(gc_out["macro_sems"]) >= 1
-    assert gc_out["archived_proposals"] >= 1
-    assert gc_out["closed_rqs"] >= 1
-    assert gc_out["archived_files"] >= 10
+    # Hard Zero-Loss Gates block Sacred Nodes AND block lazy summaries that drop quantitative metrics!
+    with pytest.raises(ValueError, match="Sacred node"):
+        execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "merge", "source_ids": ["LAW-01", "OBS-001"], "title": "Illegal Law Merge", "summary": "Attempting to merge sacred law node into semantic digest 0.100", "content": "Detailed body text attempting to fold LAW-01 into a summary with metric 0.100 which must fail."}]})
+    with pytest.raises(ValueError, match="preserved ZERO numbers"):
+        execute_command("consolidate", {"workspace": w, "mode": "apply_plan", "operations": [{"op": "merge", "source_ids": ["OBS-001", "OBS-002"], "title": "Lazy Prose Summary", "summary": "Everything worked nicely across several buildings without concrete numbers.", "content": "General prose summary that lazily omits all concrete decimal regret scores from the underlying runs."}]})
 
-    # Consolidated nodes excluded from Stage-1 recall, while Dead-End Digest surfaces warning & Stage-2 rehydrates from archive!
-    r_stage1 = execute_command("recall", {"workspace": w, "query": "thermal_valve_0 regressed comfort"})
-    assert all(r["status"] != "CONSOLIDATED" for r in r_stage1["results"])
-    assert any("FAILURE INSIGHT" in w_txt for w_txt in r_stage1["anti_repeat_warnings"])
-    r_stage2 = execute_command("recall", {"workspace": w, "node_id": "OBS-F00"})
-    assert "memory/archive/06_KNOWLEDGE_NODES/" in r_stage2["node"]["file_path"]
+    # Valid LLM-reviewed plan preserves metrics, archives cold files safely, and stays 100% searchable & reversible!
+    applied = execute_command(
+        "consolidate",
+        {
+            "workspace": w,
+            "mode": "apply_plan",
+            "archive_cold_files": True,
+            "operations": [
+                {
+                    "op": "merge",
+                    "source_ids": ["OBS-001", "OBS-002"],
+                    "title": "Early Giant-Zone Regret Baseline (0.100 - 0.101)",
+                    "summary": "Building_0 scored 0.100 and building_1 scored 0.101 regret on BNK-001.",
+                    "content": "Synthesized baseline across building_0 (0.100 regret) and building_1 (0.101 regret) prior to log-area scaling.",
+                },
+                {"op": "transition_status", "node_id": pid, "new_status": "ARCHIVED"},
+                {"op": "transition_status", "node_id": rq_id, "new_status": "ANSWERED"},
+            ],
+        },
+    )
+    assert applied["merged_nodes"] == ["SEM-001"]
+    assert applied["archived_files"] >= 2
 
+    # Rare token `unique_token_0` inside consolidated OBS-001 STILL surfaces via 0.35x damped fallback (0 amnesia)!
+    r_rare = execute_command("recall", {"workspace": w, "query": "unique_token_0"})
+    assert any(r["id"] == "OBS-001" for r in r_rare["results"])
+    # And 1-click `restore` reverses consolidation + restores `.md` file from archive!
+    rest = execute_command("consolidate", {"workspace": w, "mode": "restore", "source_ids": ["OBS-001"]})
+    assert rest["restored"] == ["OBS-001"]
     with GraphStore(ws) as st2:
-        assert st2.get_node(pid).status == "ARCHIVED"  # type: ignore[union-attr]
-        assert st2.get_node(rq_id).status == "ANSWERED"  # type: ignore[union-attr]
-        assert st2.get_node(idea["node"]["id"]).status == "IMPLEMENTED"  # type: ignore[union-attr]
+        obs1 = st2.get_node("OBS-001")
+        assert obs1 is not None and obs1.status == "SCIENTIFIC_INSIGHT"
+        assert obs1.file_path == "memory/06_KNOWLEDGE_NODES/OBS-001.md"
         ws_clone = tmp_path / "clone_check"
         ws_clone.mkdir()
         with GraphStore(ws_clone) as cloned:
-            stats = import_snapshot(cloned, ws / "memory" / "graph_snapshot.json")
-            assert stats["nodes"] > 20
+            assert import_snapshot(cloned, ws / "memory" / "graph_snapshot.json")["nodes"] > 20
 
 
 def test_per_window_mcp_isolation_and_uninit_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

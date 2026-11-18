@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
-from supermemory.cognitive.gc_hygiene import run_memory_hygiene_gc
 from supermemory.cognitive.outcome_ledger import (
     build_split_consolidation_digest,
     collect_observation_consolidation_batches,
@@ -290,7 +289,4 @@ def auto_consolidate_episodic(store: GraphStore, min_cluster_size: int = 3, repa
     for ttl, summ, body, obs_ids in collect_observation_consolidation_batches(store, min_cluster_size=max(3, min_cluster_size)):
         res = consolidate_nodes(store, obs_ids, MemoryTier.SEMANTIC.value, ttl, summ, body)
         created.append(res["created_node"]["id"])
-    gc_rep = run_memory_hygiene_gc(store, archive_disk_files=repair_fallback)
-    created.extend(gc_rep["failure_digests"])
-    created.extend(gc_rep["macro_sems"])
-    return {"created_semantic_nodes": created, "count": len(created), "repaired_orphans": orph["repaired_count"], "gc": gc_rep}
+    return {"created_semantic_nodes": created, "count": len(created), "repaired_orphans": orph["repaired_count"]}

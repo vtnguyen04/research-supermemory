@@ -180,7 +180,7 @@ def record_scientific_experiment(
         store.add_edge(MemoryEdge(source_id=exp_id, target_id=proposal_id, relation=EdgeType.TESTS_HYPOTHESIS.value))
 
     observation_ids: List[str] = []
-    auto_sup_ids: List[str] = []
+    related_obs_ids: List[str] = []
     obs_dir = store.mem_dir / "06_KNOWLEDGE_NODES"
     obs_dir.mkdir(parents=True, exist_ok=True)
     for ins_text in clean_insights:
@@ -201,22 +201,20 @@ def record_scientific_experiment(
                 id=obs_id, node_type=NodeType.OBSERVATION.value, title=obs_title, status=obs_kind,
                 summary=f"(From {exp_id}) {_clip(ins_text, 220)}", content=obs_md, file_path=obs_rel,
                 tags=["observation", clean_track, obs_kind.lower()], priority=87,
-                metadata={"source_exp_id": exp_id, "track": clean_track, "kind": obs_kind},
+                metadata={"source_exp_id": exp_id, "track": clean_track, "kind": obs_kind, "related_candidates": obs_dups},
             )
         )
         store.add_edge(MemoryEdge(source_id=obs_id, target_id=exp_id, relation=EdgeType.DERIVED_FROM.value))
         wire_contextual_edges(store, obs_id, ins_text, context_ids=[exp_id, proposal_id] if proposal_id else [exp_id])
-        if obs_dups:
-            auto_sup_ids.extend(apply_supersedes_links(store, [obs_id], obs_dups))
+        related_obs_ids.extend(obs_dups)
         observation_ids.append(obs_id)
 
-    superseded_ids = list(dict.fromkeys([*auto_sup_ids, *apply_supersedes_links(store, observation_ids or [exp_id], supersedes or [])]))
+    superseded_ids = list(dict.fromkeys(apply_supersedes_links(store, observation_ids or [exp_id], supersedes or [])))
 
-    # Autonomous REM-sleep consolidation on long-horizon runs (>= 6 unconsolidated episodic runs/track)
-    from supermemory.cognitive.tiers import auto_consolidate_episodic
+    from supermemory.cognitive.curator_engine import check_curation_pressure
     from supermemory.research.stagnation_guard import sync_stagnation_after_experiment
 
-    auto_cons = auto_consolidate_episodic(store, min_cluster_size=6, repair_fallback=False)
+    curation = check_curation_pressure(store)
     stagnation_alert = sync_stagnation_after_experiment(store, clean_track)
 
     out_payload: Dict[str, Any] = {
@@ -225,9 +223,12 @@ def record_scientific_experiment(
         "regression_detected": regression_detected,
         "observation_ids": observation_ids,
         "superseded_ids": superseded_ids,
-        "auto_consolidated_nodes": auto_cons.get("created_semantic_nodes", []),
         "log_path": rel_log,
     }
+    if related_obs_ids:
+        out_payload["related_existing_insights"] = list(dict.fromkeys(related_obs_ids))
+    if curation["needs_curation"]:
+        out_payload["curation_needed"] = curation
     if stagnation_alert:
         out_payload["stagnation_alert"] = stagnation_alert
     return out_payload

@@ -55,11 +55,17 @@ def apply_supersession_decay(
     superseded_by: Dict[str, str],
     beaten_by: Dict[str, str],
 ) -> Tuple[float, str]:
-    """Decay outdated positive observations/baselines while preserving 100% of dead-end warnings."""
+    """Damp consolidated/superseded episodes (`0.35x`–`0.42x` floor — never 0.0) while keeping 100% of active dead-end warnings."""
+    if nd.node_type == NodeType.LESSON.value:
+        return score, ""
+    if nd.status == "CONSOLIDATED" or (nd.metadata or {}).get("consolidated"):
+        return score * 0.35, str((nd.metadata or {}).get("consolidated_into") or "SEM")
     if is_negative_warning_node(nd):
         return score, ""
     if nd.id in superseded_by or nd.status == "SUPERSEDED":
         return score * 0.42, superseded_by.get(nd.id, "NEWER")
+    if nd.status == "ARCHIVED":
+        return score * 0.45, ""
     if nd.id in beaten_by:
         return score * 0.72, beaten_by[nd.id]
     return score, ""

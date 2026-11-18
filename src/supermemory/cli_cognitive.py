@@ -21,7 +21,7 @@ def handle_workspaces(_args: argparse.Namespace) -> int:
 def handle_consolidate(args: argparse.Namespace) -> int:
     scope = "global" if getattr(args, "use_global", False) else "local"
     ids = [s.strip() for s in (args.ids or "").split(",") if s.strip()]
-    mode = "gc" if getattr(args, "gc", False) else ("auto" if args.auto else "merge")
+    mode = "review" if getattr(args, "review", False) else ("auto" if args.auto else "merge")
     res = execute_command(
         "consolidate",
         {

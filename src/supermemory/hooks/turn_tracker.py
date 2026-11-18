@@ -7,6 +7,7 @@ import shlex
 from pathlib import Path
 from typing import Any, Dict, List
 
+from supermemory.cognitive.curator_engine import check_curation_pressure
 from supermemory.gates.sim_helpers import extract_tool_file_path
 from supermemory.hooks.compaction_probe import extract_memory_read_relpath, recall_module_dead_ends
 from supermemory.kernel import classify_mcp_call
@@ -162,7 +163,17 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
                 "Tick completed step(s) or move QUEUED task via `checkpoint(task_updates=[{'id': '...', 'stage': 'IN_PROGRESS', 'done_steps': [...]}])` "
                 "(or pass `checkpoint(status='CLEAN')` if current step is still midway)."
             )
-    elif not err and (cmd_kind == "SUBSTANTIVE_EXEC" or t_name in ("invoke_subagent", "run_workflow")):
+        if norm_mcp != "consolidate":
+            cur = check_curation_pressure(store, mark_prompted=True)
+            if cur["needs_curation"]:
+                notifications.append(
+                    f"🧹 [SuperMemory Subagent Curation Trigger] Vault reached curation threshold ({', '.join(cur['reasons'])}). "
+                    f"Spawn `memory-curator` in background (`invoke_subagent(TypeName='memory-curator', Role='Semantic Memory Curator', Prompt=...)`) -> {cur['subagent_prompt']}"
+                )
+    elif not err and (
+        cmd_kind == "SUBSTANTIVE_EXEC"
+        or (t_name in ("invoke_subagent", "run_workflow", "agent") and str(t_args.get("TypeName") or t_args.get("subagent_type") or "").lower() != "memory-curator")
+    ):
         desc = f"Subagent/workflow `{t_name}`" if t_name in ("invoke_subagent", "run_workflow") else f"Substantive execution `{cmd[:55]}`"
         st["pending_sync_reason"] = f"{desc} completed"
         st["turn_memory_handled"] = False

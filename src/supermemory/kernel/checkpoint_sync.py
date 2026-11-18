@@ -5,7 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
-from supermemory.graph.auto_linker import find_exact_or_duplicate_insights, wire_contextual_edges
+from supermemory.cognitive.curator_engine import check_curation_pressure
+from supermemory.graph.auto_linker import find_near_duplicate_insights, wire_contextual_edges
 from supermemory.graph.supersession import apply_supersedes_links
 from supermemory.lifecycle.manager import LifecycleManager
 from supermemory.lifecycle.validators import assert_all_steps_completed, validate_insight_schema
@@ -48,34 +49,11 @@ def _mint_insight_node(
 
     existing = store.list_nodes(node_types=[ntype], limit=5000)
     for ex in existing:
-        if ex.title.strip().lower() == t_clean.lower():
-            ex.summary = s_clean[:240]
-            ex.content = s_clean
-            ex.status = "SCIENTIFIC_INSIGHT" if ntype == NodeType.OBSERVATION.value else "ACTIVE"
-            ex.metadata.pop("superseded_by", None)
-            store.conn.execute("DELETE FROM edges WHERE target_id = ? AND relation = 'SUPERSEDES'", (ex.id,))
-            store.upsert_node(ex, log_event=True)
+        if ex.title.strip().lower() == t_clean.lower() and ex.summary.strip().lower() == s_clean[:240].strip().lower():
             wire_contextual_edges(store, ex.id, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
             return ex.to_dict()
 
-    merge_id, auto_dups = (
-        find_exact_or_duplicate_insights(store, t_clean, s_clean)
-        if ntype == NodeType.OBSERVATION.value
-        else ("", [])
-    )
-    if merge_id:
-        ex_m = store.get_node(merge_id)
-        if ex_m is not None:
-            ex_m.title = t_clean
-            ex_m.summary = s_clean[:240]
-            ex_m.content = s_clean
-            ex_m.status = "SCIENTIFIC_INSIGHT"
-            ex_m.metadata.pop("superseded_by", None)
-            store.upsert_node(ex_m, log_event=True)
-            wire_contextual_edges(store, ex_m.id, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
-            if auto_dups:
-                apply_supersedes_links(store, [ex_m.id], auto_dups)
-            return ex_m.to_dict()
+    related_obs = find_near_duplicate_insights(store, t_clean, s_clean) if ntype == NodeType.OBSERVATION.value else []
     nums = [int(m.group(1)) for x in existing for m in [re.match(rf"^{pref}-(\d+)$", x.id)] if m]
     nid = f"{pref}-{(max(nums) + 1) if nums else 1:03d}"
     kn_dir = store.mem_dir / "06_KNOWLEDGE_NODES"
@@ -95,12 +73,10 @@ def _mint_insight_node(
             file_path=rel_path,
             tags=["auto-insight", tier_up.lower()],
             priority=88,
-            metadata={"memory_tier": tier_up, "note": note, "auto_superseded": auto_dups},
+            metadata={"memory_tier": tier_up, "note": note, "related_candidates": related_obs},
         )
     )
     wire_contextual_edges(store, nid, f"{t_clean} {s_clean} {note}", context_ids=context_ids)
-    if auto_dups:
-        apply_supersedes_links(store, [nid], auto_dups)
     return nd.to_dict()
 
 
@@ -134,9 +110,10 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
 
     raw_sup = args.get("supersedes") or []
     sup_list = [s.strip() for s in raw_sup.split(",") if s.strip()] if isinstance(raw_sup, str) else [str(s).strip() for s in raw_sup if str(s).strip()]
-    superseded_ids: List[str] = [
-        sid for item in captured_insights for sid in ((item.get("metadata") or {}).get("auto_superseded") or [])
-    ]
+    superseded_ids: List[str] = []
+    related_candidates = list(
+        dict.fromkeys(sid for item in captured_insights for sid in ((item.get("metadata") or {}).get("related_candidates") or []))
+    )
     if sup_list and captured_insights:
         superseded_ids.extend(apply_supersedes_links(store, [str(x["id"]) for x in captured_insights], sup_list))
         mutated = True
@@ -223,6 +200,12 @@ def execute_atomic_checkpoint(store: GraphStore, args: Dict[str, Any]) -> Dict[s
         "created_task": created_task,
         "updated_tasks": applied_tasks,
     }
+    if related_candidates:
+        out["related_existing_insights"] = related_candidates
+    if mutated:
+        curation = check_curation_pressure(store)
+        if curation["needs_curation"]:
+            out["curation_needed"] = curation
     if captured_insights and any(re.search(r"[+-]\d+\.\d+%|\b0\.\d{3,}\b", str(c.get("summary") or "")) for c in captured_insights):
         out["experiment_reminder"] = (
             "If this insight came from a quantitative benchmark/ablation run (KEEP or DISCARD), "

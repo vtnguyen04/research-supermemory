@@ -56,13 +56,18 @@ def test_zero_orphan_checkpoint_and_near_duplicate_supersession(tmp_path: Path) 
         obs2 = r2["captured"]["id"]
         assert _degree_of(store, obs2) >= 1
 
-        # Near-duplicate updated insight automatically supersedes obs1
+        # Related insight keeps obs1 intact (zero silent overwrite) while surfacing obs1 in `related_existing_insights`,
+        # and explicit `supersedes=[obs1]` marks obs1 SUPERSEDED only when agent/curator confirms!
         r3 = execute_command(
             "checkpoint",
-            {"insights": [f"Schmitt Hysteresis Sweep Updated: On {bnk}, widening deadband to 16K cut overnight pulses by 81%."]},
+            {
+                "insights": [f"Schmitt Hysteresis Sweep Updated: On {bnk}, widening deadband to 16K cut overnight pulses by 81%."],
+                "supersedes": [obs1],
+            },
             store=store,
         )
         obs3 = r3["captured"]["id"]
+        assert obs1 in r3["related_existing_insights"]
         assert obs1 in r3["superseded_ids"]
         old_nd = store.get_node(obs1)
         assert old_nd is not None and old_nd.status == "SUPERSEDED"
