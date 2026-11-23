@@ -59,14 +59,14 @@ def generate_agent_files(store: GraphStore, install_workspace_hooks: bool = True
 
     core_rule_body = (
         f"# {proj.upper()} — SUPERMEMORY CONSTITUTION\n\n"
-        f"> **Zero-Overhead Q&A / Zero-Reminder Work Sync:** Reply directly on Q&A (`0` MCP calls). "
-        f"Before non-trivial edits/proposals, read `memory/01_ACTIVE_STATE.md`, `memory/02_CONSTITUTION_AND_LESSONS.md`, & `recall`.\n\n"
+        f"> **Zero-Overhead Q&A / Compaction Recall:** Reply directly on Q&A (`0` MCP calls). "
+        f"Before non-trivial edits/proposals or resuming work after `<CONTEXT_SUMMARY>`, read `01_ACTIVE_STATE.md`, `02_CONSTITUTION_AND_LESSONS.md`, & call `recall` FIRST.\n\n"
         f"## 1. Laws (PreToolUse Enforced)\n"
         f"{law_bullets}\n\n"
         f"## 2. Autonomous Real-Time Sync (`<{max_lines}`L — Never Wait to Be Reminded)\n"
-        f"- **Tasks & Insights (1-Call Sync):** Whenever you implement code, uncover an insight/root-cause, or advance/complete subtasks, immediately call `checkpoint(insights=[...], new_task=..., task_updates=[...], next_actions=...)` (or `orchestrate`).\n"
-        f"- **Results & Research Vaults:** Empirical runs/metrics -> `log_experiment`; Pareto slices -> `diagnose_bottleneck` (`08_BOTTLENECKS/`); Papers -> `scout_sota` (`07_METHOD_VAULT/`); Specs -> `propose_idea`/`manage_proposal`.\n"
-        f"- **Lessons:** `record_lesson` (+ `CodeGate`) ONLY for durable user rules or bug post-mortems; inspect all UI tabs/viewports after UI edits.\n"
+        f"- **Tasks & Insights:** On code edits, root-causes, or subtask progress, immediately call `checkpoint(insights=[...], new_task=..., task_updates=[...], next_actions=...)` (or `orchestrate`).\n"
+        f"- **Results & Vaults:** Metrics -> `log_experiment`; Pareto slices -> `diagnose_bottleneck`; Papers -> `scout_sota`; Specs -> `propose_idea`/`manage_proposal`.\n"
+        f"- **Lessons:** `record_lesson` (+ `CodeGate`) ONLY for durable user rules or bug post-mortems; audit all UI tabs/viewports after UI edits.\n"
     )
 
     _purge_duplicate_rule_files(root)

@@ -2,9 +2,9 @@
 
 You operate with a **Federated 4-Tier Research Graph** (`Local` `.supermemory/` + `Global` `~/.supermemory/global` + `Sibling Vaults`; `L0 WORKING`, `L1 PROCEDURAL`, `L2 SEMANTIC`, `L3 EPISODIC`):
 
-1. **Zero-Overhead Q&A, Compaction Resume & Zero-Turn Auto-Recall:**
-   - `SessionStart` + `PreInvocation` / `UserPromptSubmit` automatically inject the `< 850`-token capsule, live Kanban deltas, and top non-superseded graph matches. Do **NOT** call `supermemory_graph` MCP tools on casual Q&A or clarifications; expand full details via `recall(node_id=...)` only when needed.
-   - **Compaction Historical-Media Guard:** When resuming from `<CONTEXT_SUMMARY>`, any attached image/media belongs to an earlier `# User Requests` item marked `[Attachment: ...]`, **NEVER** a new silent screenshot prompt. Do **NOT** stop to ask why an old `<CONTEXT_SUMMARY>` screenshot was sent or run redundant `plan_sprint` boilerplate when an active `PROP-XXX` checklist already exists — immediately continue the **latest** `# User Requests` item and next unchecked Kanban step.
+1. **Zero-Overhead Q&A, Mandatory Post-Compaction Recall & Zero-Turn Auto-Recall:**
+   - `SessionStart` + `PreInvocation` / `UserPromptSubmit` automatically inject the `< 850`-token capsule, live Kanban deltas, and top non-superseded graph matches. Do **NOT** call `supermemory_graph` MCP tools on casual Q&A or clarifications.
+   - **Mandatory Post-Compaction Active Grounding (`<CONTEXT_SUMMARY>`):** Because `<CONTEXT_SUMMARY>` is a lossy prose summary and `CHECKPOINT` fires *after* `PreInvocation`, whenever resuming active coding, debugging, or experiments from `<CONTEXT_SUMMARY>` (anything beyond pure Q&A or a final reply to an already-synced turn), your **FIRST tool call MUST include `recall(...)`** (querying active `PROP-XXX` / `BNK-XXX` / target module, or `node_id="PROP-XXX"`) to restore exact metrics, checklists, and dead-ends before editing files or running benchmarks (`PreToolUse` enforces this if skipped). Any attached image/media in `<CONTEXT_SUMMARY>` belongs to an earlier `[Attachment: ...]` item, **NEVER** a new screenshot prompt — continue the latest request and active Kanban step directly.
 
 2. **Autonomous Zero-Reminder Sync (`PostToolUse` + `Stop` + Async Wakeup Enforced):**
    - **NEVER wait for the user to tell you to save memory or tick Kanban, and ALWAYS pass `workspace="<workspace_root>"` on MCP calls:**

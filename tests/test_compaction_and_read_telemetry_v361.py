@@ -217,3 +217,57 @@ def test_periodic_capsule_refresh_and_visible_memory_read_events(tmp_path: Path)
         assert "MEMORY_RECALLED" in ev_types
         assert "MEMORY_READ" in ev_types
         assert "PERIODIC_CAPSULE_REFRESH" in ev_types
+
+
+def test_post_compaction_pre_tool_use_grounding_gate_and_contextual_query(tmp_path: Path) -> None:
+    """Verify PROP-021: pre-PreInvocation CHECKPOINT grounding gate, recall clearance, 1-strike valve & smart query."""
+    empty_ws = tmp_path / "empty_ws"
+    init_workspace(empty_ws, project_name="EmptyVault")
+    t_empty = tmp_path / "empty_transcript.jsonl"
+    t_empty.write_text(json.dumps({"step_index": 5, "type": "CHECKPOINT", "created_at": "2026-11-23T10:00:00Z"}) + "\n", encoding="utf-8")
+    assert dispatch_hook("PreToolUse", {"cwd": str(empty_ws), "conversationId": "c-emp", "transcriptPath": str(t_empty), "toolCall": {"name": "write_file", "args": {"Path": str(empty_ws / "a.py"), "Content": "x = 1\n"}}})["decision"] == "allow"
+
+    ws = tmp_path / "ws_ground"
+    init_workspace(ws, project_name="GroundedProj", active_goal="Unthrottle polar warmup rate on giant zones")
+    w = str(ws)
+    execute_command("manage_proposal", {"workspace": w, "action": "create", "title": "Polar Warmup Rate Controller", "why": "Remove hardcoded 0.50h cap", "what_changes": "Edit hybrid_manifold_head.py", "tasks": ["Patch step_hybrid_fm_v8_pre", "Run fairbanks_3 probe"]})
+    execute_command("checkpoint", {"workspace": w, "insights": ["Polar Warmup Breakthrough: Unlocking warmup_rate_k_h cut fairbanks_3 regret by 10.09%."]})
+
+    t_file = tmp_path / "main_transcript.jsonl"
+    t_file.write_text(json.dumps({"step_index": 1, "type": "USER_INPUT", "created_at": "2026-11-23T10:00:00Z"}) + "\n", encoding="utf-8")
+    dispatch_hook("SessionStart", {"cwd": w, "conversationId": "conv-g1", "transcriptPath": str(t_file)})
+
+    # Simulate Antigravity writing CHECKPOINT immediately BEFORE PLANNER_RESPONSE (before PreInvocation re-runs!)
+    with t_file.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"step_index": 42, "type": "CHECKPOINT", "created_at": "2026-11-23T10:05:00Z", "content": "# Resuming from a compaction"}) + "\n")
+
+    # 1. Read-only commands & outside-workspace artifacts pass straight through (0 false blocks)
+    assert dispatch_hook("PreToolUse", {"cwd": w, "conversationId": "conv-g1", "transcriptPath": str(t_file), "toolCall": {"name": "run_command", "args": {"CommandLine": "pytest -q && git status"}}})["decision"] == "allow"
+    assert dispatch_hook("PreToolUse", {"cwd": w, "conversationId": "conv-g1", "transcriptPath": str(t_file), "toolCall": {"name": "write_file", "args": {"Path": str(tmp_path / "scratch_note.md"), "Content": "ok"}}})["decision"] == "allow"
+
+    # 2. Ungrounded workspace edit right after CHECKPOINT is denied once while preserving PreInvocation's marker!
+    deny_1 = dispatch_hook("PreToolUse", {"cwd": w, "conversationId": "conv-g1", "transcriptPath": str(t_file), "toolCall": {"name": "edit_file", "args": {"Path": str(ws / "hybrid_manifold_head.py"), "Target": "a", "Replacement": "b"}}})
+    assert deny_1["decision"] == "deny"
+    assert "POST-COMPACTION GROUNDING REQUIRED" in deny_1["reason"]
+    assert "PROP-001" in deny_1["reason"]
+
+    # 3. Subsequent PreInvocation on short prompt ("tiếp đi") STILL detects CHECKPOINT, sets user_markdown & contextual recall!
+    pre_out = dispatch_hook("PreInvocation", {"cwd": w, "conversationId": "conv-g1", "invocationNum": 9, "initialNumSteps": 43, "transcriptPath": str(t_file), "lastUserInput": "tiếp đi"})
+    sm_node = pre_out["injectSteps"][0]["systemMessage"]
+    assert "COMPACTION RECOVERY DETECTED" in sm_node["systemMessage"]
+    assert "Polar Warmup Breakthrough" in sm_node["systemMessage"]
+    assert "user_markdown" in sm_node["metadata"]
+
+    # 4. Calling MCP `recall` immediately grounds the session so workspace edits & substantive runs succeed!
+    execute_command("recall", {"workspace": w, "query": "Polar Warmup Rate Controller"})
+    allow_after_recall = dispatch_hook("PreToolUse", {"cwd": w, "conversationId": "conv-g1", "transcriptPath": str(t_file), "toolCall": {"name": "edit_file", "args": {"Path": str(ws / "hybrid_manifold_head.py"), "Target": "a", "Replacement": "b"}}})
+    assert allow_after_recall["decision"] == "allow"
+
+    # 5. Second compaction verifies 1-strike anti-deadlock valve if agent retries twice without recall
+    with t_file.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"step_index": 90, "type": "CHECKPOINT", "created_at": "2026-11-23T10:20:00Z"}) + "\n")
+    d2_a = dispatch_hook("PreToolUse", {"cwd": w, "conversationId": "conv-g1", "transcriptPath": str(t_file), "toolCall": {"name": "run_command", "args": {"CommandLine": "python3 run_probe.py"}}})
+    d2_b = dispatch_hook("PreToolUse", {"cwd": w, "conversationId": "conv-g1", "transcriptPath": str(t_file), "toolCall": {"name": "run_command", "args": {"CommandLine": "python3 run_probe.py"}}})
+    assert d2_a["decision"] == "deny"
+    assert d2_b["decision"] == "allow"
+

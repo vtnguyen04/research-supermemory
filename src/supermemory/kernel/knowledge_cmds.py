@@ -13,6 +13,7 @@ from supermemory.cognitive.federation import (
 from supermemory.cognitive.tiers import auto_consolidate_episodic, consolidate_nodes
 from supermemory.kernel.registry import REGISTRY, SCOPE_SCHEMA_PROP
 from supermemory.models import MemoryEdge, MemoryNode, MemoryTier, NodeType
+from supermemory.storage.snapshot_io import mark_active_sessions_compaction_grounded
 from supermemory.storage.sqlite_store import GraphStore
 from supermemory.sync.markdown_compiler import MarkdownCompiler
 
@@ -55,13 +56,14 @@ def _cmd_recall(args: Dict[str, Any]) -> Dict[str, Any]:
         compact=bool(args.get("compact", True)),
         node_id=nid,
     )
-    if local_ok and raw_ws is not None and (q_str.strip() or nid.strip()):
+    if local_ok and raw_ws is not None:
         with GraphStore(raw_ws) as store:
+            mark_active_sessions_compaction_grounded(store)
             if nid.strip():
                 store.log_event("MEMORY_RECALLED", nid.strip(), f"Expanded node `{nid.strip()}` via Stage-2 recall")
             else:
                 hits = len(res.get("results") or [])
-                store.log_event("MEMORY_RECALLED", "RECALL_QUERY", f"Recalled {hits} hits for `{q_str.strip()[:64]}`")
+                store.log_event("MEMORY_RECALLED", "RECALL_QUERY", f"Recalled {hits} hits for `{q_str.strip()[:64] or '*'}`")
     return res
 
 

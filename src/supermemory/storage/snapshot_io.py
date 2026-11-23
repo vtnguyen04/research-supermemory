@@ -74,11 +74,8 @@ def import_snapshot(store: GraphStore, source_path: Path) -> Dict[str, int]:
     for ed in edges:
         store.add_edge(
             MemoryEdge(
-                source_id=ed["source_id"],
-                target_id=ed["target_id"],
-                relation=ed["relation"],
-                weight=float(ed.get("weight", 1.0)),
-                metadata=ed.get("metadata") or {},
+                source_id=ed["source_id"], target_id=ed["target_id"], relation=ed["relation"],
+                weight=float(ed.get("weight", 1.0)), metadata=ed.get("metadata") or {},
                 created_at=ed.get("created_at", utc_now_iso()),
             )
         )
@@ -86,17 +83,11 @@ def import_snapshot(store: GraphStore, source_path: Path) -> Dict[str, int]:
     for gt in gates:
         store.upsert_gate(
             CodeGate(
-                id=gt["id"],
-                gate_type=gt["gate_type"],
-                name=gt["name"],
-                law_id=gt.get("law_id", ""),
-                lesson_id=gt.get("lesson_id", ""),
-                target_glob=gt.get("target_glob", "**/*"),
-                pattern=gt.get("pattern", ""),
-                config=gt.get("config") or {},
-                enabled=bool(gt.get("enabled", True)),
-                blocked_count=int(gt.get("blocked_count", 0)),
-                last_blocked_at=gt.get("last_blocked_at"),
+                id=gt["id"], gate_type=gt["gate_type"], name=gt["name"],
+                law_id=gt.get("law_id", ""), lesson_id=gt.get("lesson_id", ""),
+                target_glob=gt.get("target_glob", "**/*"), pattern=gt.get("pattern", ""),
+                config=gt.get("config") or {}, enabled=bool(gt.get("enabled", True)),
+                blocked_count=int(gt.get("blocked_count", 0)), last_blocked_at=gt.get("last_blocked_at"),
                 created_at=gt.get("created_at", utc_now_iso()),
             )
         )
@@ -104,25 +95,15 @@ def import_snapshot(store: GraphStore, source_path: Path) -> Dict[str, int]:
     for ex in exps:
         store.upsert_experiment(
             ExperimentRecord(
-                exp_id=ex["exp_id"],
-                track=ex["track"],
-                title=ex["title"],
-                hypothesis=ex["hypothesis"],
-                single_var_diff=ex["single_var_diff"],
-                model_stack=ex.get("model_stack", ""),
-                baseline_id=ex.get("baseline_id", ""),
-                proposal_id=ex.get("proposal_id", ""),
-                cv_score=ex.get("cv_score"),
-                cv_summary=ex.get("cv_summary", ""),
-                test_score=ex.get("test_score"),
-                test_summary=ex.get("test_summary", ""),
-                delta_vs_baseline=ex.get("delta_vs_baseline"),
-                runtime_summary=ex.get("runtime_summary", ""),
-                verdict=ex.get("verdict", "PENDING"),
-                leakage_audit=ex.get("leakage_audit", "CLEAN"),
-                post_mortem=ex.get("post_mortem", ""),
-                log_path=ex.get("log_path", ""),
-                metadata=ex.get("metadata") or {},
+                exp_id=ex["exp_id"], track=ex["track"], title=ex["title"],
+                hypothesis=ex["hypothesis"], single_var_diff=ex["single_var_diff"],
+                model_stack=ex.get("model_stack", ""), baseline_id=ex.get("baseline_id", ""),
+                proposal_id=ex.get("proposal_id", ""), cv_score=ex.get("cv_score"),
+                cv_summary=ex.get("cv_summary", ""), test_score=ex.get("test_score"),
+                test_summary=ex.get("test_summary", ""), delta_vs_baseline=ex.get("delta_vs_baseline"),
+                runtime_summary=ex.get("runtime_summary", ""), verdict=ex.get("verdict", "PENDING"),
+                leakage_audit=ex.get("leakage_audit", "CLEAN"), post_mortem=ex.get("post_mortem", ""),
+                log_path=ex.get("log_path", ""), metadata=ex.get("metadata") or {},
                 created_at=ex.get("created_at", utc_now_iso()),
             )
         )
@@ -170,7 +151,9 @@ _EXTRA_DEFAULTS: Dict[str, Any] = {
     "notified_edit": False, "notified_exec": False, "notified_research": False,
     "unsynced_work_steps": 0, "pending_notifications": [], "last_compaction_marker": "",
     "last_capsule_step": 0, "last_capsule_inv": 0, "last_read_mem": "",
-    "last_wakeup_marker": "", "stop_block_streak": 0,
+    "last_wakeup_marker": "", "stop_block_streak": 0, "compaction_recall_pending": False,
+    "compaction_gate_strikes": 0, "grounded_compaction_marker": "", "strike_compaction_marker": "",
+    "ground_next_tail_marker": False,
 }
 
 
@@ -187,15 +170,9 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
         )
         store.conn.commit()
         base: Dict[str, Any] = {
-            "conversation_id": conversation_id,
-            "invocation_num": 0,
-            "last_step_idx": 0,
-            "pending_lesson_lock": False,
-            "pending_lesson_quote": "",
-            "pending_lesson_category": "",
-            "dirty_files": [],
-            "unlogged_exp_cmds": [],
-            "compaction_count": 0,
+            "conversation_id": conversation_id, "invocation_num": 0, "last_step_idx": 0,
+            "pending_lesson_lock": False, "pending_lesson_quote": "", "pending_lesson_category": "",
+            "dirty_files": [], "unlogged_exp_cmds": [], "compaction_count": 0,
         }
         for k, v in _EXTRA_DEFAULTS.items():
             base[k] = list(v) if isinstance(v, list) else v
@@ -204,15 +181,11 @@ def get_session_state(store: GraphStore, conversation_id: str) -> Dict[str, Any]
     raw_extra = str(row["unlogged_exp_cmds_json"] or "[]").strip()
     extra_obj = json.loads(raw_extra) if raw_extra.startswith("{") else {"cmds": json.loads(raw_extra or "[]")}
     out: Dict[str, Any] = {
-        "conversation_id": str(row["conversation_id"]),
-        "invocation_num": int(row["invocation_num"]),
-        "last_step_idx": int(row["last_step_idx"]),
-        "pending_lesson_lock": bool(row["pending_lesson_lock"]),
-        "pending_lesson_quote": str(row["pending_lesson_quote"]),
-        "pending_lesson_category": str(row["pending_lesson_category"]),
+        "conversation_id": str(row["conversation_id"]), "invocation_num": int(row["invocation_num"]),
+        "last_step_idx": int(row["last_step_idx"]), "pending_lesson_lock": bool(row["pending_lesson_lock"]),
+        "pending_lesson_quote": str(row["pending_lesson_quote"]), "pending_lesson_category": str(row["pending_lesson_category"]),
         "dirty_files": json.loads(row["dirty_files_json"] or "[]"),
-        "unlogged_exp_cmds": list(extra_obj.get("cmds") or []),
-        "compaction_count": int(row["compaction_count"]),
+        "unlogged_exp_cmds": list(extra_obj.get("cmds") or []), "compaction_count": int(row["compaction_count"]),
     }
     for k, dv in _EXTRA_DEFAULTS.items():
         val = extra_obj.get(k, dv)
@@ -284,6 +257,11 @@ def mark_turn_memory_handled(
         st = get_session_state(store, str(r["conversation_id"]))
         st["turn_memory_handled"] = True
         st["stop_block_streak"] = 0
+        st["compaction_recall_pending"] = False
+        st["compaction_gate_strikes"] = 0
+        st["ground_next_tail_marker"] = True
+        if st.get("last_compaction_marker") and st["last_compaction_marker"] != "NONE":
+            st["grounded_compaction_marker"] = st["last_compaction_marker"]
         if include_dirty:
             st["dirty_files"] = []
         st["pending_sync_reason"] = ""
@@ -293,5 +271,26 @@ def mark_turn_memory_handled(
             st["pending_lesson_lock"] = False
         if clear_kanban_sync:
             st["pending_kanban_sync"] = False
+        save_session_state(store, st, commit=False)
+    store.conn.commit()
+
+
+def mark_active_sessions_compaction_grounded(store: GraphStore) -> None:
+    """Mark active sessions (`<=45m`) as post-compaction grounded directly from inward kernel `recall`/`status`."""
+    active_cut = (datetime.now(timezone.utc) - timedelta(minutes=45)).replace(microsecond=0).isoformat()
+    rows = store.conn.execute(
+        "SELECT conversation_id FROM session_state WHERE updated_at >= ? ORDER BY updated_at DESC LIMIT 6",
+        (active_cut,),
+    ).fetchall()
+    if not rows:
+        return
+    for r in rows:
+        st = get_session_state(store, str(r["conversation_id"]))
+        st["compaction_recall_pending"] = False
+        st["compaction_gate_strikes"] = 0
+        st["ground_next_tail_marker"] = True
+        if st.get("last_compaction_marker") and st["last_compaction_marker"] != "NONE":
+            st["grounded_compaction_marker"] = st["last_compaction_marker"]
+            st["strike_compaction_marker"] = st["last_compaction_marker"]
         save_session_state(store, st, commit=False)
     store.conn.commit()

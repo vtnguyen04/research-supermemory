@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 from supermemory.cognitive.curator_engine import check_curation_pressure
 from supermemory.gates.sim_helpers import extract_tool_file_path, split_shell_commands
+from supermemory.hooks.compaction_guard import mark_session_compaction_grounded
 from supermemory.hooks.compaction_probe import extract_memory_read_relpath, recall_module_dead_ends
 from supermemory.kernel import classify_mcp_call
 from supermemory.lifecycle.validators import summarize_active_task_focus
@@ -134,19 +135,21 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
     notifications: List[str] = []
 
     mem_rel = extract_memory_read_relpath(store.workspace_root, t_name, t_args)
-    if not err and mem_rel and mem_rel != st.get("last_read_mem"):
-        st["last_read_mem"] = mem_rel
-        store.log_event("MEMORY_READ", Path(mem_rel).stem[:32], f"Agent read `{mem_rel}`")
+    t_path = str(payload.get("transcriptPath") or "")
+    if not err and mem_rel:
+        mark_session_compaction_grounded(store, st, conv_id, t_path)
+        if mem_rel != st.get("last_read_mem"):
+            st["last_read_mem"] = mem_rel
+            store.log_event("MEMORY_READ", Path(mem_rel).stem[:32], f"Agent read `{mem_rel}`")
 
-    if not err and (
-        (t_name in ("run_command", "bash") and _has_sm_cli_subcmd(cmd, {"learn", "gate"}))
-        or (("supermemory" in t_name or "supermemory" in mcp_srv) and ("record_lesson" in t_name or "add_gate" in t_name or norm_mcp in ("record_lesson", "add_gate")))
-    ):
+    if not err and ((t_name in ("run_command", "bash") and _has_sm_cli_subcmd(cmd, {"learn", "gate"})) or (("supermemory" in t_name or "supermemory" in mcp_srv) and ("record_lesson" in t_name or "add_gate" in t_name or norm_mcp in ("record_lesson", "add_gate")))):
         st["pending_lesson_lock"] = False
         st["turn_memory_handled"] = True
 
     sm_mutated, scout_readonly = classify_mcp_call(t_name, mcp_srv, norm_mcp, inner_args)
     cmd_kind = _classify_shell_command(cmd) if t_name in ("run_command", "bash") else "NONE"
+    if not err and (sm_mutated or cmd_kind == "SM_MUTATION" or norm_mcp in ("recall", "status") or (t_name in ("run_command", "bash") and _has_sm_cli_subcmd(cmd, {"recall", "status"}))):
+        mark_session_compaction_grounded(store, st, conv_id, t_path)
     is_bg_launch = "running as a background task" in out_txt.lower() or bool(t_args.get("IsDaemon"))
     work_bumped = False
 
@@ -191,19 +194,12 @@ def track_post_tool_use(store: GraphStore, conv_id: str, payload: Dict[str, Any]
                 "technical insight -> `checkpoint(insights=[...])`; verified task step -> `checkpoint(task_updates=[...])`; "
                 "diagnostic/poll -> `checkpoint(status='CLEAN' | 'IN_FLIGHT_WAIT')`."
             )
-    elif not err and (
-        cmd_kind == "EXTERNAL_RESEARCH"
-        or scout_readonly
-        or (t_name in ("search_web", "read_url_content", "websearch", "webfetch") and st.get("research_campaign_active"))
-    ):
+    elif not err and (cmd_kind == "EXTERNAL_RESEARCH" or scout_readonly or (t_name in ("search_web", "read_url_content", "websearch", "webfetch") and st.get("research_campaign_active"))):
         st["pending_sync_reason"] = "Research/literature lookup executed without saving distilled findings to SuperMemory Vault"
         st["turn_memory_handled"] = False
         if not st.get("notified_research"):
             st["notified_research"] = True
-            notifications.append(
-                "🔔 [SuperMemory Research Notification] Literature/web lookup observed. Distill concrete mechanisms into "
-                "`07_METHOD_VAULT/` (`scout_sota`), `08_BOTTLENECKS/` (`diagnose_bottleneck`), or `checkpoint(insights=[...])`."
-            )
+            notifications.append("🔔 [SuperMemory Research Notification] Literature/web lookup observed. Distill concrete mechanisms into `07_METHOD_VAULT/` (`scout_sota`), `08_BOTTLENECKS/` (`diagnose_bottleneck`), or `checkpoint(insights=[...])`.")
 
     if not err and t_name in ("write_file", "edit_file", "write", "edit", "multiedit", "replace_file_content", "multi_replace_file_content", "notebookedit"):
         raw_p = extract_tool_file_path(t_args)
@@ -253,12 +249,7 @@ def evaluate_stop_gate(store: GraphStore, conv_id: str, payload: Dict[str, Any])
 
     st = get_session_state(store, conv_id)
     if int(st.get("stop_block_streak") or 0) >= 1:
-        st["stop_block_streak"] = 0
-        st["pending_lesson_lock"] = False
-        st["turn_memory_handled"] = True
-        st["pending_sync_reason"] = ""
-        st["pending_kanban_sync"] = False
-        st["dirty_files"] = []
+        st.update({"stop_block_streak": 0, "pending_lesson_lock": False, "turn_memory_handled": True, "pending_sync_reason": "", "pending_kanban_sync": False, "dirty_files": []})
         save_session_state(store, st)
         return {"decision": "allow"}
 

@@ -8,24 +8,31 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from supermemory.cognitive.federation import (
-    federated_recall,
-    get_global_root,
-    set_active_workspace,
-)
+from supermemory.cognitive.federation import federated_recall, get_global_root, set_active_workspace
 from supermemory.cognitive.tiers import build_tiered_capsule
 from supermemory.gates.enforcer import GateEnforcer
 from supermemory.hooks.claude_bridge import format_hook_output, is_claude_code_payload, normalize_hook_input
+from supermemory.hooks.compaction_guard import (
+    arm_compaction_grounding,
+    build_compaction_recovery_query,
+    evaluate_compaction_pre_tool_gate,
+    handle_subagent_hook,
+)
 from supermemory.hooks.compaction_probe import (
     apply_async_wakeup_guard,
-    extract_memory_read_relpath,
     has_content_overlap,
     is_subagent_session,
     probe_async_wakeup,
     probe_transcript_compaction,
     reset_state_on_compaction,
 )
-from supermemory.hooks.turn_tracker import evaluate_stop_gate, track_post_tool_use
+from supermemory.hooks.turn_tracker import (
+    _active_task_focus_line,
+    _classify_shell_command,
+    _has_sm_cli_subcmd,
+    evaluate_stop_gate,
+    track_post_tool_use,
+)
 from supermemory.models import NodeType
 from supermemory.research.kanban_digest import build_kanban_board_digest, has_unchecked_kanban_items
 from supermemory.research.stagnation_guard import evaluate_stagnation_state
@@ -82,9 +89,9 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
         if not subagent_mode:
             set_active_workspace(ws)
         if ev == "PreToolUse":
-            out = _on_pre_tool_use(store, payload)
+            out = _on_pre_tool_use(store, conv_id, st, payload, subagent_mode=subagent_mode)
         elif subagent_mode:
-            out = _handle_subagent_hook(store, ev, payload)
+            out = handle_subagent_hook(store, ev, payload)
         elif ev == "SessionStart":
             out = _on_session_start(store, conv_id, payload)
         elif ev == "PreInvocation":
@@ -96,35 +103,21 @@ def dispatch_hook(event_name: str, raw_payload: Dict[str, Any]) -> Dict[str, Any
     return format_hook_output(raw_ev, out, is_claude)
 
 
-def _handle_subagent_hook(store: GraphStore, ev: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Keep PreToolUse CodeGates 100% enforced inside subagents while avoiding orchestrator nags & Stop blocks."""
-    if ev == "SessionStart":
-        msg = f"🧠 SuperMemory Subagent Guard Active — Workspace: `{store.workspace_root}` (Constitutional Laws & PreToolUse CodeGates enforced)."
-        return {"injectSteps": [{"systemMessage": {"systemMessage": msg}}]}
-    if ev == "PostToolUse":
-        tc = payload.get("toolCall") or {}
-        mem_rel = extract_memory_read_relpath(store.workspace_root, str(tc.get("name") or "").lower(), tc.get("args") or {})
-        if mem_rel:
-            store.log_event("MEMORY_READ", Path(mem_rel).stem[:32], f"Subagent read `{mem_rel}`")
-        return {}
-    if ev == "Stop":
-        return {"decision": "allow"}
-    return {}
-
-
 def _on_session_start(store: GraphStore, conv_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    capsule = build_tiered_capsule(store, global_rules=_global_rule_titles())
+    is_compact = str((payload or {}).get("source") or "").lower() == "compact"
+    cap_q = build_compaction_recovery_query(store) if is_compact else ""
+    capsule = build_tiered_capsule(store, query=cap_q, global_rules=_global_rule_titles())
     st = get_session_state(store, conv_id)
     t_path = str((payload or {}).get("transcriptPath") or "")
     _, m0 = probe_transcript_compaction(conv_id, "", t_path)
     _, w0, _ = probe_async_wakeup(conv_id, "", t_path)
-    st["last_compaction_marker"] = m0 or "NONE"
-    st["last_wakeup_marker"] = w0 or "NONE"
-    st["last_capsule_step"] = 0
-    st["last_capsule_inv"] = 0
-    st["stop_block_streak"] = 0
+    st.update({"last_compaction_marker": m0 or "NONE", "last_wakeup_marker": w0 or "NONE", "last_capsule_step": 0, "last_capsule_inv": 0, "stop_block_streak": 0})
+    if is_compact:
+        reset_state_on_compaction(st, 0, int(st.get("invocation_num") or 0), marker=m0 or "COMPACT_START")
+        arm_compaction_grounding(store, st, m0 or "COMPACT_START")
+        capsule = "♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED (Call `recall(...)` before mutating code or running experiments!):\n" + capsule
     save_session_state(store, st)
-    store.log_event("HOOK_SESSION_START", conv_id, "Injected tiered SuperMemory capsule")
+    store.log_event("COMPACTION_RECOVERY" if is_compact else "HOOK_SESSION_START", conv_id, "Injected tiered SuperMemory capsule")
     return {"injectSteps": [{"systemMessage": {"systemMessage": capsule}}]}
 
 
@@ -148,11 +141,13 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
     compacted_now = step_drop or chk_hit
     if compacted_now:
         reset_state_on_compaction(st, step_idx, inv_num, marker=new_marker)
-        cap_q = "" if is_new_turn else user_input
+        armed = arm_compaction_grounding(store, st, new_marker)
+        cap_q = build_compaction_recovery_query(store, user_input)
         capsule = build_tiered_capsule(store, query=cap_q, global_rules=_global_rule_titles())
+        rec_note = " If continuing coding/experiments (not casual Q&A), call `recall(...)` first to restore full specs & dead-ends!" if armed else ""
         injected_msgs.append(
             "♻️ COMPACTION RECOVERY DETECTED — TIERED SUPERMEMORY RESTORED "
-            "(Note: images attached to `<CONTEXT_SUMMARY>` are old `[Attachment:]` items, NOT a new prompt — continue the latest request & active Kanban step directly!):\n"
+            f"(Note: images attached to `<CONTEXT_SUMMARY>` are old `[Attachment:]` items, NOT a new prompt — continue the latest request & active Kanban step directly!{rec_note}):\n"
             + capsule
         )
         if not is_new_turn:
@@ -164,19 +159,12 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         store.log_event("COMPACTION_RECOVERY", conv_id, f"Restored tiered state at step {step_idx}")
 
     if is_new_turn:
-        st["last_seen_user_input"] = user_input
-        st["turn_memory_handled"] = False
-        st["pending_kanban_sync"] = False
-        st["research_campaign_active"] = False
-        st["dirty_files"] = []
-        st["pending_sync_reason"] = ""
-        st["notified_edit"] = False
-        st["notified_exec"] = False
-        st["notified_research"] = False
-        st["unsynced_work_steps"] = 0
-        st["pending_notifications"] = []
-        st["last_read_mem"] = ""
-        st["stop_block_streak"] = 0
+        st.update({
+            "last_seen_user_input": user_input, "turn_memory_handled": False, "pending_kanban_sync": False,
+            "research_campaign_active": False, "dirty_files": [], "pending_sync_reason": "",
+            "notified_edit": False, "notified_exec": False, "notified_research": False,
+            "unsynced_work_steps": 0, "pending_notifications": [], "last_read_mem": "", "stop_block_streak": 0,
+        })
 
         if not compacted_now:
             steps_gap = step_idx - int(st.get("last_capsule_step") or 0)
@@ -204,9 +192,7 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
         if "<CONTEXT_SUMMARY>" not in user_input:
             sig = SelfLearningDetector.analyze(user_input)
             if sig.requires_lesson:
-                st["pending_lesson_lock"] = True
-                st["pending_lesson_quote"] = user_input
-                st["pending_lesson_category"] = sig.category
+                st.update({"pending_lesson_lock": True, "pending_lesson_quote": user_input, "pending_lesson_category": sig.category})
                 injected_msgs.append(sig.guidance)
             elif sig.category == "RESEARCH_CAMPAIGN":
                 st["research_campaign_active"] = True
@@ -260,17 +246,27 @@ def _on_pre_invocation(store: GraphStore, conv_id: str, payload: Dict[str, Any])
 
     if not injected_msgs:
         return {}
-    return {"injectSteps": [{"systemMessage": {"systemMessage": "\n\n".join(injected_msgs)}}], "terminationBehavior": ""}
+    sm_obj: Dict[str, Any] = {"systemMessage": "\n\n".join(injected_msgs)}
+    if compacted_now:
+        sm_obj["metadata"] = {"user_markdown": "♻️ *SuperMemory restored tiered context capsule & armed post-compaction recall check.*"}
+    return {"injectSteps": [{"systemMessage": sm_obj}], "terminationBehavior": ""}
 
 
-def _on_pre_tool_use(store: GraphStore, payload: Dict[str, Any]) -> Dict[str, Any]:
+def _on_pre_tool_use(store: GraphStore, conv_id: str, st: Dict[str, Any], payload: Dict[str, Any], subagent_mode: bool = False) -> Dict[str, Any]:
     raw_tc = payload.get("toolCall")
     tc: Dict[str, Any] = raw_tc if isinstance(raw_tc, dict) else {}
     t_name = str(tc.get("name") or payload.get("toolName") or payload.get("tool_name") or "")
     raw_args = tc.get("args") if tc.get("args") is not None else (payload.get("toolInput") or payload.get("tool_input") or {})
-    decision = GateEnforcer(store).evaluate_tool_call(t_name, raw_args if isinstance(raw_args, dict) else {})
+    clean_args = raw_args if isinstance(raw_args, dict) else {}
+    decision = GateEnforcer(store).evaluate_tool_call(t_name, clean_args)
     if not decision.allowed:
         return {"decision": "deny", "reason": f"🛡️ SUPERMEMORY CONSTITUTIONAL GATE BLOCKED TOOL `{t_name}`: {decision.reason}"}
+    if not subagent_mode:
+        comp_reason = evaluate_compaction_pre_tool_gate(
+            store, conv_id, st, payload, t_name, clean_args, _classify_shell_command, _has_sm_cli_subcmd, _active_task_focus_line
+        )
+        if comp_reason:
+            return {"decision": "deny", "reason": comp_reason}
     return {"decision": "allow"}
 
 

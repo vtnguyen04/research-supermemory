@@ -18,6 +18,7 @@ from supermemory.graph.query_engine import QueryEngine
 from supermemory.kernel.registry import REGISTRY, SCOPE_SCHEMA_PROP
 from supermemory.models import CodeGate, EdgeType, MemoryEdge, MemoryNode, NodeType
 from supermemory.self_learning.consolidator import LessonConsolidator
+from supermemory.storage.snapshot_io import mark_active_sessions_compaction_grounded
 from supermemory.storage.sqlite_store import GraphStore
 
 
@@ -54,9 +55,13 @@ def _cmd_init(args: Dict[str, Any]) -> Dict[str, Any]:
     fallback_to_global_if_uninit=True,
 )
 def _cmd_status(store: GraphStore, _args: Dict[str, Any]) -> Dict[str, Any]:
+    is_global = store.workspace_root == ensure_global_memory()
+    if not is_global:
+        mark_active_sessions_compaction_grounded(store)
+        store.log_event("MEMORY_RECALLED", "STATUS_CAPSULE", "Queried 4-Tier Cognitive Status capsule")
     qe = QueryEngine(store)
     return {
-        "scope": "global" if store.workspace_root == ensure_global_memory() else "local",
+        "scope": "global" if is_global else "local",
         "capsule": build_tiered_capsule(store),
         "analytics": qe.graph_analytics(),
         "cognitive_tiers": compute_tier_telemetry(store),
